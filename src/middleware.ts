@@ -1,7 +1,14 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest } from "next/server";
 
-import { AUTH_ROUTES, PROTECTED_ROUTES, ROUTES } from "@/constants/routes";
 import { createClient } from "@/lib/supabase/middleware";
+import {
+  isPlatformAuthRoute,
+  isPlatformProtectedApiRoute,
+  isPlatformProtectedAppRoute,
+  redirectAuthenticatedToDashboard,
+  redirectUnauthenticatedToLogin,
+  unauthenticatedApiResponse,
+} from "@/modules/platform-guards/middleware/platform-guards-middleware";
 
 export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse } = createClient(request);
@@ -11,32 +18,25 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isProtectedRoute = PROTECTED_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`),
-  );
+  const isProtectedAppRoute = isPlatformProtectedAppRoute(pathname);
+  const isProtectedApiRoute = isPlatformProtectedApiRoute(pathname);
+  const isAuthRoute = isPlatformAuthRoute(pathname);
 
-  const isAuthRoute = AUTH_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`),
-  );
+  if ((isProtectedAppRoute || isProtectedApiRoute) && !user) {
+    if (isProtectedApiRoute) {
+      return unauthenticatedApiResponse();
+    }
 
-  if (isProtectedRoute && !user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = ROUTES.login;
-    redirectUrl.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(redirectUrl);
+    return redirectUnauthenticatedToLogin(request, pathname);
   }
 
   if (isAuthRoute && user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = ROUTES.dashboard;
-    return NextResponse.redirect(redirectUrl);
+    return redirectAuthenticatedToDashboard(request);
   }
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

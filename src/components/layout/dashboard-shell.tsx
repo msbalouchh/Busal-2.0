@@ -10,10 +10,11 @@ import { useSidebarStore } from "@/stores/sidebar.store";
 
 interface DashboardShellProps {
   children: ReactNode;
-  title?: string;
+  greeting: string;
+  userEmail: string;
 }
 
-export function DashboardShell({ children, title }: DashboardShellProps) {
+export function DashboardShell({ children, greeting, userEmail }: DashboardShellProps) {
   const isMobile = useIsMobile();
   const isOpen = useSidebarStore((state) => state.isOpen);
 
@@ -26,7 +27,7 @@ export function DashboardShell({ children, title }: DashboardShellProps) {
           !isMobile && isOpen ? "ml-64" : "",
         )}
       >
-        <Header title={title} />
+        <Header greeting={greeting} userEmail={userEmail} />
         <main className="flex-1">{children}</main>
       </div>
     </div>

@@ -1,0 +1,28 @@
+export const STAFF_SESSION_COOKIE = "busal-staff-session" as const;
+
+export const STAFF_AUTH_ERROR_CODES = {
+  INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
+  STAFF_INACTIVE: "STAFF_INACTIVE",
+  STAFF_NOT_FOUND: "STAFF_NOT_FOUND",
+  BUSINESS_INACTIVE: "BUSINESS_INACTIVE",
+  BUSINESS_NOT_FOUND: "BUSINESS_NOT_FOUND",
+  ROLE_NOT_ASSIGNED: "ROLE_NOT_ASSIGNED",
+  WRONG_BUSINESS: "WRONG_BUSINESS",
+  SESSION_INVALID: "SESSION_INVALID",
+} as const;
+
+export const STAFF_AUTH_ERROR_MESSAGES = {
+  [STAFF_AUTH_ERROR_CODES.INVALID_CREDENTIALS]: "Invalid email or password",
+  [STAFF_AUTH_ERROR_CODES.STAFF_INACTIVE]: "Staff account is disabled",
+  [STAFF_AUTH_ERROR_CODES.STAFF_NOT_FOUND]: "Staff account not found",
+  [STAFF_AUTH_ERROR_CODES.BUSINESS_INACTIVE]: "Business is not active",
+  [STAFF_AUTH_ERROR_CODES.BUSINESS_NOT_FOUND]: "Business not found",
+  [STAFF_AUTH_ERROR_CODES.ROLE_NOT_ASSIGNED]: "Staff role is not assigned",
+  [STAFF_AUTH_ERROR_CODES.WRONG_BUSINESS]: "Staff does not belong to this business",
+  [STAFF_AUTH_ERROR_CODES.SESSION_INVALID]: "Staff session is invalid",
+} as const;
+
+export const ACCOUNT_TYPES = {
+  OWNER: "owner",
+  STAFF: "staff",
+} as const;

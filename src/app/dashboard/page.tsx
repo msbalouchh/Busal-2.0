@@ -1,16 +1,14 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { EmptyState } from "@/components/common/empty-state";
-import { PageContainer } from "@/components/common/page-container";
+import type { Metadata } from "next";
 
-export default function DashboardPage() {
-  return (
-    <DashboardShell title="Dashboard">
-      <PageContainer title="Dashboard" description="Your business operating system command center.">
-        <EmptyState
-          title="Dashboard shell ready"
-          description="Foundation is configured. Business modules will appear here in future releases."
-        />
-      </PageContainer>
-    </DashboardShell>
-  );
+import { DashboardHome } from "@/modules/dashboard/components/dashboard-home";
+import { getDashboardContext } from "@/modules/dashboard/lib/get-dashboard-context";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+};
+
+export default async function DashboardPage() {
+  const { user, business } = await getDashboardContext();
+
+  return <DashboardHome business={business} userFullName={user.fullName} />;
 }

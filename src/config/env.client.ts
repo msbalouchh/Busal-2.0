@@ -1,12 +1,6 @@
-import { z } from "zod";
+import { clientEnvSchema, type ClientEnvSchema } from "@/schemas/env.schema";
 
-const clientEnvSchema = z.object({
-  NEXT_PUBLIC_APP_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-});
-
-export type ClientEnv = z.infer<typeof clientEnvSchema>;
+export type ClientEnv = ClientEnvSchema;
 
 function validateClientEnv(): ClientEnv {
   const parsed = clientEnvSchema.safeParse({

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
+import { resolvePublicAppUrl } from "@/config/app-url";
+
 export const siteConfig = {
   name: "Busal OS",
   description:
     "AI-first multi-tenant operating system for small businesses. Built for restaurants, designed for every industry.",
-  url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  url: resolvePublicAppUrl(),
   ogImage: "/og.png",
   links: {
     github: "https://github.com/busal-os",

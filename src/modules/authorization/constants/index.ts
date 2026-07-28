@@ -1,0 +1,8 @@
+export {
+  ALL_PERMISSION_CODES,
+  AUTHORIZATION_ERROR_CODES,
+  AUTHORIZATION_ERROR_MESSAGES,
+  PERMISSION_CODES,
+  PERMISSION_MODULES,
+  SYSTEM_ROLE_SLUGS,
+} from "@/modules/authorization/constants/permissions";

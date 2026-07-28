@@ -6,8 +6,14 @@ import { clientEnvSchema } from "@/schemas/env.schema";
 
 const serverEnvSchema = clientEnvSchema.extend({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().min(1),
-  DIRECT_URL: z.string().min(1),
+  DATABASE_URL: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().min(1),
+  ),
+  DIRECT_URL: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().min(1),
+  ),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

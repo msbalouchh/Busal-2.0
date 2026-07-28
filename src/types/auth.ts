@@ -3,6 +3,7 @@ import type { UserRole } from "@/constants/roles";
 export interface AuthUser {
   id: string;
   email: string;
+  fullName: string;
   role: UserRole;
   tenantId: string | null;
 }

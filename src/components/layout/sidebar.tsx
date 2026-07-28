@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -9,12 +9,10 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { siteConfig } from "@/config/site";
-import { ROUTES } from "@/constants/routes";
+import { DASHBOARD_NAVIGATION } from "@/modules/dashboard/constants/navigation";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/stores/sidebar.store";
-
-const navigation = [{ name: "Dashboard", href: ROUTES.dashboard, icon: LayoutDashboard }] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -50,12 +48,12 @@ export function Sidebar() {
         aria-label="Main navigation"
       >
         <div className="flex h-14 items-center justify-between px-4">
-          <Link href={ROUTES.home} className="flex items-center gap-2 font-semibold">
+          <div className="flex items-center gap-2 font-semibold">
             <span className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-md text-sm">
               B
             </span>
             <span>{siteConfig.name}</span>
-          </Link>
+          </div>
           {isMobile ? (
             <Button variant="ghost" size="icon" onClick={close} aria-label="Close menu">
               <X className="h-4 w-4" />
@@ -66,25 +64,40 @@ export function Sidebar() {
         <Separator />
 
         <ScrollArea className="flex-1 px-3 py-4">
-          <nav className="space-y-1">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          <nav className="space-y-1" aria-label="Dashboard navigation">
+            {DASHBOARD_NAVIGATION.map((item) => {
               const Icon = item.icon;
+              const isActive = item.href
+                ? pathname === item.href || pathname.startsWith(`${item.href}/`)
+                : false;
+
+              const className = cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/80",
+                item.href ? "hover:bg-sidebar-accent/50" : "cursor-default opacity-80",
+              );
+
+              if (item.href) {
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={className}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {item.name}
+                  </Link>
+                );
+              }
 
               return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-                  )}
-                >
-                  <Icon className="h-4 w-4" aria-hidden="true" />
+                <div key={item.name} className={className}>
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                   {item.name}
-                </Link>
+                </div>
               );
             })}
           </nav>
