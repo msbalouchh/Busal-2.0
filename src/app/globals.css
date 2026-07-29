@@ -2,64 +2,304 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ========================================================================== */
+/*                        BUSAL OS DESIGN TOKEN FOUNDATION                     */
+/* ========================================================================== */
+/* All design tokens live here. Dark mode is the default; light mode overrides
+   live under `:root` and `.light`. Components must never hardcode colour
+   values — they consume the semantic tokens below via Tailwind utilities
+   (`bg-surface`, `text-text-muted`, `shadow-md`, `duration-fast`, …) or via
+   the typed mirror in `src/styles/tokens.ts`.                              */
+
+/* -------------------------------------------------------------------------- */
+/*  RAW PALETTE (private) — never reference these from components.            */
+/*  HSL triplets only.                                                        */
+/* -------------------------------------------------------------------------- */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
-  --radius: 0.5rem;
-  --sidebar: 0 0% 98%;
-  --sidebar-foreground: 240 5.3% 26.1%;
-  --sidebar-border: 220 13% 91%;
-  --sidebar-accent: 240 4.8% 95.9%;
-  --sidebar-accent-foreground: 240 5.9% 10%;
+  /* Slate / neutral ramp */
+  --palette-slate-50: 210 40% 98%;
+  --palette-slate-100: 210 40% 96%;
+  --palette-slate-200: 214 32% 91%;
+  --palette-slate-300: 213 27% 84%;
+  --palette-slate-400: 215 20% 65%;
+  --palette-slate-500: 215 16% 47%;
+  --palette-slate-600: 215 19% 35%;
+  --palette-slate-700: 215 25% 27%;
+  --palette-slate-800: 217 33% 17%;
+  --palette-slate-850: 217 33% 12%;
+  --palette-slate-900: 222 47% 11%;
+  --palette-slate-950: 229 84% 5%;
+
+  /* Primary (deep emerald — brand) */
+  --palette-primary-50: 152 76% 96%;
+  --palette-primary-100: 149 76% 92%;
+  --palette-primary-200: 152 72% 84%;
+  --palette-primary-300: 154 67% 72%;
+  --palette-primary-400: 153 65% 58%;
+  --palette-primary-500: 152 60% 46%;
+  --palette-primary-600: 153 55% 41%;
+  --palette-primary-700: 154 50% 34%;
+  --palette-primary-800: 154 47% 28%;
+  --palette-primary-900: 155 46% 22%;
+
+  /* Secondary (warm sand) */
+  --palette-secondary-50: 38 80% 96%;
+  --palette-secondary-100: 36 77% 92%;
+  --palette-secondary-200: 35 72% 82%;
+  --palette-secondary-300: 33 66% 70%;
+  --palette-secondary-400: 31 60% 58%;
+  --palette-secondary-500: 29 54% 48%;
+  --palette-secondary-600: 27 48% 40%;
+  --palette-secondary-700: 25 43% 33%;
+  --palette-secondary-800: 23 40% 27%;
+  --palette-secondary-900: 22 38% 21%;
+
+  /* Success (emerald) */
+  --palette-success-50: 152 76% 96%;
+  --palette-success-100: 150 72% 90%;
+  --palette-success-400: 152 65% 52%;
+  --palette-success-500: 153 60% 45%;
+  --palette-success-600: 154 55% 39%;
+
+  /* Warning (amber) */
+  --palette-warning-50: 43 96% 96%;
+  --palette-warning-100: 42 96% 90%;
+  --palette-warning-400: 40 94% 52%;
+  --palette-warning-500: 38 92% 45%;
+  --palette-warning-600: 35 85% 38%;
+
+  /* Error (rose) */
+  --palette-error-50: 0 86% 97%;
+  --palette-error-100: 0 84% 94%;
+  --palette-error-400: 0 84% 60%;
+  --palette-error-500: 0 78% 52%;
+  --palette-error-600: 0 72% 45%;
+
+  /* Info (sky) */
+  --palette-info-50: 199 89% 96%;
+  --palette-info-100: 197 88% 92%;
+  --palette-info-400: 199 85% 56%;
+  --palette-info-500: 199 83% 48%;
+  --palette-info-600: 200 78% 42%;
+
+  /* AI gradient (teal -> cyan -> emerald) */
+  --palette-ai-from: 168 84% 52%;
+  --palette-ai-via: 187 85% 53%;
+  --palette-ai-to: 152 60% 46%;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  SEMANTIC TOKENS — DARK MODE (default)                                     */
+/* -------------------------------------------------------------------------- */
+:root,
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
-  --sidebar: 240 5.9% 10%;
-  --sidebar-foreground: 240 4.8% 95.9%;
-  --sidebar-border: 240 3.7% 15.9%;
-  --sidebar-accent: 240 3.7% 15.9%;
-  --sidebar-accent-foreground: 0 0% 98%;
+  /* Surfaces */
+  --background: var(--palette-slate-950);
+  --foreground: var(--palette-slate-50);
+  --surface: var(--palette-slate-900);
+  --surface-foreground: var(--palette-slate-100);
+  --card: var(--palette-slate-850);
+  --card-foreground: var(--palette-slate-50);
+  --popover: var(--palette-slate-900);
+  --popover-foreground: var(--palette-slate-50);
+
+  /* Brand */
+  --primary: var(--palette-primary-500);
+  --primary-foreground: var(--palette-slate-950);
+  --secondary: var(--palette-secondary-800);
+  --secondary-foreground: var(--palette-secondary-50);
+  --accent: var(--palette-primary-800);
+  --accent-foreground: var(--palette-primary-50);
+
+  /* Muted */
+  --muted: var(--palette-slate-800);
+  --muted-foreground: var(--palette-slate-400);
+
+  /* Text */
+  --text: var(--palette-slate-50);
+  --text-muted: var(--palette-slate-400);
+  --text-subtle: var(--palette-slate-500);
+  --text-inverse: var(--palette-slate-950);
+
+  /* Lines & focus */
+  --border: var(--palette-slate-800);
+  --input: var(--palette-slate-800);
+  --ring: var(--palette-primary-500);
+
+  /* Status */
+  --success: var(--palette-success-500);
+  --success-foreground: var(--palette-slate-950);
+  --warning: var(--palette-warning-500);
+  --warning-foreground: var(--palette-slate-950);
+  --error: var(--palette-error-500);
+  --error-foreground: var(--palette-slate-50);
+  --destructive: var(--palette-error-500);
+  --destructive-foreground: var(--palette-slate-50);
+  --info: var(--palette-info-500);
+  --info-foreground: var(--palette-slate-950);
+
+  /* Sidebar */
+  --sidebar: var(--palette-slate-900);
+  --sidebar-foreground: var(--palette-slate-300);
+  --sidebar-border: var(--palette-slate-800);
+  --sidebar-accent: var(--palette-slate-800);
+  --sidebar-accent-foreground: var(--palette-slate-50);
+
+  /* AI gradient */
+  --ai-from: var(--palette-ai-from);
+  --ai-via: var(--palette-ai-via);
+  --ai-to: var(--palette-ai-to);
+
+  /* Radius */
+  --radius: 0.625rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-full: 9999px;
+
+  /* Spacing (8px rhythm) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+  --spacing-4xl: 96px;
+
+  /* Typography */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --text-6xl: 3.75rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --leading-tight: 1.2;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Shadows (dark-tuned) */
+  --shadow-sm: 0 1px 2px 0 hsl(var(--palette-slate-950) / 0.3);
+  --shadow-md: 0 2px 4px -1px hsl(var(--palette-slate-950) / 0.4),
+    0 1px 2px -1px hsl(var(--palette-slate-950) / 0.3);
+  --shadow-lg: 0 8px 16px -4px hsl(var(--palette-slate-950) / 0.5),
+    0 4px 6px -2px hsl(var(--palette-slate-950) / 0.35);
+  --shadow-xl: 0 20px 40px -12px hsl(var(--palette-slate-950) / 0.6),
+    0 8px 16px -4px hsl(var(--palette-slate-950) / 0.4);
+
+  /* Motion */
+  --duration-instant: 100ms;
+  --duration-fast: 200ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
+  --ease-linear: cubic-bezier(0, 0, 1, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Breakpoints */
+  --breakpoint-mobile: 0px;
+  --breakpoint-tablet: 640px;
+  --breakpoint-laptop: 1024px;
+  --breakpoint-desktop: 1280px;
+  --breakpoint-wide: 1536px;
+
+  /* Z-index */
+  --z-index-base: 0;
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1100;
+  --z-index-overlay: 1200;
+  --z-index-popover: 1300;
+  --z-index-modal: 1400;
+  --z-index-toast: 1500;
+  --z-index-tooltip: 1600;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  SEMANTIC TOKENS — LIGHT MODE                                              */
+/* -------------------------------------------------------------------------- */
+.light {
+  --background: var(--palette-slate-50);
+  --foreground: var(--palette-slate-900);
+  --surface: var(--palette-slate-100);
+  --surface-foreground: var(--palette-slate-800);
+  --card: 0 0% 100%;
+  --card-foreground: var(--palette-slate-900);
+  --popover: 0 0% 100%;
+  --popover-foreground: var(--palette-slate-900);
+
+  --primary: var(--palette-primary-600);
+  --primary-foreground: 0 0% 100%;
+  --secondary: var(--palette-secondary-100);
+  --secondary-foreground: var(--palette-secondary-900);
+  --accent: var(--palette-primary-100);
+  --accent-foreground: var(--palette-primary-800);
+
+  --muted: var(--palette-slate-100);
+  --muted-foreground: var(--palette-slate-500);
+
+  --text: var(--palette-slate-900);
+  --text-muted: var(--palette-slate-500);
+  --text-subtle: var(--palette-slate-400);
+  --text-inverse: 0 0% 100%;
+
+  --border: var(--palette-slate-200);
+  --input: var(--palette-slate-200);
+  --ring: var(--palette-primary-500);
+
+  --success: var(--palette-success-600);
+  --success-foreground: 0 0% 100%;
+  --warning: var(--palette-warning-500);
+  --warning-foreground: var(--palette-slate-950);
+  --error: var(--palette-error-600);
+  --error-foreground: 0 0% 100%;
+  --destructive: var(--palette-error-600);
+  --destructive-foreground: 0 0% 100%;
+  --info: var(--palette-info-600);
+  --info-foreground: 0 0% 100%;
+
+  --sidebar: var(--palette-slate-50);
+  --sidebar-foreground: var(--palette-slate-600);
+  --sidebar-border: var(--palette-slate-200);
+  --sidebar-accent: var(--palette-slate-100);
+  --sidebar-accent-foreground: var(--palette-slate-900);
+
+  --ai-from: var(--palette-ai-from);
+  --ai-via: var(--palette-ai-via);
+  --ai-to: var(--palette-ai-to);
+
+  /* Shadows (light-tuned: softer, warmer) */
+  --shadow-sm: 0 1px 2px 0 hsl(var(--palette-slate-900) / 0.05);
+  --shadow-md: 0 2px 4px -1px hsl(var(--palette-slate-900) / 0.08),
+    0 1px 2px -1px hsl(var(--palette-slate-900) / 0.06);
+  --shadow-lg: 0 8px 16px -4px hsl(var(--palette-slate-900) / 0.1),
+    0 4px 6px -2px hsl(var(--palette-slate-900) / 0.06);
+  --shadow-xl: 0 20px 40px -12px hsl(var(--palette-slate-900) / 0.15),
+    0 8px 16px -4px hsl(var(--palette-slate-900) / 0.08);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  TAILWIND THEME EXTENSION                                                  */
+/*  Maps every semantic token to a Tailwind utility namespace so components   */
+/*  can use `bg-surface`, `text-text-muted`, `shadow-md`, `duration-fast`,    */
+/*  `rounded-lg`, `z-modal`, etc. without any tailwind.config file.           */
+/* -------------------------------------------------------------------------- */
 @theme inline {
+  /* Colours */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
+  --color-surface: hsl(var(--surface));
+  --color-surface-foreground: hsl(var(--surface-foreground));
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
   --color-popover: hsl(var(--popover));
@@ -72,31 +312,173 @@
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+  --color-text: hsl(var(--text));
+  --color-text-muted: hsl(var(--text-muted));
+  --color-text-subtle: hsl(var(--text-subtle));
+  --color-text-inverse: hsl(var(--text-inverse));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-error: hsl(var(--error));
+  --color-error-foreground: hsl(var(--error-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-accent: hsl(var(--sidebar-accent));
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ai-from: hsl(var(--ai-from));
+  --color-ai-via: hsl(var(--ai-via));
+  --color-ai-to: hsl(var(--ai-to));
+
+  /* Radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  /* Spacing scale */
+  --spacing-xs: var(--spacing-xs);
+  --spacing-sm: var(--spacing-sm);
+  --spacing-md: var(--spacing-md);
+  --spacing-lg: var(--spacing-lg);
+  --spacing-xl: var(--spacing-xl);
+  --spacing-2xl: var(--spacing-2xl);
+  --spacing-3xl: var(--spacing-3xl);
+  --spacing-4xl: var(--spacing-4xl);
+
+  /* Typography */
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+  --text-3xl: var(--text-3xl);
+  --text-4xl: var(--text-4xl);
+  --text-5xl: var(--text-5xl);
+  --text-6xl: var(--text-6xl);
+  --font-weight-normal: var(--font-weight-normal);
+  --font-weight-medium: var(--font-weight-medium);
+  --font-weight-semibold: var(--font-weight-semibold);
+  --font-weight-bold: var(--font-weight-bold);
+  --leading-tight: var(--leading-tight);
+  --leading-snug: var(--leading-snug);
+  --leading-normal: var(--leading-normal);
+  --leading-relaxed: var(--leading-relaxed);
+
+  /* Shadows */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+
+  /* Motion */
+  --duration-instant: var(--duration-instant);
+  --duration-fast: var(--duration-fast);
+  --duration-normal: var(--duration-normal);
+  --duration-slow: var(--duration-slow);
+  --ease-linear: var(--ease-linear);
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+  --ease-spring: var(--ease-spring);
+
+  /* Breakpoints */
+  --breakpoint-mobile: var(--breakpoint-mobile);
+  --breakpoint-tablet: var(--breakpoint-tablet);
+  --breakpoint-laptop: var(--breakpoint-laptop);
+  --breakpoint-desktop: var(--breakpoint-desktop);
+  --breakpoint-wide: var(--breakpoint-wide);
+
+  /* Z-index */
+  --z-index-base: var(--z-index-base);
+  --z-index-dropdown: var(--z-index-dropdown);
+  --z-index-sticky: var(--z-index-sticky);
+  --z-index-overlay: var(--z-index-overlay);
+  --z-index-popover: var(--z-index-popover);
+  --z-index-modal: var(--z-index-modal);
+  --z-index-toast: var(--z-index-toast);
+  --z-index-tooltip: var(--z-index-tooltip);
 }
 
+/* -------------------------------------------------------------------------- */
+/*  BASE LAYER                                                                */
+/* -------------------------------------------------------------------------- */
 @layer base {
   * {
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-sans), system-ui, sans-serif;
+  html {
+    color-scheme: dark;
   }
+
+  html.light {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-background text-text antialiased;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Selection uses the brand primary */
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
+  }
+
+  /* Scrollbar styling (subtle, theme-aware) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: var(--radius-full);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  AI GRADIENT UTILITY                                                       */
+/* -------------------------------------------------------------------------- */
+@utility bg-ai-gradient {
+  background-image: linear-gradient(
+    135deg,
+    hsl(var(--ai-from)),
+    hsl(var(--ai-via)),
+    hsl(var(--ai-to))
+  );
+}
+
+@utility text-ai-gradient {
+  background-image: linear-gradient(
+    135deg,
+    hsl(var(--ai-from)),
+    hsl(var(--ai-via)),
+    hsl(var(--ai-to))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
