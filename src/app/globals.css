@@ -3,13 +3,23 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ========================================================================== */
-/*                        BUSAL OS DESIGN TOKEN FOUNDATION                     */
+/*                       BUSAL OS THEME SYSTEM — CSS LAYER                     */
 /* ========================================================================== */
-/* All design tokens live here. Dark mode is the default; light mode overrides
-   live under `:root` and `.light`. Components must never hardcode colour
-   values — they consume the semantic tokens below via Tailwind utilities
-   (`bg-surface`, `text-text-muted`, `shadow-md`, `duration-fast`, …) or via
-   the typed mirror in `src/styles/tokens.ts`.                              */
+/* Three appearance modes: `dark` (default), `light`, and `system` (OS pref).
+   The JS theme system (`src/lib/theme`) resolves `system` to dark/light and
+   applies exactly ONE of the `.dark` / `.light` classes to <html>. CSS here
+   only owns variable values — never behaviour.
+
+   Layering:
+     :root / .dark  → dark semantic variables (default experience)
+     .light         → light semantic variables (identical surface set)
+   Non-colour tokens (radius, spacing, typography, motion, z-index) are theme
+   agnostic and live only under `:root`.
+
+   Components must never hardcode colour values — they consume the semantic
+   tokens via Tailwind utilities (`bg-surface`, `text-text-muted`,
+   `shadow-md`, `duration-fast`, …) or via the typed mirror in
+   `src/styles/tokens.ts`.                                           */
 
 /* -------------------------------------------------------------------------- */
 /*  RAW PALETTE (private) — never reference these from components.            */
@@ -419,7 +429,10 @@
     @apply border-border;
   }
 
-  html {
+  /* Dark is the default; `color-scheme` is mirrored per active class so the
+     browser chrome (scrollbars, form controls) follows the applied theme. */
+  html,
+  html.dark {
     color-scheme: dark;
   }
 
