@@ -373,6 +373,7 @@ export const CUSTOMER_LOGOS = [
 
 export const SOCIAL_LINKS = [
   { label: "LinkedIn", href: "https://www.linkedin.com/company/busal-os" },
+  { label: "Facebook", href: "https://www.facebook.com/getbusal" },
   { label: "X", href: "https://x.com/getbusal" },
   { label: "YouTube", href: "https://www.youtube.com/@getbusal" },
 ] as const;
