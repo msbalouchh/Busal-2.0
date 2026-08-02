@@ -10,14 +10,14 @@ export function WelcomeStep() {
 
   return (
     <div className="flex flex-col items-center gap-6 py-2 text-center">
-      <p className="max-w-sm text-base leading-relaxed text-white/70">
+      <p className="mx-auto max-w-2xl text-base leading-relaxed text-white/70">
         You&apos;re minutes away from a unified operating system for operations, customers, finance,
-        and AI agents — built for modern service businesses.
+        and AI agents &mdash; built for modern service businesses.
       </p>
 
       <p className="onboarding__welcome-time">
         <Clock className="h-4 w-4" aria-hidden="true" />
-        Estimated setup time: 2–3 minutes
+        Estimated setup time: 2&ndash;3 minutes
       </p>
 
       <OnboardingButton className="mt-2 max-w-sm" onClick={nextStep}>
