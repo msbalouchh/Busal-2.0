@@ -330,6 +330,76 @@ export const BLOG_POSTS = [
       "Software launches fail in the first two weeks. Training and operating rhythms decide the outcome.",
     date: "2026-05-04",
   },
+  {
+    slug: "ai-for-restaurants",
+    title: "AI for restaurants: from hype to pre-service intelligence",
+    excerpt:
+      "How domain agents turn kitchen queues, covers, and margin signals into briefings managers act on before the rush.",
+    date: "2026-07-22",
+  },
+  {
+    slug: "retail-automation-without-chaos",
+    title: "Retail automation without operational chaos",
+    excerpt:
+      "Automate replenishment, checkout, and CRM segments without losing the human judgment that protects margin.",
+    date: "2026-07-08",
+  },
+  {
+    slug: "business-intelligence-for-operators",
+    title: "Business intelligence built for operators, not analysts",
+    excerpt:
+      "Dashboards fail when they arrive after close. Live intelligence means decisions during service—not after.",
+    date: "2026-06-28",
+  },
+  {
+    slug: "inventory-optimization-guide",
+    title: "Inventory optimization without spreadsheet drift",
+    excerpt:
+      "Purchase orders, low-stock alerts, and supplier continuity when sell-through and kitchen usage share one ledger.",
+    date: "2026-06-18",
+  },
+  {
+    slug: "crm-best-practices-service",
+    title: "CRM best practices for service businesses",
+    excerpt:
+      "Guest profiles, loyalty, and marketing segments grounded in every visit—not exported CSVs.",
+    date: "2026-05-18",
+  },
+  {
+    slug: "staff-management-modern-ops",
+    title: "Staff management for modern multi-branch operations",
+    excerpt:
+      "Roles, permissions, rosters, and accountability when every location runs live service on one platform.",
+    date: "2026-05-08",
+  },
+  {
+    slug: "analytics-that-drive-decisions",
+    title: "Business analytics that drive same-day decisions",
+    excerpt:
+      "From revenue mix to labour efficiency—metrics operators can act on before the shift ends.",
+    date: "2026-04-22",
+  },
+  {
+    slug: "customer-loyalty-that-compounds",
+    title: "Customer loyalty programs that compound over time",
+    excerpt:
+      "Rewards, portal access, and retention loops tied to live order and visit data—not batch campaigns.",
+    date: "2026-04-08",
+  },
+  {
+    slug: "security-by-design-operators",
+    title: "Security by design for growing operators",
+    excerpt:
+      "Encryption, tenant isolation, audit logs, and access controls that scale with multi-location growth.",
+    date: "2026-03-25",
+  },
+  {
+    slug: "busal-platform-summer-2026",
+    title: "Busal Platform Summer 2026: what we shipped",
+    excerpt:
+      "AI Manager briefings, multi-location dashboard, predictive inventory, and customer portal refresh—now live.",
+    date: "2026-08-01",
+  },
 ] as const;
 
 export const HELP_TOPICS = [
@@ -363,12 +433,16 @@ export const CAREERS = [
 ] as const;
 
 export const CUSTOMER_LOGOS = [
-  "Harbour Kitchen Group",
-  "Northline Retail",
-  "Atlas Clinics",
-  "Velvet Salons",
-  "Forge Fitness",
-  "Summit Hospitality",
+  {
+    name: "Harbour Kitchen Group",
+    mark: "HK",
+    gradient: "linear-gradient(135deg, #3b82f6, #6366f1)",
+  },
+  { name: "Northline Retail", mark: "NR", gradient: "linear-gradient(135deg, #8b5cf6, #a855f7)" },
+  { name: "Atlas Clinics", mark: "AC", gradient: "linear-gradient(135deg, #06b6d4, #3b82f6)" },
+  { name: "Velvet Salons", mark: "VS", gradient: "linear-gradient(135deg, #ec4899, #8b5cf6)" },
+  { name: "Forge Fitness", mark: "FF", gradient: "linear-gradient(135deg, #f97316, #ef4444)" },
+  { name: "Summit Hospitality", mark: "SH", gradient: "linear-gradient(135deg, #10b981, #059669)" },
 ] as const;
 
 export const SOCIAL_LINKS = [

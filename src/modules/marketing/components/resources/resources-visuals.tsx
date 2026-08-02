@@ -46,7 +46,7 @@ export function ResourcesHeroViz() {
 
         <div className="rs-viz__stat">
           <Sparkles className="h-3.5 w-3.5 text-[#8B5CF6]" />
-          <strong>50+</strong>
+          <strong>21+</strong>
           <span>resources for operators</span>
         </div>
       </motion.div>

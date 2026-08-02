@@ -35,6 +35,8 @@ import {
   HELP_SUPPORT,
   HELP_VIDEOS,
 } from "@/modules/marketing/components/help/help-data";
+import { getHelpSearchItems } from "@/modules/marketing/components/help/help-guides";
+import { MarketingCoverArt } from "@/modules/marketing/components/marketing-cover-art";
 import { HelpSearchViz } from "@/modules/marketing/components/help/help-visuals";
 import { MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
 
@@ -58,13 +60,27 @@ export function HelpPage() {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
 
+  const allItems = useMemo(() => getHelpSearchItems(), []);
+
+  const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return allItems.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.summary.toLowerCase().includes(q) ||
+        item.topic.toLowerCase().includes(q),
+    );
+  }, [allItems, query]);
+
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [...HELP_SEARCH_SUGGESTIONS];
     return HELP_SEARCH_SUGGESTIONS.filter((s) => s.toLowerCase().includes(q));
   }, [query]);
 
-  const showSuggestions = focused && suggestions.length > 0;
+  const showSuggestions = focused && query.trim().length === 0 && suggestions.length > 0;
+  const showResults = focused && query.trim().length > 0 && searchResults.length > 0;
 
   return (
     <div className="hc">
@@ -95,7 +111,12 @@ export function HelpPage() {
                   <label htmlFor="hc-search-input" className="sr-only">
                     Search help articles
                   </label>
-                  <div className={cn("hc-search__shell", showSuggestions && "is-open")}>
+                  <div
+                    className={cn(
+                      "hc-search__shell",
+                      (showSuggestions || showResults) && "is-open",
+                    )}
+                  >
                     <Sparkles className="hc-search__ai" aria-hidden="true" />
                     <input
                       id="hc-search-input"
@@ -134,10 +155,33 @@ export function HelpPage() {
                         ))}
                       </ul>
                     ) : null}
+                    {showResults ? (
+                      <ul className="hc-search__suggestions" role="listbox">
+                        {searchResults.slice(0, 6).map((item) => (
+                          <li key={item.title}>
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={false}
+                              className="hc-search__suggestion hc-search__suggestion--result"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setQuery(item.title);
+                                setFocused(false);
+                                scrollToId("featured-guides");
+                              }}
+                            >
+                              <strong>{item.title}</strong>
+                              <span>{item.topic}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                   <p className="hc-search__hint">
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    AI-powered search across 100+ articles
+                    AI-powered search across {allItems.length} guides
                   </p>
                 </div>
               </FadeIn>
@@ -246,7 +290,12 @@ export function HelpPage() {
                   </div>
                   <h3>{guide.title}</h3>
                   <p>{guide.summary}</p>
-                  <Link href={MARKETING_ROUTES.faq} className="hc-guides__link">
+                  <Link
+                    href={
+                      guide.slug ? `${MARKETING_ROUTES.blog}/${guide.slug}` : MARKETING_ROUTES.help
+                    }
+                    className="hc-guides__link"
+                  >
                     Read guide
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </Link>
@@ -268,12 +317,15 @@ export function HelpPage() {
             {HELP_VIDEOS.map((video, i) => (
               <Reveal key={video.title} delay={i * 0.05}>
                 <article className="hc-videos__card">
-                  <div
-                    className="hc-videos__thumb"
-                    style={{ background: video.gradient }}
-                    aria-hidden="true"
-                  >
-                    <span className="hc-videos__play">
+                  <div className="hc-videos__media">
+                    <MarketingCoverArt
+                      variant={video.coverVariant}
+                      gradient={video.gradient}
+                      label={video.topic}
+                      className="hc-videos__thumb-art"
+                      size="md"
+                    />
+                    <span className="hc-videos__play" aria-hidden="true">
                       <Play className="h-5 w-5 fill-white text-white" />
                     </span>
                     <span className="hc-videos__duration">{video.duration}</span>

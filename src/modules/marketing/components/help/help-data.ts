@@ -1,3 +1,10 @@
+import { HELP_ALL_GUIDES } from "@/modules/marketing/components/help/help-guides";
+
+export {
+  HELP_ALL_GUIDES,
+  getHelpSearchItems,
+} from "@/modules/marketing/components/help/help-guides";
+
 export const HELP_QUICK_ACTIONS = [
   { label: "Getting Started", href: "#popular-topics", topic: "Setup" },
   { label: "Integrations", href: "#categories", topic: "Integrations" },
@@ -41,62 +48,25 @@ export const HELP_POPULAR_TOPICS = [
 ] as const;
 
 export const HELP_CATEGORIES = [
-  { title: "Setup", desc: "Onboarding, accounts, and first-week checklists.", articles: 12 },
-  { title: "Business", desc: "Locations, roles, permissions, and org settings.", articles: 9 },
-  { title: "Restaurants", desc: "Service flow, kitchen, reservations, and F&B.", articles: 14 },
-  { title: "POS", desc: "Checkout, QR ordering, payments, and receipts.", articles: 11 },
-  { title: "CRM", desc: "Guests, loyalty, marketing segments, and portal.", articles: 10 },
-  { title: "AI Agents", desc: "Manager, reception, marketing, and ops agents.", articles: 8 },
-  { title: "Automation", desc: "Workflows, triggers, and cross-module rules.", articles: 7 },
-  { title: "Integrations", desc: "Accounting, payments, and third-party tools.", articles: 9 },
-  { title: "Payments", desc: "Billing, subscriptions, invoices, and plans.", articles: 6 },
-  { title: "Analytics", desc: "Reports, dashboards, and operational intelligence.", articles: 8 },
-  { title: "Security", desc: "Roles, encryption, audit logs, and compliance.", articles: 7 },
+  { title: "Setup", desc: "Onboarding, accounts, and first-week checklists.", articles: 4 },
+  { title: "Business", desc: "Locations, roles, permissions, and org settings.", articles: 3 },
+  { title: "Restaurants", desc: "Service flow, kitchen, reservations, and F&B.", articles: 4 },
+  { title: "POS", desc: "Checkout, QR ordering, payments, and receipts.", articles: 3 },
+  { title: "CRM", desc: "Guests, loyalty, marketing segments, and portal.", articles: 3 },
+  { title: "AI Agents", desc: "Manager, reception, marketing, and ops agents.", articles: 3 },
+  { title: "Automation", desc: "Workflows, triggers, and cross-module rules.", articles: 3 },
+  { title: "Integrations", desc: "Accounting, payments, and third-party tools.", articles: 3 },
+  { title: "Payments", desc: "Billing, subscriptions, invoices, and plans.", articles: 2 },
+  { title: "Analytics", desc: "Reports, dashboards, and operational intelligence.", articles: 2 },
+  { title: "Security", desc: "Roles, encryption, audit logs, and compliance.", articles: 2 },
   {
     title: "Troubleshooting",
     desc: "Common issues, diagnostics, and recovery steps.",
-    articles: 11,
+    articles: 4,
   },
 ] as const;
 
-export const HELP_FEATURED_GUIDES = [
-  {
-    title: "Complete business onboarding",
-    topic: "Setup",
-    readTime: "8 min",
-    summary: "Create your business, invite managers, and configure your first location.",
-  },
-  {
-    title: "Invite your team securely",
-    topic: "Setup",
-    readTime: "5 min",
-    summary: "Roles, permissions, and first-week access best practices.",
-  },
-  {
-    title: "Run a live service day",
-    topic: "POS",
-    readTime: "12 min",
-    summary: "POS, QR ordering, and kitchen display working as one queue.",
-  },
-  {
-    title: "Prevent stockouts before service",
-    topic: "Inventory",
-    readTime: "7 min",
-    summary: "Purchase orders, low-stock alerts, and supplier continuity.",
-  },
-  {
-    title: "Deploy AI Manager briefings",
-    topic: "AI Agents",
-    readTime: "6 min",
-    summary: "Pre-service intelligence summaries for managers and floor leads.",
-  },
-  {
-    title: "Connect accounting exports",
-    topic: "Integrations",
-    readTime: "9 min",
-    summary: "Sync revenue, VAT, and ledger entries with your accounting stack.",
-  },
-] as const;
+export const HELP_FEATURED_GUIDES = HELP_ALL_GUIDES.slice(0, 12);
 
 export const HELP_VIDEOS = [
   {
@@ -104,24 +74,56 @@ export const HELP_VIDEOS = [
     duration: "10:24",
     topic: "Getting started",
     gradient: "linear-gradient(145deg, #3b82f6, #6366f1)",
+    coverVariant: "product" as const,
   },
   {
     title: "POS & kitchen workflow",
     duration: "8:15",
     topic: "Restaurants",
     gradient: "linear-gradient(145deg, #f97316, #ef4444)",
+    coverVariant: "restaurant" as const,
   },
   {
     title: "AI agents in practice",
     duration: "7:42",
     topic: "AI Agents",
     gradient: "linear-gradient(145deg, #8b5cf6, #a855f7)",
+    coverVariant: "ai" as const,
   },
   {
     title: "Multi-location dashboard",
     duration: "6:30",
     topic: "Business",
     gradient: "linear-gradient(145deg, #06b6d4, #3b82f6)",
+    coverVariant: "analytics" as const,
+  },
+  {
+    title: "CRM & loyalty setup",
+    duration: "5:48",
+    topic: "CRM",
+    gradient: "linear-gradient(145deg, #ec4899, #8b5cf6)",
+    coverVariant: "crm" as const,
+  },
+  {
+    title: "Inventory replenishment",
+    duration: "6:12",
+    topic: "Inventory",
+    gradient: "linear-gradient(145deg, #6366f1, #8b5cf6)",
+    coverVariant: "inventory" as const,
+  },
+  {
+    title: "Security & permissions",
+    duration: "4:55",
+    topic: "Security",
+    gradient: "linear-gradient(145deg, #1e293b, #475569)",
+    coverVariant: "security" as const,
+  },
+  {
+    title: "Integrations walkthrough",
+    duration: "7:20",
+    topic: "Integrations",
+    gradient: "linear-gradient(145deg, #06b6d4, #6366f1)",
+    coverVariant: "integration" as const,
   },
 ] as const;
 

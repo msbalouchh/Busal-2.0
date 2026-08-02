@@ -194,9 +194,12 @@ export function HomePage() {
         <p className="home-marquee__label">Trusted by operators across industries</p>
         <div className="home-marquee__viewport">
           <div className="home-marquee__track">
-            {logos.map((name, i) => (
-              <span key={`${name}-${i}`} className="home-marquee__item">
-                {name}
+            {logos.map((logo, i) => (
+              <span key={`${logo.name}-${i}`} className="home-marquee__item">
+                <span className="home-marquee__mark" style={{ background: logo.gradient }}>
+                  {logo.mark}
+                </span>
+                {logo.name}
               </span>
             ))}
           </div>

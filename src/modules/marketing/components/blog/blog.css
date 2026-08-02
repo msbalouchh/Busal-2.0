@@ -310,24 +310,81 @@
   border-color: rgba(139, 92, 246, 0.25);
 }
 
-.bl-article__cover {
-  display: flex;
-  align-items: flex-end;
-  aspect-ratio: 16 / 9;
-  padding: 1rem;
+.bl-article__cover-link {
+  display: block;
   text-decoration: none;
 }
 
-.bl-article__category {
-  padding: 0.3rem 0.65rem;
+.bl-article__cover {
+  width: 100%;
+}
+
+.bl-article__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.bl-article__tag {
+  padding: 0.2rem 0.5rem;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: white;
+  color: rgba(248, 250, 252, 0.55);
+}
+
+.bl-article__author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bl-featured__cover-link {
+  display: block;
+  text-decoration: none;
+}
+
+.bl-featured__cover {
+  width: 100%;
+}
+
+.bl-featured__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.bl-featured__tag {
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.12);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #c4b5fd;
+}
+
+.bl-featured__author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.bl-updates__item {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 200ms ease;
+}
+
+.bl-updates__item:hover {
+  border-color: rgba(59, 130, 246, 0.35);
 }
 
 .bl-article__body {
@@ -450,6 +507,26 @@
   .bl-trending {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+.bl-trending__card-link {
+  position: relative;
+  display: block;
+  text-decoration: none;
+  border-radius: 1.15rem;
+  overflow: hidden;
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+.bl-trending__card-link:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 28px 56px -20px rgba(59, 130, 246, 0.45);
+}
+
+.bl-trending__card-link .bl-trending__card {
+  min-height: 12rem;
 }
 
 .bl-trending__card {

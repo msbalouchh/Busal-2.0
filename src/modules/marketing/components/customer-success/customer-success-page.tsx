@@ -13,6 +13,8 @@ import {
   BEFORE_AFTER,
   JOURNEY_STEPS,
   SUCCESS_FAQ,
+  SUCCESS_STORIES,
+  SUCCESS_TESTIMONIALS,
   TRUST_BADGES,
 } from "@/modules/marketing/components/customer-success/customer-success-data";
 import {
@@ -32,127 +34,6 @@ const KPI_STATS = [
   { value: "18", label: "Hours Saved Per Week" },
   { value: "4.9/5", label: "Customer Satisfaction" },
   { value: "50+", label: "AI Automations Running Daily" },
-] as const;
-
-const STORIES = [
-  {
-    industry: "Restaurant",
-    title: "Harbour Kitchen Group",
-    overview:
-      "Three-site coastal restaurant group serving 800+ covers daily across dine-in and delivery.",
-    challenges:
-      "Kitchen bottlenecks, disconnected POS and loyalty, margin blind spots until month-end.",
-    implementation:
-      "Unified POS, kitchen display, reservations, and CRM with AI Manager briefings before service.",
-    results:
-      "Single order truth, faster ticket times, and loyalty tied to every cover without spreadsheet drift.",
-    revenue: "+22% revenue",
-    timeSaved: "16 hrs/week saved",
-    efficiency: "+38% ticket speed",
-    ai: ["AI Manager", "AI Inventory", "AI Waiter"],
-  },
-  {
-    industry: "Retail Store",
-    title: "Northline Retail",
-    overview:
-      "Multi-branch fashion and lifestyle retail with high SKU velocity and seasonal peaks.",
-    challenges:
-      "Stockouts on bestsellers, sell-through data arriving too late, CRM disconnected from checkout.",
-    implementation:
-      "Inventory, POS, and CRM on one ledger with AI replenishment and marketing segments.",
-    results: "Live stock signals, fewer stockouts, and retention loops grounded in basket data.",
-    revenue: "+18% sell-through",
-    timeSaved: "12 hrs/week saved",
-    efficiency: "22% fewer stockouts",
-    ai: ["AI Inventory", "AI Marketing", "AI Analytics"],
-  },
-  {
-    industry: "Salon",
-    title: "Velvet Salons",
-    overview: "Premium salon chain with chair utilisation, retail attach, and repeat visit goals.",
-    challenges:
-      "Empty chairs between bookings, client history scattered, campaigns not tied to visit data.",
-    implementation:
-      "Appointments, CRM, payments, and marketing automation with AI rebooking nudges.",
-    results:
-      "Higher chair utilisation, stronger retail attach, and 31% rebooking lift in six months.",
-    revenue: "+31% rebooking",
-    timeSaved: "10 hrs/week saved",
-    efficiency: "+24% chair utilisation",
-    ai: ["AI Receptionist", "AI Marketing", "AI Manager"],
-  },
-  {
-    industry: "Clinic",
-    title: "Atlas Clinics",
-    overview: "Multi-practitioner clinic with high front-desk volume and follow-up coordination.",
-    challenges:
-      "Phone tag for confirmations, front desk overwhelmed, follow-ups falling through cracks.",
-    implementation:
-      "Appointments, patient CRM, billing, and AI Receptionist for booking queries and reminders.",
-    results:
-      "2.1× faster front-desk flow, clear booking status, and automated patient follow-up trails.",
-    revenue: "+15% capacity",
-    timeSaved: "14 hrs/week saved",
-    efficiency: "2.1× front-desk flow",
-    ai: ["AI Receptionist", "AI Support", "AI Analytics"],
-  },
-  {
-    industry: "Gym",
-    title: "Forge Fitness",
-    overview: "Growing gym group with memberships, classes, and retention-focused operations.",
-    challenges:
-      "Churn visible only after cancellation, scheduling conflicts, billing disputes manual.",
-    implementation:
-      "Memberships, scheduling, CRM, and portal with AI retention signals before churn.",
-    results:
-      "Retention alerts weeks earlier, smoother billing, and class scheduling aligned to demand.",
-    revenue: "+19% retention",
-    timeSaved: "11 hrs/week saved",
-    efficiency: "+26% class fill rate",
-    ai: ["AI Manager", "AI Marketing", "AI Finance"],
-  },
-  {
-    industry: "Hotel",
-    title: "Summit Hospitality",
-    overview:
-      "Boutique hotel group coordinating F&B, front desk, and guest preferences across stays.",
-    challenges:
-      "Guest preferences lost between departments, RevPAR insights late, ops and finance split.",
-    implementation: "Reservations, CRM, POS, housekeeping workflows, and AI guest intelligence.",
-    results:
-      "Guest profiles follow the stay, unified commercial view, and proactive service coordination.",
-    revenue: "+17% RevPAR",
-    timeSaved: "20 hrs/week saved",
-    efficiency: "+21% guest satisfaction",
-    ai: ["AI Manager", "AI Operations", "AI Marketing"],
-  },
-] as const;
-
-const TESTIMONIALS = [
-  {
-    initials: "AH",
-    quote:
-      "We stopped juggling five systems. Orders, kitchen, and loyalty finally speak the same language.",
-    name: "Amira Hassan",
-    role: "Owner · Restaurant group",
-    company: "Restaurant",
-  },
-  {
-    initials: "JO",
-    quote:
-      "The AI briefings save our morning stand-up. We know what matters before the doors open.",
-    name: "James Okonkwo",
-    role: "Operations Director · Retail",
-    company: "Retail",
-  },
-  {
-    initials: "SM",
-    quote:
-      "Implementation felt like a partnership, not a software dump. Our team was ready on day one.",
-    name: "Sofia Mendes",
-    role: "General Manager · Hospitality",
-    company: "Hotel",
-  },
 ] as const;
 
 const TRUST_ICONS = [Shield, Zap, BadgeCheck, Cloud, Globe, Cpu] as const;
@@ -275,11 +156,23 @@ export function CustomerSuccessPage() {
             </p>
           </Reveal>
           <div className="cs-stories">
-            {STORIES.map((story, i) => (
+            {SUCCESS_STORIES.map((story, i) => (
               <Reveal key={story.title} delay={i * 0.03}>
                 <article className="cs-story">
-                  <span className="cs-story__industry">{story.industry}</span>
-                  <h3 className="cs-story__title">{story.title}</h3>
+                  <div className="cs-story__head">
+                    <span
+                      className="cs-story__logo"
+                      style={{ background: story.logoGradient }}
+                      aria-hidden="true"
+                    >
+                      {story.logoMark}
+                    </span>
+                    <div>
+                      <span className="cs-story__industry">{story.industry}</span>
+                      <h3 className="cs-story__title">{story.title}</h3>
+                      <p className="cs-story__size">{story.businessSize}</p>
+                    </div>
+                  </div>
                   <p className="cs-story__overview">{story.overview}</p>
                   <div className="cs-story__grid">
                     <div className="cs-story__block">
@@ -368,11 +261,18 @@ export function CustomerSuccessPage() {
             </p>
           </Reveal>
           <div className="cs-testimonials">
-            {TESTIMONIALS.map((t, i) => (
+            {SUCCESS_TESTIMONIALS.map((t, i) => (
               <Reveal key={t.name} delay={i * 0.05}>
                 <blockquote className="cs-testimonial">
                   <p className="cs-testimonial__quote">&ldquo;{t.quote}&rdquo;</p>
                   <footer className="cs-testimonial__footer">
+                    <span
+                      className="cs-testimonial__brand"
+                      style={{ background: t.logoGradient }}
+                      aria-hidden="true"
+                    >
+                      {t.logoMark}
+                    </span>
                     <span className="cs-testimonial__avatar" aria-hidden="true">
                       {t.initials}
                     </span>

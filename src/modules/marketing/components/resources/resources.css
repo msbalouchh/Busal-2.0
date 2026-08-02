@@ -183,6 +183,14 @@
   }
 }
 
+.rs-featured--library {
+  margin-top: 2rem;
+}
+
+.rs-featured__cover {
+  width: 100%;
+}
+
 .rs-featured__card {
   display: flex;
   flex-direction: column;

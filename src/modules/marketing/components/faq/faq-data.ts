@@ -29,7 +29,7 @@ export const FAQ_POPULAR_TOPICS = [
     title: "AI",
     summary: "How domain agents work, data boundaries, and operational intelligence.",
     icon: "ai" as const,
-    categoryId: "ai-features",
+    categoryId: "ai",
   },
   {
     title: "Support",
@@ -62,29 +62,19 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         q: "Is Busal OS only for restaurants?",
         a: "Restaurants are our deepest vertical today, but the architecture is industry-ready. Retail, hospitality, clinics, and professional services run on the same foundation with module configurations tailored to each sector.",
       },
-    ],
-  },
-  {
-    id: "platform",
-    title: "Platform",
-    items: [
       {
         q: "What modules are included?",
         a: "Core modules include POS, CRM, inventory, kitchen display, customer portal, analytics, and AI agents. You activate modules based on your plan and operational needs—no separate products to stitch together.",
       },
       {
         q: "Does Busal support multiple locations?",
-        a: "Yes. Busal supports multi-location hierarchies with branch-level permissions, consolidated reporting, and shared or location-specific configurations. Enterprise plans include advanced org structures for franchise and group operators.",
-      },
-      {
-        q: "Can I migrate from another system?",
-        a: "Yes. Implementation includes data migration planning for customers, menus, inventory, and historical records where applicable. Scope is confirmed during discovery based on your current stack and data quality.",
+        a: "Yes. Busal supports multi-location hierarchies with branch-level permissions, consolidated reporting, and shared or location-specific configurations.",
       },
     ],
   },
   {
-    id: "ai-features",
-    title: "AI Features",
+    id: "ai",
+    title: "AI",
     items: [
       {
         q: "How does AI work inside Busal?",
@@ -116,6 +106,14 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         q: "What's included in implementation?",
         a: "Implementation covers discovery, configuration, core data setup, role mapping, training, and go-live support. Scope is confirmed after business analysis—complex multi-location rollouts may include phased deployment.",
       },
+      {
+        q: "Can I migrate from another system?",
+        a: "Yes. Implementation includes data migration planning for customers, menus, inventory, and historical records where applicable. Scope is confirmed during discovery based on your current stack and data quality.",
+      },
+      {
+        q: "What happens to my data if I cancel?",
+        a: "You can export your operational data before closure. Enterprise agreements include defined data retention and export windows aligned with your contract.",
+      },
     ],
   },
   {
@@ -133,6 +131,10 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
       {
         q: "Which payment providers are supported?",
         a: "Busal integrates with major payment processors including Stripe. Regional and enterprise payment requirements are scoped during onboarding.",
+      },
+      {
+        q: "Can I sync with accounting software?",
+        a: "Yes. Revenue, VAT, and ledger exports integrate with common accounting platforms. Scope and mapping are confirmed during implementation.",
       },
     ],
   },
@@ -170,6 +172,14 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         q: "Do you offer training?",
         a: "Yes. Implementation includes role-based training for managers, floor staff, and back-of-house teams. Recorded guides and in-app help supplement live sessions.",
       },
+      {
+        q: "What are support hours?",
+        a: "Email and chat support are available during UK business hours with extended coverage on Growth and Enterprise plans. Live sites receive priority routing.",
+      },
+      {
+        q: "Is there a dedicated success manager?",
+        a: "Growth plans include success check-ins; Enterprise plans include a named customer success manager and quarterly business reviews.",
+      },
     ],
   },
   {
@@ -188,6 +198,10 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         q: "What payment methods do you accept?",
         a: "We accept major credit cards and bank transfer for enterprise accounts. Invoices include VAT details for UK and international customers as applicable.",
       },
+      {
+        q: "Do you offer annual billing?",
+        a: "Yes. Annual billing is available on Growth and Enterprise plans with discounted rates compared to monthly billing.",
+      },
     ],
   },
   {
@@ -205,6 +219,10 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
       {
         q: "Can I invite my team during trial?",
         a: "Yes. Trial accounts support team invitations so you can evaluate Busal with the people who will operate it daily.",
+      },
+      {
+        q: "How do I add a new location?",
+        a: "Administrators add branches from business settings, assign location managers, and configure modules independently or inherit from the parent business.",
       },
     ],
   },
@@ -237,6 +255,14 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
       {
         q: "Can retail and F&B run on one account?",
         a: "Multi-concept groups can run different module configurations per location under one business hierarchy with consolidated reporting.",
+      },
+      {
+        q: "Does Busal support barcode and SKU management?",
+        a: "Yes. Retail catalog supports variants, barcodes, and sell-through tracking tied to inventory and POS checkout.",
+      },
+      {
+        q: "How does retail loyalty differ from restaurants?",
+        a: "Retail loyalty focuses on visit frequency, basket size, and product affinity—configured with the same CRM engine but retail-specific segments and rewards.",
       },
     ],
   },

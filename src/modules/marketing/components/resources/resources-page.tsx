@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { FadeIn, Reveal } from "@/modules/marketing/components/home/home-motion";
 import { NewsletterForm } from "@/modules/marketing/components/newsletter-form";
 import {
+  ALL_RESOURCES,
   FEATURED_RESOURCES,
   FREE_DOWNLOADS,
   LEARNING_CENTER,
@@ -16,6 +17,7 @@ import {
   RESOURCE_CATEGORIES,
   type ResourceCategory,
 } from "@/modules/marketing/components/resources/resources-data";
+import { MarketingCoverArt } from "@/modules/marketing/components/marketing-cover-art";
 import {
   ResourcesHeroViz,
   ResourcesVideoPreview,
@@ -50,9 +52,9 @@ function DownloadCard({ title, desc, format }: { title: string; desc: string; fo
 export function ResourcesPage() {
   const [activeCategory, setActiveCategory] = useState<ResourceCategory | "All">("All");
 
-  const filteredFeatured = useMemo(() => {
-    if (activeCategory === "All") return FEATURED_RESOURCES;
-    return FEATURED_RESOURCES.filter((r) => r.category === activeCategory);
+  const filteredResources = useMemo(() => {
+    if (activeCategory === "All") return ALL_RESOURCES;
+    return ALL_RESOURCES.filter((r) => r.category === activeCategory);
   }, [activeCategory]);
 
   const scrollToResources = () => {
@@ -115,17 +117,27 @@ export function ResourcesPage() {
         <div className="home-container">
           <Reveal>
             <p className="home-eyebrow">Featured Resources</p>
-            <h2 className="home-title rs-title--wide">Start with our most popular guides.</h2>
+            <h2 className="home-title rs-title--wide">
+              {activeCategory === "All"
+                ? "Start with our most popular guides."
+                : `${activeCategory} resources.`}
+            </h2>
           </Reveal>
           <div className="rs-featured">
-            {filteredFeatured.map((item, i) => (
+            {(activeCategory === "All" ? FEATURED_RESOURCES : filteredResources).map((item, i) => (
               <Reveal key={item.id} delay={i * 0.03}>
                 <article className="rs-featured__card">
-                  <div className="rs-featured__cover" style={{ background: item.gradient }}>
-                    <span className="rs-featured__cover-label">{item.category}</span>
-                  </div>
+                  <MarketingCoverArt
+                    variant={item.coverVariant}
+                    gradient={item.gradient}
+                    label={item.type}
+                    className="rs-featured__cover"
+                    size="md"
+                  />
                   <div className="rs-featured__body">
-                    <span className="rs-featured__meta">{item.readTime}</span>
+                    <span className="rs-featured__meta">
+                      {item.readTime} · {item.category}
+                    </span>
                     <h3>{item.title}</h3>
                     <Link href={item.href} className="rs-featured__cta">
                       {item.cta}
@@ -138,6 +150,43 @@ export function ResourcesPage() {
           </div>
         </div>
       </section>
+
+      {/* Full Resource Library */}
+      {activeCategory === "All" ? (
+        <section className="home-section">
+          <div className="home-container">
+            <Reveal>
+              <p className="home-eyebrow">Resource Library</p>
+              <h2 className="home-title">All guides, playbooks, and downloads.</h2>
+            </Reveal>
+            <div className="rs-featured rs-featured--library">
+              {ALL_RESOURCES.map((item, i) => (
+                <Reveal key={`lib-${item.id}`} delay={i * 0.02}>
+                  <article className="rs-featured__card">
+                    <MarketingCoverArt
+                      variant={item.coverVariant}
+                      gradient={item.gradient}
+                      label={item.type}
+                      className="rs-featured__cover"
+                      size="md"
+                    />
+                    <div className="rs-featured__body">
+                      <span className="rs-featured__meta">
+                        {item.readTime} · {item.category}
+                      </span>
+                      <h3>{item.title}</h3>
+                      <Link href={item.href} className="rs-featured__cta">
+                        {item.cta}
+                        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      </Link>
+                    </div>
+                  </article>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* Browse by Category */}
       <section className="home-section">

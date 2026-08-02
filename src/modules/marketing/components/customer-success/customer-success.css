@@ -288,6 +288,31 @@
   box-shadow: 0 24px 48px -32px rgba(59, 130, 246, 0.4);
 }
 
+.cs-story__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.cs-story__logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+}
+
+.cs-story__size {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: rgba(248, 250, 252, 0.45);
+}
+
 .cs-story__industry {
   display: inline-flex;
   padding: 0.3rem 0.65rem;
@@ -302,7 +327,7 @@
 }
 
 .cs-story__title {
-  margin: 0.85rem 0 0;
+  margin: 0.35rem 0 0;
   font-family: var(--font-marketing-display), Georgia, serif;
   font-size: 1.35rem;
   font-weight: 500;
@@ -550,6 +575,19 @@
   margin-top: 1.25rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cs-testimonial__brand {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: white;
 }
 
 .cs-testimonial__avatar {

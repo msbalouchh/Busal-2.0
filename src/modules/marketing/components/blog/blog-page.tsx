@@ -2,6 +2,9 @@
 
 import { ArrowRight, Clock, Newspaper } from "lucide-react";
 import Link from "next/link";
+
+import { MarketingAuthorAvatar } from "@/modules/marketing/components/marketing-author-avatar";
+import { MarketingCoverArt } from "@/modules/marketing/components/marketing-cover-art";
 import { useMemo, useState } from "react";
 
 import { ROUTES } from "@/constants/routes";
@@ -35,10 +38,23 @@ function ArticleCard({
 
   return (
     <article className={cn("bl-article", variant === "editor" && "bl-article--editor")}>
-      <Link href={href} className="bl-article__cover" style={{ background: article.gradient }}>
-        <span className="bl-article__category">{article.category}</span>
+      <Link href={href} className="bl-article__cover-link">
+        <MarketingCoverArt
+          variant={article.coverVariant}
+          gradient={article.gradient}
+          label={article.category}
+          className="bl-article__cover"
+          size="md"
+        />
       </Link>
       <div className="bl-article__body">
+        <div className="bl-article__tags">
+          {article.tags.slice(0, 2).map((tag) => (
+            <span key={tag} className="bl-article__tag">
+              {tag}
+            </span>
+          ))}
+        </div>
         <div className="bl-article__meta">
           <span>{article.readTime}</span>
           <time dateTime={article.date}>{article.dateLabel}</time>
@@ -48,7 +64,10 @@ function ArticleCard({
         </h3>
         <p>{article.excerpt}</p>
         <footer className="bl-article__footer">
-          <span>{article.author}</span>
+          <span className="bl-article__author">
+            <MarketingAuthorAvatar initials={article.authorInitials} name={article.author} />
+            {article.author}
+          </span>
           <Link href={href} className="bl-article__cta">
             Read Article
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -142,14 +161,23 @@ export function BlogPage() {
           </Reveal>
           <Reveal delay={0.06}>
             <article className="bl-featured">
-              <Link
-                href={featuredHref}
-                className="bl-featured__cover"
-                style={{ background: FEATURED_STORY.gradient }}
-              >
-                <span className="bl-featured__category">{FEATURED_STORY.category}</span>
+              <Link href={featuredHref} className="bl-featured__cover-link">
+                <MarketingCoverArt
+                  variant={FEATURED_STORY.coverVariant}
+                  gradient={FEATURED_STORY.gradient}
+                  label={FEATURED_STORY.category}
+                  className="bl-featured__cover"
+                  size="lg"
+                />
               </Link>
               <div className="bl-featured__body">
+                <div className="bl-featured__tags">
+                  {FEATURED_STORY.tags.map((tag) => (
+                    <span key={tag} className="bl-featured__tag">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
                 <div className="bl-featured__meta">
                   <span className="bl-featured__pill">
                     <Clock className="h-3.5 w-3.5" aria-hidden="true" />
@@ -162,7 +190,14 @@ export function BlogPage() {
                 </h2>
                 <p>{FEATURED_STORY.excerpt}</p>
                 <footer className="bl-featured__footer">
-                  <span>{FEATURED_STORY.author}</span>
+                  <span className="bl-featured__author">
+                    <MarketingAuthorAvatar
+                      initials={FEATURED_STORY.authorInitials}
+                      name={FEATURED_STORY.author}
+                      size="md"
+                    />
+                    {FEATURED_STORY.author}
+                  </span>
                   <Link href={featuredHref} className="home-btn home-btn--primary">
                     Read featured story
                   </Link>
@@ -248,11 +283,16 @@ export function BlogPage() {
               <Reveal key={`trend-${article.slug}`} delay={i * 0.04}>
                 <Link
                   href={`${MARKETING_ROUTES.blog}/${article.slug}`}
-                  className="bl-trending__card"
-                  style={{ background: article.gradient }}
+                  className="bl-trending__card-link"
                 >
+                  <MarketingCoverArt
+                    variant={article.coverVariant}
+                    gradient={article.gradient}
+                    label={article.category}
+                    className="bl-trending__card"
+                    size="md"
+                  />
                   <div className="bl-trending__overlay">
-                    <span>{article.category}</span>
                     <strong>{article.title}</strong>
                     <span className="bl-trending__meta">
                       {article.readTime} · {article.author}
@@ -313,12 +353,12 @@ export function BlogPage() {
           <div className="bl-updates">
             {PRODUCT_UPDATES.map((item, i) => (
               <Reveal key={`${item.title}-${i}`} delay={i * 0.04}>
-                <article className="bl-updates__item">
+                <Link href={item.href} className="bl-updates__item">
                   <span className="bl-updates__type">{item.type}</span>
                   <strong>{item.title}</strong>
                   <p>{item.desc}</p>
                   <time>{item.date}</time>
-                </article>
+                </Link>
               </Reveal>
             ))}
           </div>

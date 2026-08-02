@@ -622,6 +622,7 @@
 }
 
 .hc-videos__card {
+  position: relative;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 1.25rem;
   background: rgba(255, 255, 255, 0.03);
@@ -634,6 +635,50 @@
 .hc-videos__card:hover {
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
+}
+
+.hc-videos__media {
+  position: relative;
+}
+
+.hc-videos__thumb-art {
+  width: 100%;
+}
+
+.hc-videos__media .hc-videos__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.hc-videos__media .hc-videos__duration {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+}
+
+.hc-search__suggestion--result {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.hc-search__suggestion--result strong {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: white;
+}
+
+.hc-search__suggestion--result span {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(248, 250, 252, 0.45);
 }
 
 .hc-videos__thumb {
