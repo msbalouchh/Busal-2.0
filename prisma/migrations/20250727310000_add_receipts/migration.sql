@@ -1,17 +1,33 @@
 -- Receipt engine: receipts, items, print logs, audit logs, and permissions
+-- Idempotent re-run safe for partially applied databases.
 
-CREATE TYPE "ReceiptTemplateType" AS ENUM ('CUSTOMER', 'KITCHEN');
-CREATE TYPE "ReceiptPrintStatus" AS ENUM ('PENDING', 'PRINTED', 'FAILED');
-CREATE TYPE "ReceiptPaperSize" AS ENUM ('A4', 'THERMAL_80MM', 'THERMAL_58MM');
-CREATE TYPE "ReceiptAuditAction" AS ENUM ('CREATED', 'VIEWED', 'PRINTED', 'REPRINTED');
+DO $$ BEGIN
+  CREATE TYPE "ReceiptTemplateType" AS ENUM ('CUSTOMER', 'KITCHEN');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TABLE "receipt_sequences" (
+DO $$ BEGIN
+  CREATE TYPE "ReceiptPrintStatus" AS ENUM ('PENDING', 'PRINTED', 'FAILED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ReceiptPaperSize" AS ENUM ('A4', 'THERMAL_80MM', 'THERMAL_58MM');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ReceiptAuditAction" AS ENUM ('CREATED', 'VIEWED', 'PRINTED', 'REPRINTED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "receipt_sequences" (
     "business_id" TEXT NOT NULL,
     "last_number" INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT "receipt_sequences_pkey" PRIMARY KEY ("business_id")
 );
 
-CREATE TABLE "receipts" (
+CREATE TABLE IF NOT EXISTS "receipts" (
     "id" TEXT NOT NULL,
     "business_id" TEXT NOT NULL,
     "order_id" TEXT NOT NULL,
@@ -47,7 +63,7 @@ CREATE TABLE "receipts" (
     CONSTRAINT "receipts_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "receipt_items" (
+CREATE TABLE IF NOT EXISTS "receipt_items" (
     "id" TEXT NOT NULL,
     "receipt_id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -59,7 +75,7 @@ CREATE TABLE "receipt_items" (
     CONSTRAINT "receipt_items_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "receipt_print_logs" (
+CREATE TABLE IF NOT EXISTS "receipt_print_logs" (
     "id" TEXT NOT NULL,
     "receipt_id" TEXT NOT NULL,
     "business_id" TEXT NOT NULL,
@@ -72,7 +88,7 @@ CREATE TABLE "receipt_print_logs" (
     CONSTRAINT "receipt_print_logs_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "receipt_audit_logs" (
+CREATE TABLE IF NOT EXISTS "receipt_audit_logs" (
     "id" TEXT NOT NULL,
     "receipt_id" TEXT NOT NULL,
     "business_id" TEXT NOT NULL,
@@ -83,22 +99,71 @@ CREATE TABLE "receipt_audit_logs" (
     CONSTRAINT "receipt_audit_logs_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "receipts_payment_id_key" ON "receipts"("payment_id");
-CREATE UNIQUE INDEX "receipts_business_id_receipt_number_key" ON "receipts"("business_id", "receipt_number");
+CREATE UNIQUE INDEX IF NOT EXISTS "receipts_payment_id_key" ON "receipts"("payment_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "receipts_business_id_receipt_number_key" ON "receipts"("business_id", "receipt_number");
 
-ALTER TABLE "receipt_sequences" ADD CONSTRAINT "receipt_sequences_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipts" ADD CONSTRAINT "receipts_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipts" ADD CONSTRAINT "receipts_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipts" ADD CONSTRAINT "receipts_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "payments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipts" ADD CONSTRAINT "receipts_created_by_staff_id_fkey" FOREIGN KEY ("created_by_staff_id") REFERENCES "staff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "receipt_items" ADD CONSTRAINT "receipt_items_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipt_print_logs" ADD CONSTRAINT "receipt_print_logs_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipt_print_logs" ADD CONSTRAINT "receipt_print_logs_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipt_print_logs" ADD CONSTRAINT "receipt_print_logs_staff_id_fkey" FOREIGN KEY ("staff_id") REFERENCES "staff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "receipt_audit_logs" ADD CONSTRAINT "receipt_audit_logs_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipt_audit_logs" ADD CONSTRAINT "receipt_audit_logs_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "receipt_audit_logs" ADD CONSTRAINT "receipt_audit_logs_staff_id_fkey" FOREIGN KEY ("staff_id") REFERENCES "staff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "receipt_sequences" ADD CONSTRAINT "receipt_sequences_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-INSERT INTO "permissions" ("id", "code", "name", "description", "module", "created_at", "updated_at") VALUES
+DO $$ BEGIN
+  ALTER TABLE "receipts" ADD CONSTRAINT "receipts_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipts" ADD CONSTRAINT "receipts_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipts" ADD CONSTRAINT "receipts_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "payments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipts" ADD CONSTRAINT "receipts_created_by_staff_id_fkey" FOREIGN KEY ("created_by_staff_id") REFERENCES "staff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipt_items" ADD CONSTRAINT "receipt_items_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipt_print_logs" ADD CONSTRAINT "receipt_print_logs_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipt_print_logs" ADD CONSTRAINT "receipt_print_logs_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipt_print_logs" ADD CONSTRAINT "receipt_print_logs_staff_id_fkey" FOREIGN KEY ("staff_id") REFERENCES "staff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipt_audit_logs" ADD CONSTRAINT "receipt_audit_logs_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipt_audit_logs" ADD CONSTRAINT "receipt_audit_logs_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "receipt_audit_logs" ADD CONSTRAINT "receipt_audit_logs_staff_id_fkey" FOREIGN KEY ("staff_id") REFERENCES "staff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+INSERT INTO "permissions" ("id", "code", "name", "description", "module", "created_at", "updated_at")
+VALUES
   (gen_random_uuid(), 'receipt.view', 'View Receipts', 'View receipt history and details', 'receipt', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (gen_random_uuid(), 'receipt.print', 'Print Receipts', 'Print and reprint receipts', 'receipt', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  (gen_random_uuid(), 'receipt.print', 'Print Receipts', 'Print and reprint receipts', 'receipt', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+ON CONFLICT ("code") DO NOTHING;

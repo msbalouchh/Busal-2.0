@@ -2,11 +2,36 @@ import { cache } from "react";
 
 import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
 import { protectedPage } from "@/modules/platform-guards/guards/page.guards";
-import { getStaffManagementContext } from "@/services/staff-management.service";
+import type { StaffDirectoryQuery } from "@/modules/staff/types/staff-management-types";
+import {
+  getStaffManagementBundle,
+  getStaffMemberProfile,
+  listStaffMemberActivity,
+} from "@/services/staff-management-module.service";
 
-export const getStaffModuleContext = cache(async () => {
-  const context = await protectedPage({ permission: PERMISSION_CODES.STAFF_VIEW });
-  const data = await getStaffManagementContext(context.business.ownerId, context.branchId);
+export const getStaffManagementContext = cache(async (query: StaffDirectoryQuery = {}) => {
+  const platform = await protectedPage({ permission: PERMISSION_CODES.STAFF_VIEW });
+  const bundle = await getStaffManagementBundle(platform, query);
 
-  return { user: context.user, ...data };
+  return {
+    platform,
+    ...bundle,
+  };
+});
+
+export const getStaffModuleContext = getStaffManagementContext;
+
+export const getStaffProfileContext = cache(async (staffId: string) => {
+  const platform = await protectedPage({ permission: PERMISSION_CODES.STAFF_VIEW });
+  const [member, activity] = await Promise.all([
+    getStaffMemberProfile(platform, staffId),
+    listStaffMemberActivity(platform, staffId),
+  ]);
+
+  return {
+    platform,
+    member,
+    activity,
+    permissionsFlags: (await getStaffManagementBundle(platform)).permissionsFlags,
+  };
 });

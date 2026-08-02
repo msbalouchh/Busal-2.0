@@ -13,7 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { saveRolePermissionsAction } from "@/modules/staff/actions/staff-actions";
+import { saveStaffPermissionsAction } from "@/modules/staff/actions/staff-management-actions";
+import {
+  listPermissionGroups,
+  resolvePermissionGroup,
+} from "@/modules/staff/registry/permission-groups";
 import type { RolePermissionMatrix } from "@/services/staff-management.service";
 
 interface PermissionsMatrixProps {
@@ -33,16 +37,22 @@ export function PermissionsMatrix({ matrix }: PermissionsMatrixProps) {
     return initial;
   });
 
-  const permissionsByModule = useMemo(() => {
+  const permissionsByGroup = useMemo(() => {
     const grouped = new Map<string, (typeof permissions)[number][]>();
 
     for (const permission of permissions) {
-      const list = grouped.get(permission.module) ?? [];
+      const group = resolvePermissionGroup(permission.module);
+      const list = grouped.get(group.label) ?? [];
       list.push(permission);
-      grouped.set(permission.module, list);
+      grouped.set(group.label, list);
     }
 
-    return Array.from(grouped.entries());
+    const order = listPermissionGroups().map((entry) => entry.label);
+    return Array.from(grouped.entries()).sort(
+      ([a], [b]) =>
+        (order.indexOf(a) === -1 ? 999 : order.indexOf(a)) -
+        (order.indexOf(b) === -1 ? 999 : order.indexOf(b)),
+    );
   }, [permissions]);
 
   const togglePermission = (roleId: string, permissionId: string) => {
@@ -69,7 +79,7 @@ export function PermissionsMatrix({ matrix }: PermissionsMatrixProps) {
 
     startTransition(async () => {
       try {
-        await saveRolePermissionsAction(payload);
+        await saveStaffPermissionsAction(payload);
         toast.success("Permissions saved");
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to save permissions");
@@ -104,14 +114,14 @@ export function PermissionsMatrix({ matrix }: PermissionsMatrixProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {permissionsByModule.map(([moduleName, modulePermissions]) => (
-              <Fragment key={moduleName}>
+            {permissionsByGroup.map(([groupName, groupPermissions]) => (
+              <Fragment key={groupName}>
                 <TableRow>
                   <TableCell colSpan={roles.length + 1} className="bg-muted/50 font-semibold">
-                    {moduleName}
+                    {groupName}
                   </TableCell>
                 </TableRow>
-                {modulePermissions.map((permission) => (
+                {groupPermissions.map((permission) => (
                   <TableRow key={permission.id}>
                     <TableCell>
                       <div>

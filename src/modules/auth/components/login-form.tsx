@@ -41,7 +41,7 @@ export function LoginForm() {
     <div className="space-y-6">
       <GoogleSignInButton />
 
-      <FormWrapper form={form} onSubmit={(values) => login.mutate(values)}>
+      <FormWrapper form={form} onSubmit={(values) => login.mutate({ ...values, redirectTo })}>
         {form.formState.errors.root ? (
           <p
             className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm"

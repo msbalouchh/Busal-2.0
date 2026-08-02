@@ -9,6 +9,7 @@ import {
   isBusinessActive,
   resolveBusinessForCurrentUser,
 } from "@/modules/authorization/services/authorization.service";
+import { hasRole } from "@/modules/authorization/utils/role-utils";
 import {
   ensureStaffDashboardAccess,
   protectStaffApiRoute,
@@ -73,7 +74,7 @@ export async function requireBusiness(): Promise<{
 export async function requireRole(roleSlug: string): Promise<AuthorizationContext> {
   const context = await buildAuthorizationContextForCurrentUser();
 
-  if (context.roleSlug !== roleSlug && !context.isOwner) {
+  if (!hasRole(context, roleSlug)) {
     logDecision(context, null, "denied", "FORBIDDEN");
     throw permissionDenied();
   }

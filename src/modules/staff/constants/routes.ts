@@ -1,6 +1,6 @@
 export const STAFF_ROUTES = {
   overview: "/dashboard/staff",
-  members: "/dashboard/staff/members",
+  members: "/dashboard/staff/directory",
   roles: "/dashboard/staff/roles",
   permissions: "/dashboard/staff/permissions",
 } as const;

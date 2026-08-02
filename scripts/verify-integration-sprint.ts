@@ -282,12 +282,12 @@ async function main() {
   console.log("  PASS");
 
   console.log("Table assignment works");
-  let table = await prisma.table.findFirst({
+  let table = await prisma.legacyTable.findFirst({
     where: { businessId: business.id },
     select: { id: true },
   });
   if (!table) {
-    table = await prisma.table.create({
+    table = await prisma.legacyTable.create({
       data: { businessId: business.id, name: `Table ${suffix}`, capacity: 4 },
       select: { id: true },
     });
@@ -384,7 +384,7 @@ async function main() {
   console.log("  PASS");
 
   console.log("Business isolation");
-  const foreignOrder = await prisma.order.findFirst({
+  const foreignOrder = await prisma.legacyOrder.findFirst({
     where: { id: order.id, businessId: otherBusiness.id },
   });
   assert(!foreignOrder, "business isolation failed");
@@ -392,15 +392,15 @@ async function main() {
 
   console.log("Cascading deletes");
   await prisma.kitchenQueue.delete({ where: { id: queueItem.id } });
-  await prisma.orderItem.deleteMany({ where: { orderId: order.id } });
-  await prisma.order.delete({ where: { id: order.id } });
+  await prisma.legacyOrderItem.deleteMany({ where: { orderId: order.id } });
+  await prisma.legacyOrder.delete({ where: { id: order.id } });
   await prisma.orderSession.delete({ where: { id: orderSession.id } });
   await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
   await prisma.cart.delete({ where: { id: cart.id } });
   await prisma.qRMenuSession.delete({ where: { id: visit.session.id } });
   await deleteQRCode(ownerId, qrCode.id);
   const orphanQueue = await prisma.kitchenQueue.count({ where: { orderId: order.id } });
-  const orphanOrder = await prisma.order.count({ where: { id: order.id } });
+  const orphanOrder = await prisma.legacyOrder.count({ where: { id: order.id } });
   assert(orphanQueue === 0 && orphanOrder === 0, "orphan records remain");
   console.log("  PASS");
 

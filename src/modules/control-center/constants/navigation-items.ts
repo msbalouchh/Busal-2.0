@@ -1,0 +1,288 @@
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Bot,
+  Flag,
+  LayoutDashboard,
+  LifeBuoy,
+  Monitor,
+  Rocket,
+  ScrollText,
+  Settings,
+  Shield,
+  ShoppingBag,
+  Users,
+  Wallet,
+  Wrench,
+} from "lucide-react";
+
+import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
+import { CONTROL_CENTER_ROUTES } from "@/modules/control-center/constants/routes";
+import type {
+  ControlCenterNavGroup,
+  ControlCenterQuickAction,
+  ControlCenterWidgetDefinition,
+} from "@/modules/control-center/types/control-center-types";
+
+export const CONTROL_CENTER_NAV_GROUPS: ControlCenterNavGroup[] = [
+  {
+    id: "overview",
+    name: "Overview",
+    icon: LayoutDashboard,
+    defaultOpen: true,
+    items: [
+      {
+        id: "dashboard",
+        name: "Dashboard",
+        href: CONTROL_CENTER_ROUTES.overview,
+        icon: LayoutDashboard,
+        permission: PERMISSION_CODES.CONTROL_CENTER_VIEW,
+      },
+    ],
+  },
+  {
+    id: "platform",
+    name: "Platform",
+    icon: Shield,
+    defaultOpen: true,
+    items: [
+      {
+        id: "tenants",
+        name: "Tenants",
+        href: CONTROL_CENTER_ROUTES.tenants,
+        icon: Users,
+        permission: PERMISSION_CODES.CONTROL_CENTER_TENANTS,
+      },
+      {
+        id: "subscriptions",
+        name: "Subscriptions",
+        href: CONTROL_CENTER_ROUTES.subscriptions,
+        icon: Wallet,
+        permission: PERMISSION_CODES.CONTROL_CENTER_SUBSCRIPTIONS,
+      },
+      {
+        id: "revenue",
+        name: "Revenue",
+        href: CONTROL_CENTER_ROUTES.revenue,
+        icon: BarChart3,
+        permission: PERMISSION_CODES.CONTROL_CENTER_REVENUE,
+      },
+      {
+        id: "marketplace",
+        name: "Marketplace",
+        href: CONTROL_CENTER_ROUTES.marketplace,
+        icon: ShoppingBag,
+        permission: PERMISSION_CODES.CONTROL_CENTER_MARKETPLACE,
+      },
+      {
+        id: "ai-platform",
+        name: "AI Platform",
+        href: CONTROL_CENTER_ROUTES.aiPlatform,
+        icon: Bot,
+        permission: PERMISSION_CODES.CONTROL_CENTER_AI,
+      },
+    ],
+  },
+  {
+    id: "operations",
+    name: "Operations",
+    icon: Activity,
+    defaultOpen: true,
+    items: [
+      {
+        id: "monitoring",
+        name: "Monitoring",
+        href: CONTROL_CENTER_ROUTES.monitoring,
+        icon: Monitor,
+        permission: PERMISSION_CODES.CONTROL_CENTER_MONITORING,
+      },
+      {
+        id: "support",
+        name: "Support",
+        href: CONTROL_CENTER_ROUTES.support,
+        icon: LifeBuoy,
+        permission: PERMISSION_CODES.CONTROL_CENTER_SUPPORT,
+      },
+      {
+        id: "incidents",
+        name: "Incidents",
+        href: CONTROL_CENTER_ROUTES.incidents,
+        icon: AlertTriangle,
+        permission: PERMISSION_CODES.CONTROL_CENTER_INCIDENTS,
+      },
+      {
+        id: "audit-logs",
+        name: "Audit Logs",
+        href: CONTROL_CENTER_ROUTES.audit,
+        icon: ScrollText,
+        permission: PERMISSION_CODES.CONTROL_CENTER_AUDIT,
+      },
+    ],
+  },
+  {
+    id: "governance",
+    name: "Governance",
+    icon: Settings,
+    defaultOpen: false,
+    items: [
+      {
+        id: "platform-settings",
+        name: "Platform Settings",
+        href: CONTROL_CENTER_ROUTES.settings,
+        icon: Settings,
+        permission: PERMISSION_CODES.CONTROL_CENTER_SETTINGS,
+      },
+      {
+        id: "system-maintenance",
+        name: "System Maintenance",
+        href: CONTROL_CENTER_ROUTES.maintenance,
+        icon: Wrench,
+        permission: PERMISSION_CODES.CONTROL_CENTER_MAINTENANCE,
+      },
+      {
+        id: "release-management",
+        name: "Release Management",
+        href: CONTROL_CENTER_ROUTES.releases,
+        icon: Rocket,
+        permission: PERMISSION_CODES.CONTROL_CENTER_RELEASES,
+      },
+      {
+        id: "staff",
+        name: "Staff",
+        href: CONTROL_CENTER_ROUTES.staff,
+        icon: Users,
+        permission: PERMISSION_CODES.CONTROL_CENTER_STAFF,
+      },
+      {
+        id: "analytics",
+        name: "Analytics",
+        href: CONTROL_CENTER_ROUTES.analytics,
+        icon: BarChart3,
+        permission: PERMISSION_CODES.CONTROL_CENTER_ANALYTICS,
+      },
+      {
+        id: "feature-flags",
+        name: "Feature Flags",
+        href: CONTROL_CENTER_ROUTES.featureFlags,
+        icon: Flag,
+        permission: PERMISSION_CODES.CONTROL_CENTER_FEATURE_FLAGS,
+      },
+    ],
+  },
+];
+
+export const CONTROL_CENTER_QUICK_ACTIONS: ControlCenterQuickAction[] = [
+  {
+    id: "review-incidents",
+    label: "Review incidents",
+    href: CONTROL_CENTER_ROUTES.incidents,
+    permission: PERMISSION_CODES.CONTROL_CENTER_INCIDENTS,
+  },
+  {
+    id: "tenant-health",
+    label: "Tenant health",
+    href: CONTROL_CENTER_ROUTES.tenants,
+    permission: PERMISSION_CODES.CONTROL_CENTER_TENANTS,
+  },
+  {
+    id: "platform-monitoring",
+    label: "Open monitoring",
+    href: CONTROL_CENTER_ROUTES.monitoring,
+    permission: PERMISSION_CODES.CONTROL_CENTER_MONITORING,
+  },
+  {
+    id: "release-queue",
+    label: "Release queue",
+    href: CONTROL_CENTER_ROUTES.releases,
+    permission: PERMISSION_CODES.CONTROL_CENTER_RELEASES,
+  },
+];
+
+export const CONTROL_CENTER_WIDGETS: ControlCenterWidgetDefinition[] = [
+  {
+    id: "total-tenants",
+    title: "Total Tenants",
+    permission: PERMISSION_CODES.CONTROL_CENTER_TENANTS,
+  },
+  {
+    id: "active-businesses",
+    title: "Active Businesses",
+    permission: PERMISSION_CODES.CONTROL_CENTER_VIEW,
+  },
+  { id: "mrr", title: "MRR", permission: PERMISSION_CODES.CONTROL_CENTER_REVENUE },
+  { id: "arr", title: "ARR", permission: PERMISSION_CODES.CONTROL_CENTER_REVENUE },
+  {
+    id: "platform-revenue",
+    title: "Platform Revenue",
+    permission: PERMISSION_CODES.CONTROL_CENTER_REVENUE,
+  },
+  { id: "ai-usage", title: "AI Usage", permission: PERMISSION_CODES.CONTROL_CENTER_AI },
+  {
+    id: "api-requests",
+    title: "API Requests",
+    permission: PERMISSION_CODES.CONTROL_CENTER_MONITORING,
+  },
+  {
+    id: "storage-usage",
+    title: "Storage Usage",
+    permission: PERMISSION_CODES.CONTROL_CENTER_MONITORING,
+  },
+  {
+    id: "platform-health",
+    title: "Platform Health",
+    permission: PERMISSION_CODES.CONTROL_CENTER_MONITORING,
+  },
+  {
+    id: "active-incidents",
+    title: "Active Incidents",
+    permission: PERMISSION_CODES.CONTROL_CENTER_INCIDENTS,
+  },
+  {
+    id: "marketplace-activity",
+    title: "Marketplace Activity",
+    permission: PERMISSION_CODES.CONTROL_CENTER_MARKETPLACE,
+  },
+  {
+    id: "system-alerts",
+    title: "System Alerts",
+    permission: PERMISSION_CODES.CONTROL_CENTER_MONITORING,
+  },
+  {
+    id: "latest-deployments",
+    title: "Latest Deployments",
+    span: 2,
+    permission: PERMISSION_CODES.CONTROL_CENTER_RELEASES,
+  },
+  {
+    id: "recent-signups",
+    title: "Recent Signups",
+    permission: PERMISSION_CODES.CONTROL_CENTER_TENANTS,
+  },
+  {
+    id: "support-queue",
+    title: "Support Queue",
+    permission: PERMISSION_CODES.CONTROL_CENTER_SUPPORT,
+  },
+  { id: "platform-activity", title: "Platform Activity", span: 2, lazy: true },
+  { id: "tenant-summary", title: "Tenant Summary", span: 2 },
+  { id: "quick-actions", title: "Quick Actions", span: 2 },
+];
+
+export const CONTROL_CENTER_SECTION_LABELS: Record<string, string> = {
+  tenants: "Tenants",
+  subscriptions: "Subscriptions",
+  revenue: "Revenue",
+  marketplace: "Marketplace",
+  "ai-platform": "AI Platform",
+  monitoring: "Monitoring",
+  support: "Support",
+  incidents: "Incidents",
+  "audit-logs": "Audit Logs",
+  "platform-settings": "Platform Settings",
+  "system-maintenance": "System Maintenance",
+  "release-management": "Release Management",
+  staff: "Staff",
+  analytics: "Analytics",
+  "feature-flags": "Feature Flags",
+};

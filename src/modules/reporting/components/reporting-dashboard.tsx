@@ -2,7 +2,7 @@ import type { ReportingDashboardView } from "@/modules/reporting/utils/reporting
 import { formatReportingMoney } from "@/modules/reporting/utils/reporting-utils";
 import { ChartCard } from "@/modules/reporting/components/widgets/chart-card";
 import { KpiCard } from "@/modules/reporting/components/widgets/kpi-card";
-import { TrendChart } from "@/modules/reporting/components/widgets/trend-chart";
+import { TrendChart } from "@/modules/reporting/components/widgets/lazy-trend-chart";
 
 interface ReportingDashboardProps {
   dashboard: ReportingDashboardView;

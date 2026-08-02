@@ -18,7 +18,11 @@ const sizeClasses = {
 export function LoadingSpinner({ className, size = "md" }: LoadingSpinnerProps) {
   return (
     <Loader2
-      className={cn("text-muted-foreground animate-spin", sizeClasses[size], className)}
+      className={cn(
+        "text-muted-foreground motion-safe:animate-spin motion-reduce:animate-none",
+        sizeClasses[size],
+        className,
+      )}
       aria-hidden="true"
     />
   );

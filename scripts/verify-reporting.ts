@@ -72,7 +72,7 @@ async function createReportingOrder(businessId: string, ownerId: string, suffix:
   });
 
   const order = await createOrderFromSession(orderSession.id);
-  const orderRecord = await prisma.order.findUniqueOrThrow({
+  const orderRecord = await prisma.legacyOrder.findUniqueOrThrow({
     where: { id: order.id },
     select: { total: true },
   });

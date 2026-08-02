@@ -31,6 +31,27 @@ export async function createUserProfile(input: CreateUserProfileInput) {
 
 export async function syncUserProfile(user: User, fallbackFullName?: string) {
   try {
+    const metadataRole = user.user_metadata?.role;
+    if (metadataRole === USER_ROLES.CUSTOMER) {
+      const email = user.email ?? "";
+      const existing = await getUserProfile(user.id);
+      if (existing) {
+        return existing;
+      }
+
+      const fullName =
+        fallbackFullName ??
+        (typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "") ??
+        email;
+
+      return createUserProfile({
+        id: user.id,
+        email,
+        fullName,
+        role: USER_ROLES.CUSTOMER,
+      });
+    }
+
     const email = user.email ?? "";
     const staff = email ? await findActiveStaffByEmail(email) : null;
 

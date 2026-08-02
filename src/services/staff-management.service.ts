@@ -32,6 +32,7 @@ export interface RoleData {
   slug: string;
   description: string | null;
   isSystem: boolean;
+  isArchived: boolean;
   permissionCount: number;
   staffCount: number;
 }
@@ -217,6 +218,7 @@ export async function listRoles(businessId: string): Promise<RoleData[]> {
     slug: role.slug,
     description: role.description,
     isSystem: role.isSystem,
+    isArchived: role.isArchived,
     permissionCount: role._count.rolePermissions,
     staffCount: role._count.staffRoles,
   }));
@@ -479,7 +481,9 @@ export async function deleteCustomRole(ownerId: string, roleId: string): Promise
   const business = await getOwnedBusiness(ownerId);
   const role = await prisma.role.findFirst({
     where: { id: roleId, businessId: business.id },
-    include: { _count: { select: { staffRoles: true } } },
+    include: {
+      _count: { select: { staffRoles: true, memberRoles: true } },
+    },
   });
 
   if (!role) {
@@ -490,8 +494,8 @@ export async function deleteCustomRole(ownerId: string, roleId: string): Promise
     throw new Error("System roles cannot be deleted");
   }
 
-  if (role._count.staffRoles > 0) {
-    throw new Error("Cannot delete a role assigned to staff members");
+  if (role._count.staffRoles > 0 || role._count.memberRoles > 0) {
+    throw new Error("Cannot delete a role assigned to staff or members");
   }
 
   await prisma.role.delete({ where: { id: roleId } });

@@ -142,7 +142,7 @@ function completedOrderWhere(
   businessId: string,
   branchId: string | null = null,
   range?: DateRange,
-): Prisma.OrderWhereInput {
+): Prisma.LegacyOrderWhereInput {
   return {
     businessId,
     ...branchFilter(branchId),
@@ -191,7 +191,7 @@ async function getSalesMetricsForRange(
   range: DateRange,
   branchId: string | null = null,
 ): Promise<SalesMetrics> {
-  const orders = await prisma.order.findMany({
+  const orders = await prisma.legacyOrder.findMany({
     where: completedOrderWhere(businessId, branchId, range),
     select: { subtotal: true, total: true },
   });
@@ -228,7 +228,7 @@ export async function getOrderAnalytics(
   const effectiveRange = range ?? getDateRangeForPeriod("month");
 
   const [orders, payments, cancelledCount, refundPayments] = await Promise.all([
-    prisma.order.findMany({
+    prisma.legacyOrder.findMany({
       where: {
         businessId,
         ...branchFilter(branchId),
@@ -253,7 +253,7 @@ export async function getOrderAnalytics(
         status: true,
       },
     }),
-    prisma.order.count({
+    prisma.legacyOrder.count({
       where: {
         businessId,
         ...branchFilter(branchId),
@@ -320,7 +320,7 @@ async function aggregateProductItems(
   range: DateRange,
   branchId: string | null = null,
 ): Promise<ProductAnalyticsItem[]> {
-  const items = await prisma.orderItem.findMany({
+  const items = await prisma.legacyOrderItem.findMany({
     where: {
       order: completedOrderWhere(businessId, branchId, range),
     },
@@ -407,7 +407,7 @@ export async function getCustomerAnalytics(
       name: true,
       loyaltyPoints: true,
       createdAt: true,
-      orders: {
+      legacyOrders: {
         where: { status: "COMPLETED", ...branchFilter(branchId) },
         select: { total: true, createdAt: true },
       },
@@ -417,8 +417,12 @@ export async function getCustomerAnalytics(
   const newCustomers = customers.filter(
     (customer) => customer.createdAt >= effectiveRange.from,
   ).length;
-  const returningCustomers = customers.filter((customer) => customer.orders.length > 1).length;
-  const customersWithOrders = customers.filter((customer) => customer.orders.length > 0).length;
+  const returningCustomers = customers.filter(
+    (customer) => customer.legacyOrders.length > 1,
+  ).length;
+  const customersWithOrders = customers.filter(
+    (customer) => customer.legacyOrders.length > 0,
+  ).length;
   const retentionRatePercent =
     customersWithOrders === 0 ? 0 : Math.round((returningCustomers / customersWithOrders) * 100);
 
@@ -426,7 +430,7 @@ export async function getCustomerAnalytics(
     .map((customer) => ({
       id: customer.id,
       name: customer.name,
-      totalSpentPence: customer.orders.reduce(
+      totalSpentPence: customer.legacyOrders.reduce(
         (sum, order) => sum + moneyDecimalToPence(order.total),
         0,
       ),
@@ -640,7 +644,7 @@ export async function getFinancialReport(
   const range = getDateRangeForPeriod(mappedPeriod);
 
   const [orders, payments] = await Promise.all([
-    prisma.order.findMany({
+    prisma.legacyOrder.findMany({
       where: completedOrderWhere(businessId, branchId, range),
       select: { subtotal: true, total: true, tax: true, discount: true },
     }),

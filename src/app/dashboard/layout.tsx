@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { BusinessContextProvider } from "@/modules/business-context/components/business-context-provider";
 import { serializeClientBusinessContext } from "@/modules/business-context/services/business-context.service";
-import { getDashboardContext } from "@/modules/dashboard/lib/get-dashboard-context";
+import { DashboardProvider } from "@/modules/dashboard/components/dashboard-provider";
+import { getDashboardShellContext } from "@/modules/dashboard/lib/get-dashboard-shell-context";
 import {
   getTimeOfDayGreeting,
   resolveDisplayName,
@@ -16,7 +17,7 @@ interface DashboardLayoutProps {
 }
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
-  const context = await getDashboardContext();
+  const { context, clientDashboard } = await getDashboardShellContext();
 
   const ownerName = resolveDisplayName(context.business.ownerName, context.user.fullName);
   const greeting = getTimeOfDayGreeting();
@@ -24,9 +25,11 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   return (
     <BusinessContextProvider initialContext={clientContext}>
-      <DashboardShell greeting={`${greeting}, ${ownerName}`} userEmail={context.user.email}>
-        {children}
-      </DashboardShell>
+      <DashboardProvider value={clientDashboard}>
+        <DashboardShell greeting={`${greeting}, ${ownerName}`} userEmail={context.user.email}>
+          {children}
+        </DashboardShell>
+      </DashboardProvider>
     </BusinessContextProvider>
   );
 }

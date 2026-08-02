@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Business } from "@prisma/client";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import { ROUTES } from "@/constants/routes";
@@ -47,6 +48,13 @@ function mapBusinessRecord(business: Business): BusinessProfileData & { id: stri
     aiPersonality: business.aiPersonality,
     businessGoal: business.businessGoal,
     businessDna: business.businessDna as BusinessProfileData["businessDna"],
+    businessCode: business.businessCode,
+    industry: business.industry,
+    currency: business.currency,
+    phone: business.phone,
+    businessEmail: business.businessEmail,
+    businessSetupCompleted: business.businessSetupCompleted,
+    businessSetupStep: business.businessSetupStep,
     onboardingCompleted: business.onboardingCompleted,
     onboardingStep: business.onboardingStep,
     createdAt: business.createdAt,
@@ -255,7 +263,7 @@ export async function resolveBusinessContextForUser(user: AuthUser): Promise<Bus
   };
 }
 
-export async function requireBusinessContext(): Promise<BusinessContext> {
+export const requireBusinessContext = cache(async (): Promise<BusinessContext> => {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -271,9 +279,9 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
 
     throw error;
   }
-}
+});
 
-export async function requireBusinessContextForApi(): Promise<BusinessContext> {
+export const requireBusinessContextForApi = cache(async (): Promise<BusinessContext> => {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -289,7 +297,7 @@ export async function requireBusinessContextForApi(): Promise<BusinessContext> {
 
     throw error;
   }
-}
+});
 
 export async function getActiveBusiness(): Promise<BusinessProfileData & { id: string }> {
   const context = await requireBusinessContext();

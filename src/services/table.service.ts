@@ -112,7 +112,7 @@ async function assertUniqueTableName(
   name: string,
   excludeTableId?: string,
 ): Promise<void> {
-  const existing = await prisma.table.findFirst({
+  const existing = await prisma.legacyTable.findFirst({
     where: {
       businessId,
       name: name.trim(),
@@ -127,7 +127,7 @@ async function assertUniqueTableName(
 }
 
 async function getTableForBusiness(businessId: string, tableId: string): Promise<TableData> {
-  const table = await prisma.table.findFirst({
+  const table = await prisma.legacyTable.findFirst({
     where: { id: tableId, businessId },
   });
 
@@ -142,7 +142,7 @@ async function assertNoActiveReservations(businessId: string, tableId: string): 
   const activeReservation = await prisma.reservation.findFirst({
     where: {
       businessId,
-      tableId,
+      legacyTableId: tableId,
       status: { in: [...ACTIVE_RESERVATION_STATUSES] },
     },
     select: { id: true },
@@ -175,7 +175,7 @@ export async function createTable(ownerId: string, input: CreateTableInput): Pro
   validateCapacity(input.capacity);
   await assertUniqueTableName(business.id, input.name);
 
-  const table = await prisma.table.create({
+  const table = await prisma.legacyTable.create({
     data: {
       businessId: business.id,
       branchId: input.branchId ?? null,
@@ -205,7 +205,7 @@ export async function listTables(
 ): Promise<TableData[]> {
   const business = await getOwnedBusiness(ownerId);
 
-  const tables = await prisma.table.findMany({
+  const tables = await prisma.legacyTable.findMany({
     where: {
       businessId: business.id,
       ...branchFilter(filters.branchId ?? null),
@@ -226,7 +226,7 @@ export async function updateTable(
 ): Promise<TableData> {
   const business = await getOwnedBusiness(ownerId);
 
-  const existing = await prisma.table.findFirst({
+  const existing = await prisma.legacyTable.findFirst({
     where: { id: tableId, businessId: business.id },
   });
 
@@ -248,7 +248,7 @@ export async function updateTable(
     await assertUniqueTableName(business.id, nextName, tableId);
   }
 
-  const table = await prisma.table.update({
+  const table = await prisma.legacyTable.update({
     where: { id: tableId },
     data: {
       ...(input.name !== undefined ? { name: nextName } : {}),
@@ -269,7 +269,7 @@ export async function updateTable(
 export async function deleteTable(ownerId: string, tableId: string): Promise<void> {
   const business = await getOwnedBusiness(ownerId);
 
-  const existing = await prisma.table.findFirst({
+  const existing = await prisma.legacyTable.findFirst({
     where: { id: tableId, businessId: business.id },
   });
 
@@ -279,7 +279,7 @@ export async function deleteTable(ownerId: string, tableId: string): Promise<voi
 
   await assertNoActiveReservations(business.id, tableId);
 
-  await prisma.table.delete({ where: { id: tableId } });
+  await prisma.legacyTable.delete({ where: { id: tableId } });
 }
 
 export async function updateTableStatus(
@@ -289,7 +289,7 @@ export async function updateTableStatus(
 ): Promise<TableData> {
   const business = await getOwnedBusiness(ownerId);
 
-  const existing = await prisma.table.findFirst({
+  const existing = await prisma.legacyTable.findFirst({
     where: { id: tableId, businessId: business.id },
   });
 
@@ -297,7 +297,7 @@ export async function updateTableStatus(
     throw new Error("Table not found");
   }
 
-  const table = await prisma.table.update({
+  const table = await prisma.legacyTable.update({
     where: { id: tableId },
     data: { status },
   });

@@ -31,6 +31,7 @@ export interface MarketplaceItemView {
 
 export interface MarketplaceInstallationView {
   id: string;
+  itemId: string;
   itemName: string;
   itemSlug: string;
   versionLabel: string | null;
@@ -90,6 +91,7 @@ export function serializeMarketplaceInstallation(
 ): MarketplaceInstallationView {
   return {
     id: installation.id,
+    itemId: installation.itemId,
     itemName: installation.item.name,
     itemSlug: installation.item.slug,
     versionLabel: installation.version.versionLabel,

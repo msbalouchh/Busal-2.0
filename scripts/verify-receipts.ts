@@ -180,7 +180,7 @@ async function main() {
 
   const suffix = Date.now().toString();
   const { order } = await createPayableOrder(business.id, business.ownerId, suffix);
-  const orderRecord = await prisma.order.findUnique({
+  const orderRecord = await prisma.legacyOrder.findUnique({
     where: { id: order.id },
     select: { total: true, subtotal: true, discount: true, tax: true, orderNumber: true },
   });

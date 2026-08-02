@@ -1,0 +1,11 @@
+User-Agent: *
+Allow: /
+Disallow: /app/
+Disallow: /dashboard/
+Disallow: /control-center/
+Disallow: /portal/
+Disallow: /api/
+Disallow: /business-onboarding/
+Disallow: /onboarding/
+
+Sitemap: https://www.getbusal.com/sitemap.xml

@@ -1,19 +1,24 @@
 export const BUSINESS_ROUTES = {
   overview: "/dashboard/business",
+  profile: "/dashboard/business/profile",
   general: "/dashboard/business/general",
   branches: "/dashboard/business/branches",
   hours: "/dashboard/business/hours",
   contact: "/dashboard/business/contact",
+  address: "/dashboard/business/address",
+  branding: "/dashboard/business/branding",
   settings: "/dashboard/business/settings",
 } as const;
 
 export const BUSINESS_NAV_ITEMS = [
   { label: "Overview", href: BUSINESS_ROUTES.overview },
-  { label: "General", href: BUSINESS_ROUTES.general },
-  { label: "Branches", href: BUSINESS_ROUTES.branches },
-  { label: "Hours", href: BUSINESS_ROUTES.hours },
+  { label: "Profile", href: BUSINESS_ROUTES.profile },
   { label: "Contact", href: BUSINESS_ROUTES.contact },
+  { label: "Address", href: BUSINESS_ROUTES.address },
+  { label: "Branches", href: BUSINESS_ROUTES.branches },
+  { label: "Branding", href: BUSINESS_ROUTES.branding },
   { label: "Settings", href: BUSINESS_ROUTES.settings },
+  { label: "Hours", href: BUSINESS_ROUTES.hours },
 ] as const;
 
 export const WEEKDAYS = [

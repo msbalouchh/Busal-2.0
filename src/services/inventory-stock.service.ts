@@ -204,7 +204,7 @@ export async function deductStockForCompletedOrder(
     return;
   }
 
-  const order = await prisma.order.findFirst({
+  const order = await prisma.legacyOrder.findFirst({
     where: { id: orderId, businessId, status: "COMPLETED" },
     include: {
       items: {

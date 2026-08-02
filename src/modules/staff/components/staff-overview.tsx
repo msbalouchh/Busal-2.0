@@ -1,74 +1,57 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { StaffAuditEntry } from "@/modules/staff/types/staff-management-types";
 import type { RoleData, StaffData } from "@/services/staff-management.service";
 
 interface StaffOverviewProps {
   members: StaffData[];
   roles: RoleData[];
+  invitationCount: number;
+  recentActivity: StaffAuditEntry[];
 }
 
-export function StaffOverview({ members, roles }: StaffOverviewProps) {
+export function StaffOverview({
+  members,
+  roles,
+  invitationCount,
+  recentActivity,
+}: StaffOverviewProps) {
   const activeMembers = members.filter((member) => member.isActive);
-  const inactiveMembers = members.filter((member) => !member.isActive);
-  const systemRoles = roles.filter((role) => role.isSystem);
-  const customRoles = roles.filter((role) => !role.isSystem);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Team Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p>
-            <span className="text-muted-foreground">Total members:</span> {members.length}
-          </p>
-          <p>
-            <span className="text-muted-foreground">Active:</span> {activeMembers.length}
-          </p>
-          <p>
-            <span className="text-muted-foreground">Inactive:</span> {inactiveMembers.length}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Roles</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p>
-            <span className="text-muted-foreground">System roles:</span> {systemRoles.length}
-          </p>
-          <p>
-            <span className="text-muted-foreground">Custom roles:</span> {customRoles.length}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card className="md:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-base">Recent Members</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {members.length === 0 ? (
-            <p className="text-muted-foreground">No staff members yet.</p>
-          ) : (
-            members.slice(0, 5).map((member) => (
-              <p key={member.id}>
-                <span className="font-medium">
-                  {member.firstName} {member.lastName}
-                </span>
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="rounded-lg border p-4">
+        <p className="text-muted-foreground text-sm">Total staff</p>
+        <p className="text-2xl font-semibold">{members.length}</p>
+      </div>
+      <div className="rounded-lg border p-4">
+        <p className="text-muted-foreground text-sm">Active staff</p>
+        <p className="text-2xl font-semibold">{activeMembers.length}</p>
+      </div>
+      <div className="rounded-lg border p-4">
+        <p className="text-muted-foreground text-sm">Roles</p>
+        <p className="text-2xl font-semibold">{roles.length}</p>
+      </div>
+      <div className="rounded-lg border p-4">
+        <p className="text-muted-foreground text-sm">Pending invitations</p>
+        <p className="text-2xl font-semibold">{invitationCount}</p>
+      </div>
+      <div className="rounded-lg border p-4 md:col-span-2 xl:col-span-4">
+        <p className="mb-3 font-semibold">Recent activity</p>
+        {recentActivity.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No recent staff activity.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {recentActivity.slice(0, 5).map((entry) => (
+              <li key={entry.id}>
+                <span className="font-medium">{entry.eventType.replaceAll("_", " ")}</span>
                 <span className="text-muted-foreground">
                   {" "}
-                  — {member.roles[0]?.name ?? "No role"}
-                  {member.branch ? ` · ${member.branch.name}` : ""}
-                  {!member.isActive ? " · Inactive" : ""}
+                  · {new Date(entry.createdAt).toLocaleString()}
                 </span>
-              </p>
-            ))
-          )}
-        </CardContent>
-      </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

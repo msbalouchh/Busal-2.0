@@ -5,7 +5,7 @@ export const COMMUNICATION_ROUTES = {
   team: "/dashboard/communication/inbox/team",
   department: "/dashboard/communication/inbox/department",
   ai: "/dashboard/communication/inbox/ai",
-  conversations: "/dashboard/communication/conversations",
+  conversations: "/dashboard/communication/inbox",
   channels: "/dashboard/communication/channels",
   search: "/dashboard/communication/search",
   audit: "/dashboard/communication/audit",

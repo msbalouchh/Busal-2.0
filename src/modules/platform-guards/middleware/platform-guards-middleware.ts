@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { ROUTES } from "@/constants/routes";
 import {
   AUTH_ROUTES,
+  CUSTOMER_PORTAL_PUBLIC_ROUTES,
   PLATFORM_API_PREFIX,
   PLATFORM_DASHBOARD_PREFIX,
   PLATFORM_PROTECTED_API_ROUTES,
@@ -20,8 +21,34 @@ export function isPlatformProtectedAppRoute(pathname: string): boolean {
   return PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
+export function isCustomerPortalRoute(pathname: string): boolean {
+  return pathname === ROUTES.customerPortal || pathname.startsWith(`${ROUTES.customerPortal}/`);
+}
+
+export function isCustomerPortalPublicRoute(pathname: string): boolean {
+  return CUSTOMER_PORTAL_PUBLIC_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
+export function isCustomerPortalProtectedRoute(pathname: string): boolean {
+  return isCustomerPortalRoute(pathname) && !isCustomerPortalPublicRoute(pathname);
+}
+
 export function isPlatformAuthRoute(pathname: string): boolean {
   return AUTH_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
+export function isBusinessAuthRoute(pathname: string): boolean {
+  return [ROUTES.login, ROUTES.signup, ROUTES.forgotPassword].some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
+export function isCustomerPortalAuthRoute(pathname: string): boolean {
+  return [ROUTES.customerPortalLogin, ROUTES.customerPortalRegister].some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
 }
 
 export function isPlatformApiRoute(pathname: string): boolean {
@@ -52,14 +79,24 @@ export function redirectUnauthenticatedToLogin(
   pathname: string,
 ): NextResponse {
   const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = ROUTES.login;
+  redirectUrl.pathname = isCustomerPortalRoute(pathname)
+    ? ROUTES.customerPortalLogin
+    : ROUTES.login;
   redirectUrl.searchParams.set("redirectTo", pathname);
   return NextResponse.redirect(redirectUrl);
 }
 
 export function redirectAuthenticatedToDashboard(request: NextRequest): NextResponse {
   const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = ROUTES.dashboard;
+  redirectUrl.pathname = ROUTES.application;
+  redirectUrl.search = "";
+  return NextResponse.redirect(redirectUrl);
+}
+
+export function redirectAuthenticatedToCustomerPortal(request: NextRequest): NextResponse {
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = ROUTES.customerPortal;
+  redirectUrl.search = "";
   return NextResponse.redirect(redirectUrl);
 }
 

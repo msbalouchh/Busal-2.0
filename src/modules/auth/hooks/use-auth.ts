@@ -14,6 +14,7 @@ import {
   signupWithEmail,
 } from "@/modules/auth/lib/auth.client";
 import { useAuthStore } from "@/stores/auth.store";
+import type { LoginFormValues } from "@/schemas/auth.schema";
 
 function useInvalidateSession() {
   const queryClient = useQueryClient();
@@ -28,12 +29,12 @@ export function useLogin(redirectTo?: string) {
   const invalidateSession = useInvalidateSession();
 
   return useMutation({
-    mutationFn: loginWithEmail,
+    mutationFn: (values: LoginFormValues) => loginWithEmail({ ...values, redirectTo }),
     onSuccess: (data) => {
       setUser(data.user);
       invalidateSession();
       toast.success("Welcome back!");
-      router.push(redirectTo ?? ROUTES.dashboard);
+      router.push(data.redirectPath ?? redirectTo ?? ROUTES.application);
       router.refresh();
     },
     onError: (error: Error) => {
@@ -54,13 +55,13 @@ export function useSignup() {
         setUser(data.user);
         invalidateSession();
         toast.success("Account created successfully!");
-        router.push(ROUTES.onboarding);
+        router.push(ROUTES.businessOnboarding);
         router.refresh();
         return;
       }
 
       toast.success("Check your email to confirm your account before signing in.");
-      router.push(ROUTES.login);
+      router.push(ROUTES.verifyEmail);
     },
     onError: (error: Error) => {
       toast.error(error.message);

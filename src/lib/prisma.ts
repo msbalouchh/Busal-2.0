@@ -53,6 +53,7 @@ function getPrismaClient(): PrismaClient {
 
   // Recreate after schema changes when the dev server was not restarted.
   if (
+    process.env.NODE_ENV === "development" &&
     cached &&
     (!hasReservationDelegate(cached) ||
       !hasTableDelegate(cached) ||

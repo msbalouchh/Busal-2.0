@@ -12,10 +12,14 @@ export const RESERVATION_STATUS_OPTIONS = [
 ] as const;
 
 export const RESERVATION_SOURCE_OPTIONS = [
-  { value: "WALK_IN", label: "Walk-in" },
   { value: "PHONE", label: "Phone" },
+  { value: "WALK_IN", label: "Walk-in" },
   { value: "WEBSITE", label: "Website" },
   { value: "QR", label: "QR" },
+  { value: "GOOGLE", label: "Google" },
+  { value: "FACEBOOK", label: "Facebook" },
+  { value: "INSTAGRAM", label: "Instagram" },
+  { value: "OTHER", label: "Other" },
   { value: "ADMIN", label: "Admin" },
 ] as const;
 

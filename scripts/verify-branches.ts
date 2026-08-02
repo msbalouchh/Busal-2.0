@@ -61,7 +61,7 @@ async function createBranchOrder(
   await markOrderSessionReady(orderSession.id);
 
   const order = await createOrderFromSession(orderSession.id, branchId);
-  const orderRecord = await prisma.order.findUniqueOrThrow({
+  const orderRecord = await prisma.legacyOrder.findUniqueOrThrow({
     where: { id: order.id },
     select: { total: true, branchId: true },
   });

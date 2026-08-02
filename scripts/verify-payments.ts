@@ -207,7 +207,7 @@ async function main() {
 
   const suffix = Date.now().toString();
   const { order } = await createPayableOrder(business.id, business.ownerId, suffix);
-  const orderRecord = await prisma.order.findUnique({
+  const orderRecord = await prisma.legacyOrder.findUnique({
     where: { id: order.id },
     select: { total: true },
   });
@@ -303,7 +303,7 @@ async function main() {
   assertIntegerPenceValue(splitPayment.payment.amount, "split payment amount");
   assert(splitPayment.summary.isFullyPaid, "split payment should complete order");
   assert(splitPayment.summary.remainingBalance === 0, "remaining balance should be zero");
-  const completedOrder = await prisma.order.findUnique({
+  const completedOrder = await prisma.legacyOrder.findUnique({
     where: { id: order.id },
     select: { status: true },
   });
@@ -328,7 +328,7 @@ async function main() {
   console.log("Void payment before completion");
   const suffixVoid = `${suffix}-void`;
   const { order: voidOrder } = await createPayableOrder(business.id, business.ownerId, suffixVoid);
-  const voidOrderRecord = await prisma.order.findUnique({
+  const voidOrderRecord = await prisma.legacyOrder.findUnique({
     where: { id: voidOrder.id },
     select: { total: true },
   });

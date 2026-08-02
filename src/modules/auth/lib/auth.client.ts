@@ -40,7 +40,7 @@ export async function loginWithEmail(values: LoginFormValues) {
     body: JSON.stringify(values),
   });
 
-  return parseAuthResponse<{ user: AuthUser }>(response);
+  return parseAuthResponse<{ user: AuthUser; redirectPath?: string }>(response);
 }
 
 export async function signupWithEmail(values: SignupFormValues) {

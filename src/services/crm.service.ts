@@ -343,7 +343,7 @@ export async function getCustomerOrderHistory(
 ): Promise<CustomerOrderHistory> {
   await getCustomer(customerId, businessId);
 
-  const orders = await prisma.order.findMany({
+  const orders = await prisma.legacyOrder.findMany({
     where: { customerId, businessId, ...branchFilter(branchId), status: "COMPLETED" },
     include: {
       items: { select: { nameSnapshot: true, quantity: true } },
@@ -385,7 +385,7 @@ export async function getCrmDashboard(businessId: string, branchId: string | nul
       loyaltyPoints: true,
       createdAt: true,
       group: { select: { slug: true, name: true } },
-      orders: {
+      legacyOrders: {
         where: { status: "COMPLETED", ...branchFilter(branchId) },
         select: { total: true },
       },
@@ -396,14 +396,16 @@ export async function getCrmDashboard(businessId: string, branchId: string | nul
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   const newCustomers = customers.filter((customer) => customer.createdAt >= thirtyDaysAgo).length;
-  const returningCustomers = customers.filter((customer) => customer.orders.length > 1).length;
+  const returningCustomers = customers.filter(
+    (customer) => customer.legacyOrders.length > 1,
+  ).length;
   const vipCustomers = customers.filter((customer) => customer.group?.slug === "vip").length;
 
   const topSpenders = customers
     .map((customer) => ({
       id: customer.id,
       name: customer.name,
-      totalSpentPence: customer.orders.reduce(
+      totalSpentPence: customer.legacyOrders.reduce(
         (sum, order) => sum + moneyDecimalToPence(order.total),
         0,
       ),
@@ -476,7 +478,7 @@ export async function processCrmForCompletedOrder(
   staffId: string | null,
   paymentId?: string | null,
 ): Promise<void> {
-  const order = await prisma.order.findFirst({
+  const order = await prisma.legacyOrder.findFirst({
     where: { id: orderId, businessId },
     select: {
       id: true,
@@ -499,7 +501,7 @@ export async function processCrmForCompletedOrder(
   }
 
   if (!order.customerId) {
-    await prisma.order.update({
+    await prisma.legacyOrder.update({
       where: { id: orderId },
       data: { customerId },
     });

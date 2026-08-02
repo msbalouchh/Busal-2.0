@@ -200,11 +200,14 @@
 
   /* Shadows (dark-tuned) */
   --shadow-sm: 0 1px 2px 0 hsl(var(--palette-slate-950) / 0.3);
-  --shadow-md: 0 2px 4px -1px hsl(var(--palette-slate-950) / 0.4),
+  --shadow-md:
+    0 2px 4px -1px hsl(var(--palette-slate-950) / 0.4),
     0 1px 2px -1px hsl(var(--palette-slate-950) / 0.3);
-  --shadow-lg: 0 8px 16px -4px hsl(var(--palette-slate-950) / 0.5),
+  --shadow-lg:
+    0 8px 16px -4px hsl(var(--palette-slate-950) / 0.5),
     0 4px 6px -2px hsl(var(--palette-slate-950) / 0.35);
-  --shadow-xl: 0 20px 40px -12px hsl(var(--palette-slate-950) / 0.6),
+  --shadow-xl:
+    0 20px 40px -12px hsl(var(--palette-slate-950) / 0.6),
     0 8px 16px -4px hsl(var(--palette-slate-950) / 0.4);
 
   /* Motion */
@@ -290,11 +293,14 @@
 
   /* Shadows (light-tuned: softer, warmer) */
   --shadow-sm: 0 1px 2px 0 hsl(var(--palette-slate-900) / 0.05);
-  --shadow-md: 0 2px 4px -1px hsl(var(--palette-slate-900) / 0.08),
+  --shadow-md:
+    0 2px 4px -1px hsl(var(--palette-slate-900) / 0.08),
     0 1px 2px -1px hsl(var(--palette-slate-900) / 0.06);
-  --shadow-lg: 0 8px 16px -4px hsl(var(--palette-slate-900) / 0.1),
+  --shadow-lg:
+    0 8px 16px -4px hsl(var(--palette-slate-900) / 0.1),
     0 4px 6px -2px hsl(var(--palette-slate-900) / 0.06);
-  --shadow-xl: 0 20px 40px -12px hsl(var(--palette-slate-900) / 0.15),
+  --shadow-xl:
+    0 20px 40px -12px hsl(var(--palette-slate-900) / 0.15),
     0 8px 16px -4px hsl(var(--palette-slate-900) / 0.08);
 }
 
@@ -419,6 +425,14 @@
   --z-index-modal: var(--z-index-modal);
   --z-index-toast: var(--z-index-toast);
   --z-index-tooltip: var(--z-index-tooltip);
+
+  /* Marketing website tokens (WIP) */
+  --color-marketing-ink: #0c1222;
+  --color-marketing-muted: #5b657a;
+  --color-marketing-surface: #f7f5f1;
+  --color-marketing-panel: #efebe3;
+  --color-marketing-line: #ddd6c8;
+  --color-marketing-accent: #0d7377;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -438,6 +452,19 @@
 
   html.light {
     color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 
   body {
@@ -469,6 +496,86 @@
 
   *::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.15);
+  }
+
+  :focus-visible {
+    outline-offset: 2px;
+  }
+
+  .skip-to-content {
+    @apply bg-primary text-primary-foreground sr-only fixed top-4 left-4 z-[100] rounded-md px-4 py-2 text-sm font-medium shadow-md;
+    @apply focus:ring-ring focus:ring-offset-background focus:not-sr-only focus:ring-2 focus:ring-offset-2 focus:outline-none;
+  }
+}
+
+/* Marketing website tokens — charcoal + teal, not purple SaaS defaults */
+.marketing-root {
+  --marketing-ink: #0c1222;
+  --marketing-muted: #5b657a;
+  --marketing-surface: #f7f5f1;
+  --marketing-panel: #efebe3;
+  --marketing-line: #ddd6c8;
+  --marketing-accent: #0d7377;
+  --color-marketing-ink: var(--marketing-ink);
+  --color-marketing-muted: var(--marketing-muted);
+  --color-marketing-surface: var(--marketing-surface);
+  --color-marketing-panel: var(--marketing-panel);
+  --color-marketing-line: var(--marketing-line);
+  --color-marketing-accent: var(--marketing-accent);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(13, 115, 119, 0.08), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(12, 18, 34, 0.05), transparent 50%);
+  color: var(--marketing-ink);
+  font-family: var(--font-marketing-sans), var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.marketing-root .font-marketing-display {
+  font-family: var(--font-marketing-display), Georgia, serif;
+}
+
+.marketing-root .text-marketing-ink {
+  color: var(--marketing-ink);
+}
+.marketing-root .text-marketing-muted {
+  color: var(--marketing-muted);
+}
+.marketing-root .text-marketing-surface {
+  color: var(--marketing-surface);
+}
+.marketing-root .text-marketing-accent {
+  color: var(--marketing-accent);
+}
+.marketing-root .bg-marketing-ink {
+  background-color: var(--marketing-ink);
+}
+.marketing-root .bg-marketing-surface {
+  background-color: var(--marketing-surface);
+}
+.marketing-root .bg-marketing-panel {
+  background-color: var(--marketing-panel);
+}
+.marketing-root .bg-marketing-accent {
+  background-color: var(--marketing-accent);
+}
+.marketing-root .border-marketing-line {
+  border-color: var(--marketing-line);
+}
+
+.marketing-root .prose-marketing a {
+  color: var(--marketing-accent);
+  text-underline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .motion-safe\:animate-in,
+  .marketing-root .hover\:-translate-y-0\.5:hover,
+  .marketing-root .hover\:-translate-y-1:hover {
+    animation: none !important;
+    transform: none !important;
   }
 }
 

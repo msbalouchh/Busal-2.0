@@ -87,6 +87,15 @@ export async function ensureUserAndBusiness(
           },
         });
 
+        await tx.businessMember.create({
+          data: {
+            businessId: business.id,
+            userId: user.id,
+            role: "OWNER",
+            status: "ACTIVE",
+          },
+        });
+
         return {
           user,
           business,
@@ -119,6 +128,15 @@ export async function ensureUserAndBusiness(
         data: {
           ownerId: user.id,
           ...DEFAULT_BUSINESS_VALUES,
+        },
+      });
+
+      await tx.businessMember.create({
+        data: {
+          businessId: business.id,
+          userId: user.id,
+          role: "OWNER",
+          status: "ACTIVE",
         },
       });
 

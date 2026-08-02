@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Business, BusinessType, Prisma } from "@prisma/client";
 
+import { getActiveBusinessCookie } from "@/modules/business-context/services/business-context-session.service";
 import { ONBOARDING_TOTAL_STEPS } from "@/modules/onboarding/config/onboarding-steps";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_BUSINESS_VALUES } from "@/services/business-provisioning.service";
@@ -20,6 +21,13 @@ function mapBusiness(business: Business): BusinessProfileData {
     aiPersonality: business.aiPersonality,
     businessGoal: business.businessGoal,
     businessDna: business.businessDna as BusinessDna,
+    businessCode: business.businessCode,
+    industry: business.industry,
+    currency: business.currency,
+    phone: business.phone,
+    businessEmail: business.businessEmail,
+    businessSetupCompleted: business.businessSetupCompleted,
+    businessSetupStep: business.businessSetupStep,
     onboardingCompleted: business.onboardingCompleted,
     onboardingStep: business.onboardingStep,
     createdAt: business.createdAt,
@@ -27,7 +35,7 @@ function mapBusiness(business: Business): BusinessProfileData {
   };
 }
 
-async function getPrimaryBusinessByOwnerId(ownerId: string): Promise<Business | null> {
+export async function getPrimaryBusinessByOwnerId(ownerId: string): Promise<Business | null> {
   return prisma.business.findFirst({
     where: { ownerId },
     orderBy: { createdAt: "asc" },
@@ -35,8 +43,24 @@ async function getPrimaryBusinessByOwnerId(ownerId: string): Promise<Business | 
 }
 
 export async function getBusinessByOwnerId(ownerId: string): Promise<BusinessProfileData | null> {
-  const business = await getPrimaryBusinessByOwnerId(ownerId);
-  return business ? mapBusiness(business) : null;
+  const businesses = await listBusinessesForOwner(ownerId);
+
+  if (businesses.length === 0) {
+    return null;
+  }
+
+  const cookie = await getActiveBusinessCookie();
+
+  if (
+    cookie?.userId === ownerId &&
+    businesses.some((business) => business.id === cookie.businessId)
+  ) {
+    return (
+      businesses.find((business) => business.id === cookie.businessId) ?? businesses[0] ?? null
+    );
+  }
+
+  return businesses[0] ?? null;
 }
 
 export async function listBusinessesForOwner(ownerId: string): Promise<BusinessProfileData[]> {

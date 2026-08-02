@@ -9,6 +9,8 @@ import {
 
 export { normalizePermissions, toPermissionEvaluationContext };
 
+export { hasRole, hasAnyRole } from "@/modules/authorization/utils/role-utils";
+
 export function normalizePermissionCodes(
   permissions: Iterable<PermissionCode>,
 ): Set<PermissionCode> {

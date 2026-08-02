@@ -21,9 +21,11 @@ export function EmptyState({ title, description, icon, action, className }: Empt
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center",
+        "bg-muted/20 flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center sm:p-12",
         className,
       )}
+      role="status"
+      aria-live="polite"
     >
       <div className="bg-muted mb-4 flex h-12 w-12 items-center justify-center rounded-full">
         {icon ?? <Inbox className="text-muted-foreground h-6 w-6" aria-hidden="true" />}

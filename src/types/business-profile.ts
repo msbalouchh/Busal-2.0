@@ -12,6 +12,13 @@ export interface BusinessProfileData {
   aiPersonality: string | null;
   businessGoal: string | null;
   businessDna: BusinessDna;
+  businessCode: string | null;
+  industry: string | null;
+  currency: string | null;
+  phone: string | null;
+  businessEmail: string | null;
+  businessSetupCompleted: boolean;
+  businessSetupStep: number;
   onboardingCompleted: boolean;
   onboardingStep: number;
   createdAt: Date;

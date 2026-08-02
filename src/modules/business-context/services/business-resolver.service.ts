@@ -24,6 +24,13 @@ function mapBusinessRecord(business: {
   aiPersonality: string | null;
   businessGoal: string | null;
   businessDna: unknown;
+  businessCode?: string | null;
+  industry?: string | null;
+  currency?: string | null;
+  phone?: string | null;
+  businessEmail?: string | null;
+  businessSetupCompleted?: boolean;
+  businessSetupStep?: number;
   onboardingCompleted: boolean;
   onboardingStep: number;
   createdAt: Date;
@@ -41,6 +48,13 @@ function mapBusinessRecord(business: {
     aiPersonality: business.aiPersonality,
     businessGoal: business.businessGoal,
     businessDna: business.businessDna as BusinessProfileData["businessDna"],
+    businessCode: business.businessCode ?? null,
+    industry: business.industry ?? null,
+    currency: business.currency ?? null,
+    phone: business.phone ?? null,
+    businessEmail: business.businessEmail ?? null,
+    businessSetupCompleted: business.businessSetupCompleted ?? false,
+    businessSetupStep: business.businessSetupStep ?? 1,
     onboardingCompleted: business.onboardingCompleted,
     onboardingStep: business.onboardingStep,
     createdAt: business.createdAt,

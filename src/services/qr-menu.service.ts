@@ -186,7 +186,7 @@ async function assertTableBelongsToBusiness(
     return;
   }
 
-  const table = await prisma.table.findFirst({
+  const table = await prisma.legacyTable.findFirst({
     where: { id: tableId, businessId },
     select: { id: true },
   });

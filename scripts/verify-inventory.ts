@@ -147,7 +147,7 @@ async function main() {
 
   console.log("Schema pence storage");
   const schemaSource = readFileSync(join(root, "prisma/schema.prisma"), "utf8");
-  assert(schemaSource.includes("costPricePence Int"), "ingredient cost must be integer pence");
+  assert(/costPricePence\s+Int/.test(schemaSource), "ingredient cost must be integer pence");
   console.log("  PASS");
 
   const business = await prisma.business.findFirst({
@@ -207,7 +207,7 @@ async function main() {
   console.log("  PASS");
 
   console.log("Stock deduction on completed payment");
-  const orderRecord = await prisma.order.findUnique({
+  const orderRecord = await prisma.legacyOrder.findUnique({
     where: { id: order.id },
     select: { total: true },
   });

@@ -79,7 +79,7 @@ async function main() {
   console.log("  PASS");
 
   console.log("Order number generated");
-  const duplicate = await prisma.order.findFirst({
+  const duplicate = await prisma.legacyOrder.findFirst({
     where: { businessId: business.id, orderNumber: order.orderNumber },
   });
   assert(duplicate?.id === order.id, "order number uniqueness failed");
@@ -120,8 +120,8 @@ async function main() {
   console.log("  PASS");
 
   console.log("Cleanup");
-  await prisma.orderItem.deleteMany({ where: { orderId: order.id } });
-  await prisma.order.delete({ where: { id: order.id } });
+  await prisma.legacyOrderItem.deleteMany({ where: { orderId: order.id } });
+  await prisma.legacyOrder.delete({ where: { id: order.id } });
   await prisma.orderSession.delete({ where: { id: orderSession.id } });
   await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
   await prisma.cart.delete({ where: { id: cart.id } });

@@ -12,7 +12,10 @@ import {
   onboardingRequired,
   permissionDenied,
 } from "@/modules/authorization/utils/authorization-errors";
-import { requireBusinessContextForApi } from "@/modules/business-context/services/business-context.service";
+import {
+  requireBusinessContextForApi,
+  assertUserBelongsToBusiness,
+} from "@/modules/business-context/services/business-context.service";
 import { assertBranchAccess } from "@/modules/business-context/utils/branch-access";
 import type { PlatformContext } from "@/modules/platform-guards/types/platform-context";
 import { mapToPlatformGuardError } from "@/modules/platform-guards/utils/error-mapper";
@@ -84,6 +87,8 @@ export async function protectedAction<T>(
       });
       throw onboardingRequired();
     }
+
+    await assertUserBelongsToBusiness(platform.user.id, platform.business.id, platform.user.email);
 
     if (!evaluateRequirement(platform, requirement)) {
       logAuthorizationDecision({

@@ -788,4 +788,54 @@ export async function listMarketplaceRevenueRecords(businessId: string, limit = 
   });
 }
 
+export async function listMarketplaceLicenses(businessId: string) {
+  return prisma.marketplaceLicense.findMany({
+    where: { businessId },
+    include: { item: { include: { publisher: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function getMarketplaceItemBySlug(slug: string) {
+  await ensureMarketplaceCatalogue();
+
+  return prisma.marketplaceItem.findUnique({
+    where: { slug },
+    include: {
+      publisher: true,
+      currentVersion: true,
+      versions: { orderBy: { versionNumber: "desc" } },
+      reviews: { orderBy: { createdAt: "desc" }, take: 20 },
+    },
+  });
+}
+
+export async function listPublisherMarketplaceItems(businessId: string) {
+  const publisher = await prisma.marketplacePublisher.findFirst({
+    where: { businessId },
+  });
+
+  if (!publisher) {
+    return [];
+  }
+
+  return prisma.marketplaceItem.findMany({
+    where: { publisherId: publisher.id },
+    include: {
+      publisher: true,
+      currentVersion: { select: { versionLabel: true } },
+      versions: { orderBy: { versionNumber: "desc" }, take: 5 },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+}
+
+export async function listMarketplaceReviewsForItem(itemId: string, limit = 20) {
+  return prisma.marketplaceReview.findMany({
+    where: { itemId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
 export { ensureBootstrapMarketplacePlugins };

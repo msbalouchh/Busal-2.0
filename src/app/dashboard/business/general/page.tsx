@@ -1,23 +1,12 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { BusinessGeneralForm } from "@/modules/business/components/business-general-form";
-import { BusinessPageHeader } from "@/modules/business/components/business-page-header";
-import { getBusinessModuleContext } from "@/modules/business/lib/get-business-context";
+import { BUSINESS_PROFILE_ROUTES } from "@/modules/business/constants/business-profile";
 
 export const metadata: Metadata = {
   title: "General Information",
 };
 
-export default async function BusinessGeneralPage() {
-  const { business } = await getBusinessModuleContext();
-
-  return (
-    <div className="space-y-6">
-      <BusinessPageHeader
-        title="General Information"
-        description="Update your core business details used across Busal OS."
-      />
-      <BusinessGeneralForm business={business} />
-    </div>
-  );
+export default function BusinessGeneralRedirectPage() {
+  redirect(BUSINESS_PROFILE_ROUTES.profile);
 }

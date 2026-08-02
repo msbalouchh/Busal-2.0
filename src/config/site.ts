@@ -5,9 +5,9 @@ import { resolvePublicAppUrl } from "@/config/app-url";
 export const siteConfig = {
   name: "Busal OS",
   description:
-    "AI-first multi-tenant operating system for small businesses. Built for restaurants, designed for every industry.",
+    "The AI Operating System for Modern Businesses. Unify operations, customers, finance, and intelligence in one platform.",
   url: resolvePublicAppUrl(),
-  ogImage: "/og.png",
+  ogImage: "/opengraph-image",
   links: {
     github: "https://github.com/busal-os",
   },
@@ -20,18 +20,26 @@ export const defaultMetadata: Metadata = {
   },
   description: siteConfig.description,
   metadataBase: new URL(siteConfig.url),
+  applicationName: siteConfig.name,
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon" }],
+  },
+  manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
-    locale: "en_US",
+    locale: "en_GB",
     url: siteConfig.url,
     title: siteConfig.name,
     description: siteConfig.description,
     siteName: siteConfig.name,
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: siteConfig.name }],
   },
   twitter: {
     card: "summary_large_image",
     title: siteConfig.name,
     description: siteConfig.description,
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,

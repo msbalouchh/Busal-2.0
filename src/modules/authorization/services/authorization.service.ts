@@ -19,8 +19,10 @@ import {
   hasPermission,
   normalizePermissionCodes,
 } from "@/modules/authorization/utils/permission-utils";
+import { forbidden } from "@/modules/authorization/utils/authorization-errors";
+import { hasAnyRole, hasRole } from "@/modules/authorization/utils/role-utils";
 
-export { hasAllPermissions, hasAnyPermission, hasPermission };
+export { hasAllPermissions, hasAnyPermission, hasPermission, hasRole, hasAnyRole };
 
 export async function listAllPermissionCodes(): Promise<PermissionCode[]> {
   const permissions = await prisma.permission.findMany({
@@ -129,6 +131,40 @@ async function getStaffPermissions(
   return aggregateStaffPermissions(staffMember.staffRoles);
 }
 
+async function getBusinessMemberPermissions(
+  userId: string,
+  businessId: string,
+): Promise<{ permissions: PermissionCode[]; roleSlug: string | null }> {
+  const membership = await prisma.businessMember.findFirst({
+    where: {
+      businessId,
+      userId,
+      status: "ACTIVE",
+    },
+    include: {
+      memberRoles: {
+        include: {
+          role: {
+            include: {
+              rolePermissions: {
+                include: {
+                  permission: { select: { code: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!membership || membership.memberRoles.length === 0) {
+    return { permissions: [], roleSlug: null };
+  }
+
+  return aggregateStaffPermissions(membership.memberRoles.map((entry) => ({ role: entry.role })));
+}
+
 function aggregateStaffPermissions(
   staffRoles: Array<{
     role: {
@@ -169,7 +205,13 @@ export async function getUserPermissions(
   }
 
   const staffAccess = await getStaffPermissions(userId, businessId);
-  return staffAccess.permissions;
+
+  if (staffAccess.permissions.length > 0) {
+    return staffAccess.permissions;
+  }
+
+  const memberAccess = await getBusinessMemberPermissions(userId, businessId);
+  return memberAccess.permissions;
 }
 
 export async function resolveAuthorizationContext(
@@ -194,11 +236,23 @@ export async function resolveAuthorizationContext(
 
   const staffAccess = await getStaffPermissions(user.id, business.id);
 
+  if (staffAccess.permissions.length > 0) {
+    return {
+      user,
+      business,
+      permissions: normalizePermissionCodes(staffAccess.permissions),
+      roleSlug: staffAccess.roleSlug,
+      isOwner: false,
+    };
+  }
+
+  const memberAccess = await getBusinessMemberPermissions(user.id, business.id);
+
   return {
     user,
     business,
-    permissions: normalizePermissionCodes(staffAccess.permissions),
-    roleSlug: staffAccess.roleSlug,
+    permissions: normalizePermissionCodes(memberAccess.permissions),
+    roleSlug: memberAccess.roleSlug,
     isOwner: false,
   };
 }
@@ -269,7 +323,7 @@ export async function assertBusinessAccess(userId: string, businessId: string): 
   });
 
   if (!business) {
-    return;
+    throw forbidden("Business access denied");
   }
 
   if (business.ownerId === userId) {
@@ -282,7 +336,7 @@ export async function assertBusinessAccess(userId: string, businessId: string): 
   });
 
   if (!user?.email) {
-    return;
+    throw forbidden("Business access denied");
   }
 
   const staffMember = await prisma.staff.findFirst({
@@ -295,7 +349,7 @@ export async function assertBusinessAccess(userId: string, businessId: string): 
   });
 
   if (!staffMember) {
-    throw new Error("Business access denied");
+    throw forbidden("Business access denied");
   }
 }
 

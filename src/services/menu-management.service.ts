@@ -99,7 +99,7 @@ async function assertCategoryBelongsToBusiness(
     return;
   }
 
-  const category = await prisma.category.findFirst({
+  const category = await prisma.legacyMenuCategory.findFirst({
     where: { id: categoryId, businessId },
   });
 
@@ -124,7 +124,7 @@ export async function listCategories(
   businessId: string,
   branchId: string | null = null,
 ): Promise<CategoryData[]> {
-  const categories = await prisma.category.findMany({
+  const categories = await prisma.legacyMenuCategory.findMany({
     where: { businessId, ...branchScope(branchId) },
     include: { _count: { select: { menuItems: true } } },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -158,12 +158,12 @@ export async function listPublicMenuItems(
 
 export async function createCategory(ownerId: string, input: CategoryInput): Promise<CategoryData> {
   const business = await getOwnedBusiness(ownerId);
-  const maxSort = await prisma.category.aggregate({
+  const maxSort = await prisma.legacyMenuCategory.aggregate({
     where: { businessId: business.id },
     _max: { sortOrder: true },
   });
 
-  const category = await prisma.category.create({
+  const category = await prisma.legacyMenuCategory.create({
     data: {
       businessId: business.id,
       branchId: input.branchId ?? null,
@@ -190,7 +190,7 @@ export async function updateCategory(
   input: CategoryInput,
 ): Promise<CategoryData> {
   const business = await getOwnedBusiness(ownerId);
-  const category = await prisma.category.findFirst({
+  const category = await prisma.legacyMenuCategory.findFirst({
     where: { id: categoryId, businessId: business.id },
   });
 
@@ -198,7 +198,7 @@ export async function updateCategory(
     throw new Error("Category not found");
   }
 
-  await prisma.category.update({
+  await prisma.legacyMenuCategory.update({
     where: { id: categoryId },
     data: {
       name: input.name.trim(),
@@ -219,7 +219,7 @@ export async function updateCategory(
 
 export async function deleteCategory(ownerId: string, categoryId: string): Promise<void> {
   const business = await getOwnedBusiness(ownerId);
-  const category = await prisma.category.findFirst({
+  const category = await prisma.legacyMenuCategory.findFirst({
     where: { id: categoryId, businessId: business.id },
   });
 
@@ -227,7 +227,7 @@ export async function deleteCategory(ownerId: string, categoryId: string): Promi
     throw new Error("Category not found");
   }
 
-  await prisma.category.delete({ where: { id: categoryId } });
+  await prisma.legacyMenuCategory.delete({ where: { id: categoryId } });
 }
 
 export async function setCategoryActiveStatus(
@@ -236,7 +236,7 @@ export async function setCategoryActiveStatus(
   isActive: boolean,
 ): Promise<void> {
   const business = await getOwnedBusiness(ownerId);
-  const category = await prisma.category.findFirst({
+  const category = await prisma.legacyMenuCategory.findFirst({
     where: { id: categoryId, businessId: business.id },
   });
 
@@ -244,7 +244,7 @@ export async function setCategoryActiveStatus(
     throw new Error("Category not found");
   }
 
-  await prisma.category.update({
+  await prisma.legacyMenuCategory.update({
     where: { id: categoryId },
     data: { isActive },
   });
@@ -252,7 +252,7 @@ export async function setCategoryActiveStatus(
 
 export async function reorderCategories(ownerId: string, orderedIds: string[]): Promise<void> {
   const business = await getOwnedBusiness(ownerId);
-  const categories = await prisma.category.findMany({
+  const categories = await prisma.legacyMenuCategory.findMany({
     where: { businessId: business.id },
     select: { id: true },
   });
@@ -264,7 +264,7 @@ export async function reorderCategories(ownerId: string, orderedIds: string[]): 
         throw new Error("Category not found");
       }
 
-      return prisma.category.update({
+      return prisma.legacyMenuCategory.update({
         where: { id },
         data: { sortOrder: index },
       });
@@ -425,7 +425,7 @@ export async function setMenuItemFeatured(
 }
 
 export async function listModifierGroups(businessId: string): Promise<ModifierGroupData[]> {
-  const groups = await prisma.modifierGroup.findMany({
+  const groups = await prisma.legacyModifierGroup.findMany({
     where: { businessId },
     include: {
       options: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
@@ -460,7 +460,7 @@ export async function createModifierGroup(
 ): Promise<ModifierGroupData> {
   const business = await getOwnedBusiness(ownerId);
 
-  const group = await prisma.modifierGroup.create({
+  const group = await prisma.legacyModifierGroup.create({
     data: {
       businessId: business.id,
       name: input.name.trim(),
@@ -487,7 +487,7 @@ export async function updateModifierGroup(
   input: ModifierGroupInput,
 ): Promise<ModifierGroupData> {
   const business = await getOwnedBusiness(ownerId);
-  const group = await prisma.modifierGroup.findFirst({
+  const group = await prisma.legacyModifierGroup.findFirst({
     where: { id: groupId, businessId: business.id },
   });
 
@@ -495,7 +495,7 @@ export async function updateModifierGroup(
     throw new Error("Modifier group not found");
   }
 
-  await prisma.modifierGroup.update({
+  await prisma.legacyModifierGroup.update({
     where: { id: groupId },
     data: {
       name: input.name.trim(),
@@ -518,7 +518,7 @@ export async function updateModifierGroup(
 
 export async function deleteModifierGroup(ownerId: string, groupId: string): Promise<void> {
   const business = await getOwnedBusiness(ownerId);
-  const group = await prisma.modifierGroup.findFirst({
+  const group = await prisma.legacyModifierGroup.findFirst({
     where: { id: groupId, businessId: business.id },
   });
 
@@ -526,7 +526,7 @@ export async function deleteModifierGroup(ownerId: string, groupId: string): Pro
     throw new Error("Modifier group not found");
   }
 
-  await prisma.modifierGroup.delete({ where: { id: groupId } });
+  await prisma.legacyModifierGroup.delete({ where: { id: groupId } });
 }
 
 export async function createModifierOption(
@@ -535,7 +535,7 @@ export async function createModifierOption(
   input: ModifierOptionInput,
 ): Promise<ModifierGroupData> {
   const business = await getOwnedBusiness(ownerId);
-  const group = await prisma.modifierGroup.findFirst({
+  const group = await prisma.legacyModifierGroup.findFirst({
     where: { id: groupId, businessId: business.id },
   });
 
@@ -543,12 +543,12 @@ export async function createModifierOption(
     throw new Error("Modifier group not found");
   }
 
-  const maxSort = await prisma.modifierOption.aggregate({
+  const maxSort = await prisma.legacyModifierOption.aggregate({
     where: { modifierGroupId: groupId },
     _max: { sortOrder: true },
   });
 
-  await prisma.modifierOption.create({
+  await prisma.legacyModifierOption.create({
     data: {
       modifierGroupId: groupId,
       name: input.name.trim(),
@@ -574,7 +574,7 @@ export async function updateModifierOption(
   input: ModifierOptionInput,
 ): Promise<ModifierGroupData> {
   const business = await getOwnedBusiness(ownerId);
-  const option = await prisma.modifierOption.findFirst({
+  const option = await prisma.legacyModifierOption.findFirst({
     where: { id: optionId, modifierGroup: { businessId: business.id } },
     include: { modifierGroup: true },
   });
@@ -583,7 +583,7 @@ export async function updateModifierOption(
     throw new Error("Modifier option not found");
   }
 
-  await prisma.modifierOption.update({
+  await prisma.legacyModifierOption.update({
     where: { id: optionId },
     data: {
       name: input.name.trim(),
@@ -604,7 +604,7 @@ export async function updateModifierOption(
 
 export async function deleteModifierOption(ownerId: string, optionId: string): Promise<void> {
   const business = await getOwnedBusiness(ownerId);
-  const option = await prisma.modifierOption.findFirst({
+  const option = await prisma.legacyModifierOption.findFirst({
     where: { id: optionId, modifierGroup: { businessId: business.id } },
   });
 
@@ -612,7 +612,7 @@ export async function deleteModifierOption(ownerId: string, optionId: string): P
     throw new Error("Modifier option not found");
   }
 
-  await prisma.modifierOption.delete({ where: { id: optionId } });
+  await prisma.legacyModifierOption.delete({ where: { id: optionId } });
 }
 
 export async function assignModifierGroupsToMenuItem(
@@ -629,7 +629,7 @@ export async function assignModifierGroupsToMenuItem(
     throw new Error("Menu item not found");
   }
 
-  const validGroups = await prisma.modifierGroup.findMany({
+  const validGroups = await prisma.legacyModifierGroup.findMany({
     where: { businessId: business.id, id: { in: modifierGroupIds } },
     select: { id: true },
   });
@@ -638,10 +638,10 @@ export async function assignModifierGroupsToMenuItem(
     throw new Error("Modifier group not found");
   }
 
-  await prisma.menuItemModifier.deleteMany({ where: { menuItemId: itemId } });
+  await prisma.legacyMenuItemModifier.deleteMany({ where: { menuItemId: itemId } });
 
   if (modifierGroupIds.length > 0) {
-    await prisma.menuItemModifier.createMany({
+    await prisma.legacyMenuItemModifier.createMany({
       data: modifierGroupIds.map((modifierGroupId, index) => ({
         menuItemId: itemId,
         modifierGroupId,

@@ -61,9 +61,9 @@ const orderInclude = {
   items: {
     orderBy: [{ createdAt: "asc" as const }],
   },
-} satisfies Prisma.OrderInclude;
+} satisfies Prisma.LegacyOrderInclude;
 
-type OrderWithItems = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
+type OrderWithItems = Prisma.LegacyOrderGetPayload<{ include: typeof orderInclude }>;
 
 function mapOrderItem(item: OrderWithItems["items"][number]): OrderItemData {
   return {
@@ -112,10 +112,10 @@ function mapSessionTypeToFulfilmentType(sessionType: OrderSessionType): Fulfilme
 
 async function generateUniqueOrderNumber(businessId: string): Promise<string> {
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    const count = await prisma.order.count({ where: { businessId } });
+    const count = await prisma.legacyOrder.count({ where: { businessId } });
     const orderNumber = `ORD-${String(count + 1 + attempt).padStart(6, "0")}`;
 
-    const existing = await prisma.order.findFirst({
+    const existing = await prisma.legacyOrder.findFirst({
       where: { businessId, orderNumber },
       select: { id: true },
     });
@@ -129,7 +129,7 @@ async function generateUniqueOrderNumber(businessId: string): Promise<string> {
 }
 
 async function getOrderRecord(orderId: string): Promise<OrderWithItems> {
-  const order = await prisma.order.findUnique({
+  const order = await prisma.legacyOrder.findUnique({
     where: { id: orderId },
     include: orderInclude,
   });
@@ -197,7 +197,7 @@ export async function createOrderFromSession(
   const order = await prisma.$transaction(async (tx) => {
     const sessionBranchId = branchId ?? session.branchId ?? null;
 
-    const created = await tx.order.create({
+    const created = await tx.legacyOrder.create({
       data: {
         businessId: session.businessId,
         branchId: sessionBranchId,
@@ -254,7 +254,7 @@ export async function listOrders(
   businessId: string,
   filters: ListOrdersFilters = {},
 ): Promise<OrderData[]> {
-  const orders = await prisma.order.findMany({
+  const orders = await prisma.legacyOrder.findMany({
     where: {
       businessId,
       ...branchFilter(filters.branchId ?? null),
@@ -278,7 +278,7 @@ export async function cancelOrder(orderId: string): Promise<OrderData> {
     throw new Error("Completed orders cannot be cancelled");
   }
 
-  const updated = await prisma.order.update({
+  const updated = await prisma.legacyOrder.update({
     where: { id: orderId },
     data: { status: "CANCELLED" },
     include: orderInclude,

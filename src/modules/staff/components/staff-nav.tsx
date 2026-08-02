@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { STAFF_NAV_ITEMS } from "@/modules/staff/constants/routes";
+import { STAFF_MANAGEMENT_NAV_ITEMS } from "@/modules/staff/constants/staff-management";
 import { cn } from "@/lib/utils";
 
 export function StaffNav() {
@@ -12,8 +12,8 @@ export function StaffNav() {
   return (
     <nav className="border-b pb-4" aria-label="Staff management">
       <div className="flex flex-wrap gap-2">
-        {STAFF_NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
+        {STAFF_MANAGEMENT_NAV_ITEMS.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link

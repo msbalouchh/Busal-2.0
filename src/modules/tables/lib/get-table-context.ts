@@ -17,13 +17,13 @@ export const getTableModuleContext = cache(async () => {
       where: {
         businessId: context.business.id,
         ...branchFilter(context.branchId),
-        tableId: { not: null },
+        legacyTableId: { not: null },
         status: { in: [...ACTIVE_RESERVATION_STATUSES] },
       },
       select: {
         id: true,
-        tableId: true,
-        customerName: true,
+        legacyTableId: true,
+        guestName: true,
         reservationNumber: true,
         status: true,
       },

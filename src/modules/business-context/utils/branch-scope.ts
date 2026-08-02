@@ -20,11 +20,11 @@ export function branchFilter(branchId: string | null): { branchId?: string } {
   return { branchId };
 }
 
-export function mergeBranchWhere<T extends Prisma.OrderWhereInput>(
+export function mergeBranchWhere<T extends Prisma.LegacyOrderWhereInput>(
   businessId: string,
   branchId: string | null,
   extra?: T,
-): Prisma.OrderWhereInput {
+): Prisma.LegacyOrderWhereInput {
   return {
     businessId,
     ...branchFilter(branchId),

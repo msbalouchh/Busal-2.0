@@ -2,22 +2,22 @@ import type { Metadata } from "next";
 
 import { BusinessOverview } from "@/modules/business/components/business-overview";
 import { BusinessPageHeader } from "@/modules/business/components/business-page-header";
-import { getBusinessModuleContext } from "@/modules/business/lib/get-business-context";
+import { getBusinessProfileContext } from "@/modules/business/lib/get-business-profile-context";
 
 export const metadata: Metadata = {
   title: "Business Overview",
 };
 
 export default async function BusinessOverviewPage() {
-  const { business, branches, hours, contacts } = await getBusinessModuleContext();
+  const { profile } = await getBusinessProfileContext();
 
   return (
     <div className="space-y-6">
       <BusinessPageHeader
         title="Business Overview"
-        description="Read-only summary of your business profile, branches, hours, and contact details."
+        description="Summary of your business profile, regional settings, contact details, and branches."
       />
-      <BusinessOverview business={business} branches={branches} hours={hours} contacts={contacts} />
+      <BusinessOverview profile={profile} />
     </div>
   );
 }

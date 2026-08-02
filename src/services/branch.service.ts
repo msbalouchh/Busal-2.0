@@ -49,7 +49,7 @@ export async function getCentralBranchDashboard(
         prisma.staff.count({
           where: { businessId, branchId: branch.id, isActive: true },
         }),
-        prisma.order.count({
+        prisma.legacyOrder.count({
           where: {
             businessId,
             ...branchFilter(branch.id),
@@ -106,8 +106,10 @@ export async function getBranchDashboard(
   const [staffCount, activeTables, todayOrders, payments, pendingKitchenOrders] = await Promise.all(
     [
       prisma.staff.count({ where: { businessId, branchId, isActive: true } }),
-      prisma.table.count({ where: { businessId, ...scope, isActive: true, status: "OCCUPIED" } }),
-      prisma.order.count({
+      prisma.legacyTable.count({
+        where: { businessId, ...scope, isActive: true, status: "OCCUPIED" },
+      }),
+      prisma.legacyOrder.count({
         where: {
           businessId,
           ...scope,
@@ -144,6 +146,7 @@ export async function getBranchDashboard(
       country: branch.country,
       phone: branch.phone,
       isMain: branch.isMain,
+      isActive: branch.isActive,
       createdAt: branch.createdAt,
       updatedAt: branch.updatedAt,
     },
@@ -159,7 +162,7 @@ export async function getBranchOrderRevenuePence(
   businessId: string,
   branchId: string,
 ): Promise<number> {
-  const orders = await prisma.order.findMany({
+  const orders = await prisma.legacyOrder.findMany({
     where: { businessId, ...branchFilter(branchId), status: "COMPLETED" },
     select: { total: true },
   });

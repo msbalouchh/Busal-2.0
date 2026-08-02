@@ -15,6 +15,7 @@ export interface BranchData {
   country: string | null;
   phone: string | null;
   isMain: boolean;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -277,18 +278,24 @@ export async function saveBusinessHours(
   hours: BusinessHoursInput[],
 ): Promise<BusinessHoursData[]> {
   const business = await getOwnedBusiness(ownerId);
+  return saveBusinessHoursForBusiness(business.id, hours);
+}
 
+export async function saveBusinessHoursForBusiness(
+  businessId: string,
+  hours: BusinessHoursInput[],
+): Promise<BusinessHoursData[]> {
   await Promise.all(
     hours.map((entry) =>
       prisma.businessHours.upsert({
         where: {
           businessId_dayOfWeek: {
-            businessId: business.id,
+            businessId,
             dayOfWeek: entry.dayOfWeek,
           },
         },
         create: {
-          businessId: business.id,
+          businessId,
           dayOfWeek: entry.dayOfWeek,
           openTime: entry.isClosed ? null : entry.openTime,
           closeTime: entry.isClosed ? null : entry.closeTime,
@@ -303,7 +310,7 @@ export async function saveBusinessHours(
     ),
   );
 
-  return listBusinessHours(business.id);
+  return listBusinessHours(businessId);
 }
 
 export async function listBusinessContacts(businessId: string): Promise<BusinessContactData[]> {

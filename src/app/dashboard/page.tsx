@@ -1,14 +1,22 @@
 import type { Metadata } from "next";
 
 import { DashboardHome } from "@/modules/dashboard/components/dashboard-home";
-import { getDashboardContext } from "@/modules/dashboard/lib/get-dashboard-context";
+import { getDashboardHomeData } from "@/modules/dashboard/lib/get-dashboard-home-data";
+import { getDashboardShellContext } from "@/modules/dashboard/lib/get-dashboard-shell-context";
 
 export const metadata: Metadata = {
   title: "Dashboard",
 };
 
 export default async function DashboardPage() {
-  const { user, business } = await getDashboardContext();
+  const { context } = await getDashboardShellContext();
+  const homeData = await getDashboardHomeData(context);
 
-  return <DashboardHome business={business} userFullName={user.fullName} />;
+  return (
+    <DashboardHome
+      business={context.business}
+      userFullName={context.user.fullName}
+      homeData={homeData}
+    />
+  );
 }

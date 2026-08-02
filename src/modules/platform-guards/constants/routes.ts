@@ -1,8 +1,16 @@
-import { AUTH_ROUTES, PROTECTED_ROUTES, ROUTES } from "@/constants/routes";
+import {
+  AUTH_ROUTES,
+  CUSTOMER_PORTAL_PUBLIC_ROUTES,
+  PROTECTED_ROUTES,
+  ROUTES,
+} from "@/constants/routes";
 
-export { AUTH_ROUTES, PROTECTED_ROUTES, ROUTES };
+export { AUTH_ROUTES, CUSTOMER_PORTAL_PUBLIC_ROUTES, PROTECTED_ROUTES, ROUTES };
+
+export const CUSTOMER_PORTAL_PREFIX = ROUTES.customerPortal;
 
 export const PLATFORM_DASHBOARD_PREFIX = "/dashboard" as const;
+export const PLATFORM_CONTROL_CENTER_PREFIX = "/control-center" as const;
 export const PLATFORM_API_PREFIX = "/api" as const;
 
 /** API routes that require a Supabase session at the edge. */
@@ -17,5 +25,6 @@ export const PLATFORM_PUBLIC_API_ROUTES = [
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
   "/api/auth/google",
-  "/api/auth/callback",
+  "/api/portal/auth/login",
+  "/api/portal/auth/register",
 ] as const;

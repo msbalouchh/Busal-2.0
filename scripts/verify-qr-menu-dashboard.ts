@@ -91,14 +91,14 @@ async function main() {
 
   const ownerId = business.ownerId;
   const suffix = Date.now();
-  let table = await prisma.table.findFirst({
+  let table = await prisma.legacyTable.findFirst({
     where: { businessId: business.id },
     select: { id: true, name: true },
   });
   let createdTableId: string | null = null;
 
   if (!table) {
-    const createdTable = await prisma.table.create({
+    const createdTable = await prisma.legacyTable.create({
       data: {
         businessId: business.id,
         name: `Verify Table ${suffix}`,
@@ -256,7 +256,7 @@ async function main() {
   console.log("  PASS");
 
   if (createdTableId) {
-    await prisma.table.delete({ where: { id: createdTableId } });
+    await prisma.legacyTable.delete({ where: { id: createdTableId } });
   }
 
   console.log("\nAll QR Menu dashboard checks passed.");

@@ -32,7 +32,7 @@ export async function getOrderReviewContextAction(slug: string): Promise<{
   let tableName: string | null = null;
 
   if (tableId) {
-    const table = await prisma.table.findFirst({
+    const table = await prisma.legacyTable.findFirst({
       where: { id: tableId, businessId },
       select: { name: true },
     });

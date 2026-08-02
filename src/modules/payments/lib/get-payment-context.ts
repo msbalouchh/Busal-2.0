@@ -25,7 +25,7 @@ export const getPaymentOrderPageContext = cache(async (orderId: string) => {
   const { order, summary } = await getPaymentOrderContext(orderId, context.business.id);
 
   const table = order.tableId
-    ? await prisma.table.findUnique({
+    ? await prisma.legacyTable.findUnique({
         where: { id: order.tableId },
         select: { name: true },
       })

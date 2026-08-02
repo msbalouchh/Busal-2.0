@@ -1,31 +1,16 @@
 import { cache } from "react";
 
-import { getDashboardContext } from "@/modules/dashboard/lib/get-dashboard-context";
-import {
-  ensureDefaultBusinessHours,
-  ensureMainBranch,
-  listBranches,
-  listBusinessContacts,
-  listBusinessHours,
-} from "@/services/business-management.service";
+import { getBusinessProfileContext } from "@/modules/business/lib/get-business-profile-context";
 
 export const getBusinessModuleContext = cache(async () => {
-  const context = await getDashboardContext();
-
-  await ensureMainBranch(context.business.id);
-  await ensureDefaultBusinessHours(context.business.id);
-
-  const [branches, hours, contacts] = await Promise.all([
-    listBranches(context.business.id),
-    listBusinessHours(context.business.id),
-    listBusinessContacts(context.business.id),
-  ]);
+  const context = await getBusinessProfileContext();
 
   return {
-    user: context.user,
+    user: context.platform.user,
     business: context.business,
-    branches,
-    hours,
-    contacts,
+    branches: context.profile.branches,
+    hours: context.profile.hours,
+    contacts: context.profile.contacts,
+    profile: context.profile,
   };
 });

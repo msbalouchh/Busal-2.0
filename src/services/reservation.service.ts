@@ -13,8 +13,14 @@ const TIME_PATTERN = /^([01]?\d|2[0-3]):[0-5]\d$/;
 export interface ReservationData {
   id: string;
   businessId: string;
+  guestName: string;
+  guestPhone: string;
+  guestEmail: string | null;
+  /** @deprecated Use guestName */
   customerName: string;
+  /** @deprecated Use guestPhone */
   customerPhone: string;
+  /** @deprecated Use guestEmail */
   customerEmail: string | null;
   reservationNumber: string;
   reservationDate: Date;
@@ -25,6 +31,7 @@ export interface ReservationData {
   notes: string | null;
   source: ReservationSource;
   createdByStaffId: string | null;
+  branchId: string;
   createdAt: Date;
   updatedAt: Date;
   createdByStaff: {
@@ -35,8 +42,14 @@ export interface ReservationData {
 }
 
 export interface CreateReservationInput {
-  customerName: string;
-  customerPhone: string;
+  guestName?: string;
+  guestPhone?: string;
+  guestEmail?: string;
+  /** @deprecated Use guestName */
+  customerName?: string;
+  /** @deprecated Use guestPhone */
+  customerPhone?: string;
+  /** @deprecated Use guestEmail */
   customerEmail?: string;
   reservationDate: Date | string;
   startTime: string;
@@ -45,12 +58,18 @@ export interface CreateReservationInput {
   notes?: string;
   source?: ReservationSource;
   createdByStaffId?: string | null;
-  branchId?: string | null;
+  branchId?: string;
 }
 
 export interface UpdateReservationInput {
+  guestName?: string;
+  guestPhone?: string;
+  guestEmail?: string | null;
+  /** @deprecated Use guestName */
   customerName?: string;
+  /** @deprecated Use guestPhone */
   customerPhone?: string;
+  /** @deprecated Use guestEmail */
   customerEmail?: string | null;
   reservationDate?: Date | string;
   startTime?: string;
@@ -160,12 +179,43 @@ async function assertStaffBelongsToBusiness(
   }
 }
 
+async function resolveBranchId(
+  businessId: string,
+  branchId: string | null | undefined,
+): Promise<string> {
+  if (branchId) {
+    const branch = await prisma.branch.findFirst({
+      where: { id: branchId, businessId },
+      select: { id: true },
+    });
+
+    if (!branch) {
+      throw new Error("Branch not found");
+    }
+
+    return branch.id;
+  }
+
+  const branch = await prisma.branch.findFirst({
+    where: { businessId },
+    orderBy: [{ isMain: "desc" }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+
+  if (!branch) {
+    throw new Error("Branch is required");
+  }
+
+  return branch.id;
+}
+
 function mapReservation(reservation: {
   id: string;
   businessId: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string | null;
+  branchId: string;
+  guestName: string;
+  guestPhone: string;
+  guestEmail: string | null;
   reservationNumber: string;
   reservationDate: Date;
   startTime: string;
@@ -182,9 +232,13 @@ function mapReservation(reservation: {
   return {
     id: reservation.id,
     businessId: reservation.businessId,
-    customerName: reservation.customerName,
-    customerPhone: reservation.customerPhone,
-    customerEmail: reservation.customerEmail,
+    branchId: reservation.branchId,
+    guestName: reservation.guestName,
+    guestPhone: reservation.guestPhone,
+    guestEmail: reservation.guestEmail,
+    customerName: reservation.guestName,
+    customerPhone: reservation.guestPhone,
+    customerEmail: reservation.guestEmail,
     reservationNumber: reservation.reservationNumber,
     reservationDate: reservation.reservationDate,
     startTime: reservation.startTime,
@@ -221,13 +275,16 @@ export async function createReservation(
   input: CreateReservationInput,
 ): Promise<ReservationData> {
   const business = await getOwnedBusiness(ownerId);
+  const guestName = (input.guestName ?? input.customerName ?? "").trim();
+  const guestPhone = (input.guestPhone ?? input.customerPhone ?? "").trim();
+  const guestEmail = input.guestEmail ?? input.customerEmail;
 
-  if (!input.customerName.trim()) {
-    throw new Error("Customer name is required");
+  if (!guestName) {
+    throw new Error("Guest name is required");
   }
 
-  if (!input.customerPhone.trim()) {
-    throw new Error("Customer phone is required");
+  if (!guestPhone) {
+    throw new Error("Guest phone is required");
   }
 
   if (!Number.isInteger(input.partySize) || input.partySize < 1) {
@@ -235,6 +292,7 @@ export async function createReservation(
   }
 
   await assertStaffBelongsToBusiness(business.id, input.createdByStaffId);
+  const branchId = await resolveBranchId(business.id, input.branchId);
 
   const schedule = validateSchedule(input.reservationDate, input.startTime, input.endTime);
   const reservationNumber = await generateReservationNumber();
@@ -242,10 +300,10 @@ export async function createReservation(
   const reservation = await prisma.reservation.create({
     data: {
       businessId: business.id,
-      branchId: input.branchId ?? null,
-      customerName: input.customerName.trim(),
-      customerPhone: input.customerPhone.trim(),
-      customerEmail: input.customerEmail?.trim() || null,
+      branchId,
+      guestName,
+      guestPhone,
+      guestEmail: guestEmail?.trim() || null,
       reservationNumber,
       reservationDate: schedule.reservationDate,
       startTime: schedule.startTime,
@@ -253,7 +311,7 @@ export async function createReservation(
       partySize: input.partySize,
       status: "PENDING",
       notes: input.notes?.trim() || null,
-      source: input.source ?? "ADMIN",
+      source: input.source ?? "PHONE",
       createdByStaffId: input.createdByStaffId ?? null,
     },
     include: reservationInclude,
@@ -320,14 +378,21 @@ export async function updateReservation(
   const endTime = input.endTime ?? existing.endTime;
   const schedule = validateSchedule(reservationDate, startTime, endTime);
 
+  const guestName = input.guestName ?? input.customerName ?? existing.guestName;
+  const guestPhone = input.guestPhone ?? input.customerPhone ?? existing.guestPhone;
+  const guestEmail =
+    input.guestEmail !== undefined
+      ? input.guestEmail
+      : input.customerEmail !== undefined
+        ? input.customerEmail
+        : existing.guestEmail;
+
   const reservation = await prisma.reservation.update({
     where: { id: reservationId },
     data: {
-      ...(input.customerName !== undefined ? { customerName: input.customerName.trim() } : {}),
-      ...(input.customerPhone !== undefined ? { customerPhone: input.customerPhone.trim() } : {}),
-      ...(input.customerEmail !== undefined
-        ? { customerEmail: input.customerEmail?.trim() || null }
-        : {}),
+      guestName: guestName.trim(),
+      guestPhone: guestPhone.trim(),
+      guestEmail: guestEmail?.trim() || null,
       reservationDate: schedule.reservationDate,
       startTime: schedule.startTime,
       endTime: schedule.endTime,

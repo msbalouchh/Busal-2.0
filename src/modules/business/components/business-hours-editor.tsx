@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { saveBusinessHoursAction } from "@/modules/business/actions/business-actions";
+import { saveBusinessHoursProfileAction } from "@/modules/business/actions/business-profile-actions";
 import { WEEKDAYS } from "@/modules/business/constants/routes";
 import type { BusinessHoursData } from "@/services/business-management.service";
 
@@ -43,7 +43,7 @@ export function BusinessHoursEditor({ hours }: BusinessHoursEditorProps) {
   const handleSave = () => {
     startTransition(async () => {
       try {
-        await saveBusinessHoursAction(
+        await saveBusinessHoursProfileAction(
           entries.map((entry) => ({
             dayOfWeek: entry.dayOfWeek,
             openTime: entry.openTime,

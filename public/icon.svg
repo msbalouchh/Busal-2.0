@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Busal OS">
+  <rect width="64" height="64" rx="14" fill="#0c1222"/>
+  <path d="M18 18h14.5c6.2 0 10.5 3.4 10.5 8.4 0 3.4-1.9 6-5 7.3 4 1.2 6.5 4.2 6.5 8.3 0 5.4-4.6 9-11.5 9H18V18zm9.8 12.2c3.1 0 5-1.5 5-3.8s-1.9-3.7-5-3.7H25.2v7.5h2.6zm.6 14.6c3.6 0 5.8-1.7 5.8-4.2s-2.2-4.1-5.8-4.1H25.2v8.3h3.2z" fill="#f7f5f1"/>
+  <circle cx="48" cy="16" r="5" fill="#0d7377"/>
+</svg>

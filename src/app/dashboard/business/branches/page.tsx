@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
 
-import { BranchesManager } from "@/modules/business/components/branches-manager";
+import { BusinessBranchesPanel } from "@/modules/business/components/business-branches-panel";
 import { BusinessPageHeader } from "@/modules/business/components/business-page-header";
-import { getBusinessModuleContext } from "@/modules/business/lib/get-business-context";
+import { getBusinessProfileContext } from "@/modules/business/lib/get-business-profile-context";
 
 export const metadata: Metadata = {
-  title: "Branches",
+  title: "Branch Management",
 };
 
 export default async function BusinessBranchesPage() {
-  const { branches } = await getBusinessModuleContext();
+  const { profile } = await getBusinessProfileContext();
 
   return (
     <div className="space-y-6">
       <BusinessPageHeader
-        title="Branches"
-        description="Manage your business locations. A main branch is created automatically if none exists."
+        title="Branch Management"
+        description="Create, edit, disable, and set the default branch for your business."
       />
-      <BranchesManager branches={branches} />
+      <BusinessBranchesPanel profile={profile} />
     </div>
   );
 }

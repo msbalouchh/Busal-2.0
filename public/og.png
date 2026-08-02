@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Busal OS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0c1222"/>
+      <stop offset="100%" stop-color="#152036"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="20%" cy="20%" r="50%">
+      <stop offset="0%" stop-color="#0d7377" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#0d7377" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <text x="80" y="210" fill="#f7f5f1" font-family="Georgia, Times New Roman, serif" font-size="88" font-weight="600">Busal OS</text>
+  <text x="80" y="290" fill="#c9d0dc" font-family="system-ui, sans-serif" font-size="36">The AI Operating System for Modern Businesses</text>
+  <text x="80" y="380" fill="#0d7377" font-family="system-ui, sans-serif" font-size="24" font-weight="600">getbusal.com</text>
+  <rect x="80" y="430" width="220" height="56" rx="14" fill="#0d7377"/>
+  <text x="190" y="466" text-anchor="middle" fill="#ffffff" font-family="system-ui, sans-serif" font-size="22" font-weight="600">Book a demo</text>
+</svg>

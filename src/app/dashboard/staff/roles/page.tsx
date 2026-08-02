@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
 
-import { StaffRolesManager } from "@/modules/staff/components/staff-roles-manager";
+import { StaffRolesPanel } from "@/modules/staff/components/staff-roles-panel";
 import { StaffPageHeader } from "@/modules/staff/components/staff-page-header";
-import { getStaffModuleContext } from "@/modules/staff/lib/get-staff-context";
+import { getStaffManagementContext } from "@/modules/staff/lib/get-staff-context";
 
 export const metadata: Metadata = {
   title: "Staff Roles",
 };
 
 export default async function StaffRolesPage() {
-  const { roles } = await getStaffModuleContext();
+  const { roles, permissionsFlags } = await getStaffManagementContext();
 
   return (
     <div className="space-y-6">
       <StaffPageHeader
         title="Roles"
-        description="View system roles and create custom roles for your team."
+        description="Create, edit, duplicate, and archive custom roles for your team."
       />
-      <StaffRolesManager roles={roles} />
+      <StaffRolesPanel roles={roles} permissions={permissionsFlags} />
     </div>
   );
 }

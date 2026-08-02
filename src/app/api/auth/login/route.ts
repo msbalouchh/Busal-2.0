@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { authError, authSuccess, handleAuthRouteError } from "@/modules/auth/lib/api-response";
+import { resolvePostAuthRedirect } from "@/modules/auth/lib/post-auth-redirect";
 import { loginSchema } from "@/schemas/auth.schema";
 import { ACCOUNT_TYPES } from "@/modules/staff-auth/constants/session";
 import { completeLoginSession } from "@/modules/staff-auth/services/staff-auth.service";
@@ -21,8 +22,14 @@ export async function POST(request: Request) {
     const loginResult = await completeLoginSession(session.user.id, session.user.email);
     await persistBusinessContextCookiesForLogin(session.user, loginResult);
 
+    const redirectPath = await resolvePostAuthRedirect(
+      session.user,
+      parsed.data.redirectTo ?? null,
+    );
+
     return authSuccess({
       user: session.user,
+      redirectPath,
       accountType: loginResult.accountType,
       staffSession:
         loginResult.accountType === ACCOUNT_TYPES.STAFF ? loginResult.staffSession : null,

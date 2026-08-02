@@ -102,7 +102,7 @@ async function completeOrderIfFullyPaid(
   const amountPaidPence = await getCompletedPaymentTotalPence(orderId);
 
   if (amountPaidPence >= orderTotalPence) {
-    const order = await prisma.order.findUnique({
+    const order = await prisma.legacyOrder.findUnique({
       where: { id: orderId },
       select: { status: true },
     });
@@ -111,7 +111,7 @@ async function completeOrderIfFullyPaid(
       return false;
     }
 
-    await prisma.order.update({
+    await prisma.legacyOrder.update({
       where: { id: orderId },
       data: { status: "COMPLETED" },
     });
@@ -127,7 +127,7 @@ async function completeOrderIfFullyPaid(
 }
 
 async function assertOrderPayable(orderId: string, businessId: string) {
-  const order = await prisma.order.findFirst({
+  const order = await prisma.legacyOrder.findFirst({
     where: { id: orderId, businessId },
     select: { id: true, status: true, total: true, orderNumber: true },
   });
@@ -165,7 +165,7 @@ export async function getOrderPaymentSummary(
   orderId: string,
   businessId: string,
 ): Promise<OrderPaymentSummary> {
-  const order = await prisma.order.findFirst({
+  const order = await prisma.legacyOrder.findFirst({
     where: { id: orderId, businessId },
     select: { id: true, orderNumber: true, total: true, status: true },
   });
@@ -200,7 +200,7 @@ export async function getOrderPaymentSummary(
 }
 
 export async function listUnpaidOrders(businessId: string, branchId: string | null = null) {
-  const orders = await prisma.order.findMany({
+  const orders = await prisma.legacyOrder.findMany({
     where: {
       businessId,
       ...branchFilter(branchId),
@@ -325,7 +325,7 @@ export async function voidPayment(
     throw new Error("Only completed payments can be voided");
   }
 
-  const order = await prisma.order.findUnique({
+  const order = await prisma.legacyOrder.findUnique({
     where: { id: payment.orderId },
     select: { status: true },
   });

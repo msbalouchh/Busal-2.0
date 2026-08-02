@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
 
-import { ContactsManager } from "@/modules/business/components/contacts-manager";
+import { BusinessContactForm } from "@/modules/business/components/business-contact-form";
 import { BusinessPageHeader } from "@/modules/business/components/business-page-header";
-import { getBusinessModuleContext } from "@/modules/business/lib/get-business-context";
+import { getBusinessProfileContext } from "@/modules/business/lib/get-business-profile-context";
 
 export const metadata: Metadata = {
-  title: "Contact",
+  title: "Contact Information",
 };
 
 export default async function BusinessContactPage() {
-  const { contacts } = await getBusinessModuleContext();
+  const { profile } = await getBusinessProfileContext();
 
   return (
     <div className="space-y-6">
       <BusinessPageHeader
-        title="Contact"
-        description="Manage phone numbers, emails, websites, and other contact details."
+        title="Contact Information"
+        description="Manage email, phone, website, support, and social links."
       />
-      <ContactsManager contacts={contacts} />
+      <BusinessContactForm profile={profile} />
     </div>
   );
 }

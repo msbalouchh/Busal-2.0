@@ -128,7 +128,7 @@ export async function enqueueOrder(
     branchId?: string | null;
   } = {},
 ): Promise<KitchenQueueItemData> {
-  const order = await prisma.order.findFirst({
+  const order = await prisma.legacyOrder.findFirst({
     where: { id: orderId, businessId },
     select: { id: true },
   });

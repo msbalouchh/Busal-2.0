@@ -2,22 +2,22 @@ import type { Metadata } from "next";
 
 import { BusinessHoursEditor } from "@/modules/business/components/business-hours-editor";
 import { BusinessPageHeader } from "@/modules/business/components/business-page-header";
-import { getBusinessModuleContext } from "@/modules/business/lib/get-business-context";
+import { getBusinessProfileContext } from "@/modules/business/lib/get-business-profile-context";
 
 export const metadata: Metadata = {
-  title: "Business Hours",
+  title: "Working Hours",
 };
 
 export default async function BusinessHoursPage() {
-  const { hours } = await getBusinessModuleContext();
+  const { profile } = await getBusinessProfileContext();
 
   return (
     <div className="space-y-6">
       <BusinessPageHeader
-        title="Business Hours"
-        description="Set your weekly operating schedule."
+        title="Working Hours"
+        description="Set the default opening hours used across your business."
       />
-      <BusinessHoursEditor hours={hours} />
+      <BusinessHoursEditor hours={profile.hours} />
     </div>
   );
 }

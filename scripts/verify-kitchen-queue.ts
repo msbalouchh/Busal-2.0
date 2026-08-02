@@ -108,8 +108,8 @@ async function main() {
 
   console.log("Cleanup");
   await prisma.kitchenQueue.delete({ where: { id: queueItem.id } });
-  await prisma.orderItem.deleteMany({ where: { orderId: order.id } });
-  await prisma.order.delete({ where: { id: order.id } });
+  await prisma.legacyOrderItem.deleteMany({ where: { orderId: order.id } });
+  await prisma.legacyOrder.delete({ where: { id: order.id } });
   await prisma.orderSession.delete({ where: { id: orderSession.id } });
   await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
   await prisma.cart.delete({ where: { id: cart.id } });

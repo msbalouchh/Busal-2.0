@@ -90,12 +90,12 @@ async function main() {
   console.log("  PASS");
 
   console.log("Table assignment");
-  let table = await prisma.table.findFirst({
+  let table = await prisma.legacyTable.findFirst({
     where: { businessId: business.id },
     select: { id: true },
   });
   if (!table) {
-    table = await prisma.table.create({
+    table = await prisma.legacyTable.create({
       data: {
         businessId: business.id,
         name: `Verify Table ${suffix}`,
@@ -160,7 +160,7 @@ async function main() {
   if (table) {
     const tableInUse = await prisma.orderSession.count({ where: { tableId: table.id } });
     if (tableInUse === 0) {
-      await prisma.table.delete({ where: { id: table.id } }).catch(() => undefined);
+      await prisma.legacyTable.delete({ where: { id: table.id } }).catch(() => undefined);
     }
   }
   console.log("  PASS");

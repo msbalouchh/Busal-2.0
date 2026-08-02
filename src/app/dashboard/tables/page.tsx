@@ -15,12 +15,12 @@ export default async function TablesPage() {
 
   const reservationByTableId = new Map(
     activeReservations
-      .filter((reservation) => reservation.tableId)
+      .filter((reservation) => reservation.legacyTableId)
       .map((reservation) => [
-        reservation.tableId as string,
+        reservation.legacyTableId as string,
         {
           id: reservation.id,
-          customerName: reservation.customerName,
+          customerName: reservation.guestName,
           reservationNumber: reservation.reservationNumber,
           status: reservation.status,
         },

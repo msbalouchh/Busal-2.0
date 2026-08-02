@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { BUSINESS_NAV_ITEMS } from "@/modules/business/constants/routes";
+import { BUSINESS_PROFILE_NAV_ITEMS } from "@/modules/business/constants/business-profile";
 import { cn } from "@/lib/utils";
 
 export function BusinessNav() {
@@ -12,7 +12,7 @@ export function BusinessNav() {
   return (
     <nav className="border-b pb-4" aria-label="Business management">
       <div className="flex flex-wrap gap-2">
-        {BUSINESS_NAV_ITEMS.map((item) => {
+        {BUSINESS_PROFILE_NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
 
           return (

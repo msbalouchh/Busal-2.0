@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AuthError, Session as SupabaseSession, User } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import { USER_ROLES } from "@/constants/roles";
 import { SUPABASE_AUTH_CONFIG } from "@/lib/supabase/auth-config";
@@ -9,6 +10,7 @@ import { getAuthErrorMessage } from "@/modules/auth/lib/auth-errors";
 import { getAuthCallbackUrl, getPasswordResetRedirectUrl } from "@/modules/auth/lib/auth.utils";
 import { getUserProfile, mapProfileToAuthUser, syncUserProfile } from "@/services/user.service";
 import type { AuthUser, Session } from "@/types/auth";
+import type { UserRole } from "@/constants/roles";
 
 type AuthErrorCode = "UNAUTHORIZED" | "BAD_REQUEST";
 
@@ -39,7 +41,7 @@ async function mapSupabaseUserToSession(user: User, accessToken: string): Promis
   };
 }
 
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async (): Promise<Session | null> => {
   const supabase = await getSupabaseClient();
   const {
     data: { user },
@@ -59,12 +61,12 @@ export async function getSession(): Promise<Session | null> {
   }
 
   return mapSupabaseUserToSession(user, session.access_token);
-}
+});
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
+export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
   const session = await getSession();
   return session?.user ?? null;
-}
+});
 
 export async function requireSession(): Promise<Session> {
   const session = await getSession();
@@ -97,7 +99,9 @@ export async function signUpWithEmail(
   fullName: string,
   email: string,
   password: string,
+  options?: { role?: UserRole },
 ): Promise<{ session: Session | null; requiresEmailConfirmation: boolean }> {
+  const role = options?.role ?? USER_ROLES.OWNER;
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -105,7 +109,7 @@ export async function signUpWithEmail(
     options: {
       data: {
         full_name: fullName,
-        role: USER_ROLES.OWNER,
+        role,
       },
       emailRedirectTo: getAuthCallbackUrl(),
     },

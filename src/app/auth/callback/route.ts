@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { ROUTES } from "@/constants/routes";
-import { resolveRedirectPath } from "@/modules/auth/lib/auth.utils";
-import { AuthServiceError, exchangeCodeForSession } from "@/services/auth.service";
+import { resolvePostAuthRedirect } from "@/modules/auth/lib/post-auth-redirect";
+import { AuthServiceError, exchangeCodeForSession, getCurrentUser } from "@/services/auth.service";
 
 function redirectWithError(origin: string, message: string) {
   const url = new URL(ROUTES.home, origin);
@@ -31,7 +31,13 @@ export async function GET(request: Request) {
   try {
     await exchangeCodeForSession(code);
 
-    const redirectPath = resolveRedirectPath(next, ROUTES.dashboard);
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return redirectWithError(origin, "Unable to establish a session.");
+    }
+
+    const redirectPath = await resolvePostAuthRedirect(user, next);
     return NextResponse.redirect(new URL(redirectPath, origin));
   } catch (error) {
     const message =

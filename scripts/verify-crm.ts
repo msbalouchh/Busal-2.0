@@ -133,8 +133,8 @@ async function main() {
 
   console.log("Schema");
   const schemaSource = readFileSync(join(root, "prisma/schema.prisma"), "utf8");
-  assert(schemaSource.includes("loyaltyPoints Int"), "loyalty points must be integer");
-  assert(schemaSource.includes("valuePence    Int?"), "reward value must be integer pence");
+  assert(/loyaltyPoints\s+Int/.test(schemaSource), "loyalty points must be integer");
+  assert(/valuePence\s+Int/.test(schemaSource), "reward value must be integer pence");
   console.log("  PASS");
 
   const business = await prisma.business.findFirst({
@@ -177,7 +177,7 @@ async function main() {
   console.log("  PASS");
 
   const { order } = await createCrmOrder(business.id, business.ownerId, suffix);
-  const orderRecord = await prisma.order.findUnique({
+  const orderRecord = await prisma.legacyOrder.findUnique({
     where: { id: order.id },
     select: { total: true },
   });
@@ -191,7 +191,7 @@ async function main() {
     amountTenderedPence: orderTotalPence,
   });
 
-  const linkedOrder = await prisma.order.findUnique({
+  const linkedOrder = await prisma.legacyOrder.findUnique({
     where: { id: order.id },
     select: { customerId: true, status: true },
   });
