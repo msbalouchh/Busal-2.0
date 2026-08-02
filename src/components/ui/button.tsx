@@ -55,15 +55,26 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
-    const Comp = asChild ? Slot : "button";
     const isDisabled = disabled || loading;
+    const classNames = cn(
+      buttonVariants({ variant, size, className }),
+      fullWidth && "w-full",
+      loading && "cursor-not-allowed",
+    );
+
+    // Radix Slot requires exactly one React element child. Never inject the
+    // loading spinner (or null) as a sibling when asChild is enabled.
+    if (asChild) {
+      return (
+        <Slot className={classNames} ref={ref} aria-busy={loading || undefined} {...props}>
+          {children}
+        </Slot>
+      );
+    }
+
     return (
-      <Comp
-        className={cn(
-          buttonVariants({ variant, size, className }),
-          fullWidth && "w-full",
-          loading && "cursor-not-allowed",
-        )}
+      <button
+        className={classNames}
         ref={ref}
         disabled={isDisabled}
         aria-busy={loading || undefined}
@@ -71,7 +82,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
         {children}
-      </Comp>
+      </button>
     );
   },
 );
