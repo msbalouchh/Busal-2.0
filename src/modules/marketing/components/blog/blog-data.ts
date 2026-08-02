@@ -201,6 +201,44 @@ export const TRENDING_ARTICLES = BLOG_ARTICLES.filter((a) => a.trending);
 
 export const EDITORS_PICKS = BLOG_ARTICLES.filter((a) => a.editorsPick);
 
+export function getBlogArticleBySlug(slug: string): BlogArticle | undefined {
+  return BLOG_ARTICLES.find((article) => article.slug === slug);
+}
+
+export function getAdjacentBlogArticles(slug: string): {
+  prev?: BlogArticle;
+  next?: BlogArticle;
+} {
+  const index = BLOG_ARTICLES.findIndex((article) => article.slug === slug);
+  if (index === -1) return {};
+
+  return {
+    prev: index > 0 ? BLOG_ARTICLES[index - 1] : undefined,
+    next: index < BLOG_ARTICLES.length - 1 ? BLOG_ARTICLES[index + 1] : undefined,
+  };
+}
+
+export function getRelatedBlogArticles(slug: string, limit = 3): BlogArticle[] {
+  const current = getBlogArticleBySlug(slug);
+  if (!current) return BLOG_ARTICLES.filter((a) => a.slug !== slug).slice(0, limit);
+
+  const sameCategory = BLOG_ARTICLES.filter(
+    (article) => article.slug !== slug && article.category === current.category,
+  );
+  const pool =
+    sameCategory.length >= limit
+      ? sameCategory
+      : [
+          ...sameCategory,
+          ...BLOG_ARTICLES.filter(
+            (article) =>
+              article.slug !== slug && !sameCategory.some((item) => item.slug === article.slug),
+          ),
+        ];
+
+  return pool.slice(0, limit);
+}
+
 export const PRODUCT_UPDATES = [
   {
     type: "New Features",

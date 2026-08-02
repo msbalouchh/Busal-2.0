@@ -46,7 +46,7 @@ export function organizationJsonLd() {
     "@type": "Organization",
     name: BRAND.name,
     url: baseUrl,
-    logo: `${baseUrl}/icon.svg`,
+    logo: `${baseUrl}/branding/logo.png`,
     description: BRAND.description,
     email: "sales@getbusal.com",
     sameAs: [

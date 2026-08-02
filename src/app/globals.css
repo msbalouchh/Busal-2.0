@@ -409,12 +409,12 @@
   --ease-in-out: var(--ease-in-out);
   --ease-spring: var(--ease-spring);
 
-  /* Breakpoints */
-  --breakpoint-mobile: var(--breakpoint-mobile);
-  --breakpoint-tablet: var(--breakpoint-tablet);
-  --breakpoint-laptop: var(--breakpoint-laptop);
-  --breakpoint-desktop: var(--breakpoint-desktop);
-  --breakpoint-wide: var(--breakpoint-wide);
+  /* Breakpoints — literal values; var() in @theme breaks Turbopack media query parsing */
+  --breakpoint-mobile: 0px;
+  --breakpoint-tablet: 640px;
+  --breakpoint-laptop: 1024px;
+  --breakpoint-desktop: 1280px;
+  --breakpoint-wide: 1536px;
 
   /* Z-index */
   --z-index-base: var(--z-index-base);

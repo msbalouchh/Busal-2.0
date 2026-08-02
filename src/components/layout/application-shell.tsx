@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, type ReactNode } from "react";
 
+import { BusalLogo } from "@/components/brand/busal-logo";
 import { SkipToContent } from "@/components/common/skip-to-content";
 import {
   APPLICATION_SHELL_NAV_ITEMS,
@@ -22,7 +23,6 @@ import {
   useNavigationSidebar,
 } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
-import { siteConfig } from "@/config/site";
 import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { NotificationInboxItemView } from "@/modules/notifications/utils/notification-utils";
@@ -41,14 +41,7 @@ interface ApplicationShellProps {
 }
 
 function ApplicationShellBrand({ collapsed }: { collapsed: boolean }) {
-  return (
-    <>
-      <span className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-semibold">
-        B
-      </span>
-      {!collapsed ? <span className="truncate font-semibold">{siteConfig.name}</span> : null}
-    </>
-  );
+  return <BusalLogo height={32} className={cn("shrink-0", collapsed && "mx-auto")} />;
 }
 
 function ApplicationShellNavigation() {

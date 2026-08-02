@@ -5,6 +5,7 @@ import { Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { BusalLogo } from "@/components/brand/busal-logo";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { MARKETING_NAV, MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
@@ -34,10 +35,7 @@ export function MarketingHeader() {
           className="mkt-header__logo"
           aria-label={`${BRAND.name} home`}
         >
-          <span className="mkt-header__logo-mark" aria-hidden="true">
-            B
-          </span>
-          <span className="mkt-header__logo-text">{BRAND.name}</span>
+          <BusalLogo className="mkt-header__logo-img" height={48} priority />
         </Link>
 
         <nav className="mkt-header__nav" aria-label="Primary">

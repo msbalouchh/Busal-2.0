@@ -1,0 +1,9 @@
+/* Official logo — preserve aspect ratio; sized via inline height on Image */
+
+.busal-logo {
+  display: block;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  object-position: left center;
+}

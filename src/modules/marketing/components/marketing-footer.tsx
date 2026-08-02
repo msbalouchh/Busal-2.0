@@ -3,6 +3,7 @@
 import { Facebook, Linkedin, Twitter, Youtube } from "lucide-react";
 import Link from "next/link";
 
+import { BusalLogo } from "@/components/brand/busal-logo";
 import { NewsletterForm } from "@/modules/marketing/components/newsletter-form";
 import { MARKETING_FOOTER, MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
 import { BRAND, SOCIAL_LINKS } from "@/modules/marketing/content/site-copy";
@@ -56,10 +57,7 @@ export function MarketingFooter() {
         <div className="mkt-footer__top">
           <div className="mkt-footer__brand">
             <Link href={MARKETING_ROUTES.home} className="mkt-footer__logo">
-              <span className="mkt-footer__logo-mark" aria-hidden="true">
-                B
-              </span>
-              <span className="mkt-footer__logo-text">{BRAND.name}</span>
+              <BusalLogo className="mkt-footer__logo-img" height={56} />
             </Link>
             <p className="mkt-footer__description">{BRAND.description}</p>
             <div className="mkt-footer__newsletter">

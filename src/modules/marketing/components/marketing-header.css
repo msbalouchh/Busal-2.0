@@ -45,24 +45,11 @@
   text-decoration: none;
 }
 
-.mkt-header__logo-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.5rem;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: white;
-}
-
-.mkt-header__logo-text {
-  font-family: var(--font-marketing-display), Georgia, serif;
-  font-size: 1.125rem;
-  letter-spacing: -0.02em;
-  color: white;
+.mkt-header__logo-img {
+  height: 3rem;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
 }
 
 .mkt-header__nav {

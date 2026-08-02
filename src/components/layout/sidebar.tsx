@@ -5,11 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { BusalLogo } from "@/components/brand/busal-logo";
 import { SidebarCollapseButton } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { siteConfig } from "@/config/site";
 import { useDashboardContext } from "@/modules/dashboard/components/dashboard-provider";
 import type { DashboardNavGroup, DashboardNavItem } from "@/modules/dashboard/types/dashboard";
 import { useIsMobile } from "@/hooks/use-media-query";
@@ -210,10 +210,7 @@ export function Sidebar() {
           <div
             className={cn("flex items-center gap-2 font-semibold", isCollapsed && "justify-center")}
           >
-            <span className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm">
-              B
-            </span>
-            {!isCollapsed ? <span className="truncate">{siteConfig.name}</span> : null}
+            <BusalLogo height={32} className="shrink-0" />
           </div>
           {isMobile ? (
             <Button variant="ghost" size="icon" onClick={close} aria-label="Close menu">
