@@ -579,6 +579,93 @@
   }
 }
 
+/* Homepage premium theme — scoped so other marketing pages stay unchanged */
+.marketing-root.marketing-home {
+  --home-ink: #0b1020;
+  --home-accent: #3b82f6;
+  --home-accent-2: #8b5cf6;
+  --home-muted: rgba(255, 255, 255, 0.62);
+  --home-line: rgba(255, 255, 255, 0.1);
+  --marketing-ink: #f8fafc;
+  --marketing-muted: rgba(255, 255, 255, 0.62);
+  --marketing-surface: #0b1020;
+  --marketing-panel: #12182b;
+  --marketing-line: rgba(255, 255, 255, 0.1);
+  --marketing-accent: #3b82f6;
+  background-color: var(--home-ink);
+  background-image:
+    radial-gradient(ellipse 70% 55% at 15% -10%, rgba(59, 130, 246, 0.22), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 90% 5%, rgba(139, 92, 246, 0.18), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(59, 130, 246, 0.08), transparent 55%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    auto,
+    72px 72px,
+    72px 72px;
+  color: #f8fafc;
+}
+
+.marketing-root.marketing-home .font-marketing-display {
+  font-family: var(--font-marketing-display), Georgia, "Times New Roman", serif;
+}
+
+.marketing-root.marketing-home #newsletter-email {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+@keyframes home-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes home-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes home-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 28px 2px rgba(139, 92, 246, 0.28);
+  }
+}
+
+.home-marquee-track {
+  animation: home-marquee 36s linear infinite;
+}
+
+.home-float {
+  animation: home-float 5.5s ease-in-out infinite;
+}
+
+.home-pulse-glow {
+  animation: home-pulse-glow 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-marquee-track,
+  .home-float,
+  .home-pulse-glow {
+    animation: none;
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*  AI GRADIENT UTILITY                                                       */
 /* -------------------------------------------------------------------------- */

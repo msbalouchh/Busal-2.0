@@ -1,13 +1,29 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { NewsletterForm } from "@/modules/marketing/components/newsletter-form";
 import { MARKETING_FOOTER, MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
 import { BRAND, SOCIAL_LINKS } from "@/modules/marketing/content/site-copy";
+import { cn } from "@/lib/utils";
 
 export function MarketingFooter() {
+  const isHome = usePathname() === "/";
+
   return (
-    <footer className="border-marketing-line bg-marketing-ink text-marketing-surface/90 border-t">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1.15fr_1.85fr] lg:px-8">
+    <footer
+      className={cn(
+        "border-marketing-line text-marketing-surface/90 border-t",
+        isHome ? "border-white/10 bg-[#070B16]" : "bg-marketing-ink",
+      )}
+    >
+      <div
+        className={cn(
+          "mx-auto grid gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1.15fr_1.85fr]",
+          isHome ? "max-w-[1440px] lg:px-10" : "max-w-6xl lg:px-8",
+        )}
+      >
         <div>
           <Link
             href={MARKETING_ROUTES.home}
@@ -68,7 +84,12 @@ export function MarketingFooter() {
         </div>
       </div>
       <div className="border-t border-white/10">
-        <div className="text-marketing-muted mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 text-xs text-white/40 sm:px-6 lg:px-8">
+        <div
+          className={cn(
+            "text-marketing-muted mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-4 text-xs text-white/40 sm:px-6",
+            isHome ? "max-w-[1440px] lg:px-10" : "max-w-6xl lg:px-8",
+          )}
+        >
           <p>getbusal.com · London, United Kingdom</p>
           <div className="flex flex-wrap gap-4">
             <Link href={MARKETING_ROUTES.privacy} className="hover:text-white">
