@@ -28,7 +28,7 @@ export function BusinessSetupStepView({ profile, userEmail }: BusinessSetupStepV
       step={step}
       totalSteps={BUSINESS_SETUP_TOTAL_STEPS}
     >
-      {step === 1 ? <BusinessIdentityStep profile={profile} /> : null}
+      {step === 1 ? <BusinessIdentityStep onContinue={() => undefined} /> : null}
       {step === 2 ? <BusinessRegionStep profile={profile} /> : null}
       {step === 3 ? <BusinessContactStep profile={profile} userEmail={userEmail} /> : null}
       {step === 4 ? <BusinessReviewStep profile={profile} /> : null}

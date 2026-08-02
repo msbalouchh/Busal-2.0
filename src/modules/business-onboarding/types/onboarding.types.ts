@@ -36,7 +36,7 @@ export interface WorkspaceCreationData {
   currency: string;
   language: string;
   dateFormat: string;
-  timeFormat: string;
+  timeFormat: "12h" | "24h";
   structure: BusinessStructure;
   branchCount: number;
   defaultBranchName: string;

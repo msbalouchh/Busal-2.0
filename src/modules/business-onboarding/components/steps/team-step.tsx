@@ -1,8 +1,10 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
 
+import { FormWrapper } from "@/components/common/form-wrapper";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { TEAM_ROLE_OPTIONS } from "@/modules/business-onboarding/constants/onboarding-options";
@@ -10,7 +12,10 @@ import {
   OnboardingButton,
   OnboardingField,
 } from "@/modules/business-onboarding/components/onboarding-ui";
-import type { TeamInvite } from "@/modules/business-onboarding/types/onboarding.types";
+import {
+  teamInviteSchema,
+  type TeamInviteValues,
+} from "@/modules/business-onboarding/schemas/onboarding.schema";
 import { useWorkspaceWizardStore } from "@/modules/business-onboarding/store/onboarding.store";
 
 interface TeamStepProps {
@@ -18,23 +23,19 @@ interface TeamStepProps {
   onSkip: () => void;
 }
 
+const TEAM_INVITE_FORM_ID = "workspace-form-team-invite";
+
 export function TeamStep({ onContinue, onSkip }: TeamStepProps) {
   const data = useWorkspaceWizardStore();
-  const [draft, setDraft] = useState<TeamInvite>({ email: "", role: "staff" });
-  const [error, setError] = useState<string | null>(null);
 
-  function addInvite() {
-    if (!draft.email.trim()) {
-      setError("Enter an email address");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
-      setError("Enter a valid email");
-      return;
-    }
-    data.patch({ teamInvites: [...data.teamInvites, draft] });
-    setDraft({ email: "", role: "staff" });
-    setError(null);
+  const form = useForm<TeamInviteValues>({
+    resolver: zodResolver(teamInviteSchema),
+    defaultValues: { email: "", role: "support" },
+  });
+
+  function addInvite(values: TeamInviteValues) {
+    data.patch({ teamInvites: [...data.teamInvites, values] });
+    form.reset({ email: "", role: "support" });
   }
 
   return (
@@ -42,35 +43,37 @@ export function TeamStep({ onContinue, onSkip }: TeamStepProps) {
       <p className="text-sm text-white/55">
         Invite team members and assign roles — or skip and invite later.
       </p>
-      <div className="onboarding__grid-2">
-        <OnboardingField id="inviteEmail" label="Email" error={error ?? undefined}>
-          <Input
+
+      <FormWrapper
+        id={TEAM_INVITE_FORM_ID}
+        form={form}
+        className="onboarding__form"
+        onSubmit={addInvite}
+      >
+        <div className="onboarding__grid-2">
+          <OnboardingField
             id="inviteEmail"
-            type="email"
-            value={draft.email}
-            onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))}
-          />
-        </OnboardingField>
-        <OnboardingField id="inviteRole" label="Role">
-          <Select
-            id="inviteRole"
-            value={draft.role}
-            onChange={(e) =>
-              setDraft((p) => ({ ...p, role: e.target.value as TeamInvite["role"] }))
-            }
+            label="Email"
+            error={form.formState.errors.email?.message}
           >
-            {TEAM_ROLE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-        </OnboardingField>
-      </div>
-      <OnboardingButton type="button" variant="ghost" onClick={addInvite}>
-        <Plus className="mr-2 inline h-4 w-4" aria-hidden="true" />
-        Add team member
-      </OnboardingButton>
+            <Input id="inviteEmail" type="email" {...form.register("email")} />
+          </OnboardingField>
+          <OnboardingField id="inviteRole" label="Role">
+            <Select id="inviteRole" {...form.register("role")}>
+              {TEAM_ROLE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </OnboardingField>
+        </div>
+        <OnboardingButton type="submit" variant="ghost">
+          <Plus className="mr-2 inline h-4 w-4" aria-hidden="true" />
+          Add team member
+        </OnboardingButton>
+      </FormWrapper>
+
       {data.teamInvites.length > 0 ? (
         <ul className="space-y-2">
           {data.teamInvites.map((invite, i) => (
@@ -96,6 +99,7 @@ export function TeamStep({ onContinue, onSkip }: TeamStepProps) {
           ))}
         </ul>
       ) : null}
+
       <div className="flex flex-wrap gap-3 pt-2">
         <OnboardingButton type="button" variant="ghost" onClick={onSkip}>
           Skip for now

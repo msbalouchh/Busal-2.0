@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  AI_CAPABILITY_OPTIONS,
+  AI_AGENT_OPTIONS,
   BUSINESS_TYPE_OPTIONS,
   COUNTRY_OPTIONS,
   INDUSTRY_OPTIONS,
@@ -23,8 +23,8 @@ export function ReviewStep() {
     .map((id) => MODULE_OPTIONS.find((option) => option.id === id)?.label ?? id)
     .join(", ");
 
-  const aiLabels = data.aiCapabilities
-    .map((id) => AI_CAPABILITY_OPTIONS.find((option) => option.id === id)?.label ?? id)
+  const aiLabels = data.aiAgents
+    .map((id: string) => AI_AGENT_OPTIONS.find((option) => option.id === id)?.label ?? id)
     .join(", ");
 
   return (

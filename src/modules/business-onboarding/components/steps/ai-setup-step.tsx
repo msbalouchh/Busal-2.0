@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
 import { FormWrapper } from "@/components/common/form-wrapper";
-import { AI_CAPABILITY_OPTIONS } from "@/modules/business-onboarding/constants/onboarding-options";
+import { AI_AGENT_OPTIONS } from "@/modules/business-onboarding/constants/onboarding-options";
 import {
   aiSetupSchema,
   type AiSetupValues,
@@ -22,18 +22,15 @@ export function AiSetupStep({ onContinue }: AiSetupStepProps) {
   const form = useForm<AiSetupValues>({
     resolver: zodResolver(aiSetupSchema),
     defaultValues: {
-      aiCapabilities:
-        data.aiCapabilities.length > 0
-          ? data.aiCapabilities
-          : ["operations", "customer-support", "marketing"],
+      aiAgents: data.aiAgents.length > 0 ? data.aiAgents : ["operations", "support", "marketing"],
     },
   });
 
-  const selected = form.watch("aiCapabilities");
+  const selected = form.watch("aiAgents");
 
   function toggleCapability(id: string) {
     const next = selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id];
-    form.setValue("aiCapabilities", next, { shouldValidate: true });
+    form.setValue("aiAgents", next, { shouldValidate: true });
   }
 
   return (
@@ -51,7 +48,7 @@ export function AiSetupStep({ onContinue }: AiSetupStepProps) {
       </p>
 
       <div className="onboarding__option-grid onboarding__option-grid--2">
-        {AI_CAPABILITY_OPTIONS.map((capability) => (
+        {AI_AGENT_OPTIONS.map((capability) => (
           <button
             key={capability.id}
             type="button"
@@ -63,9 +60,9 @@ export function AiSetupStep({ onContinue }: AiSetupStepProps) {
         ))}
       </div>
 
-      {form.formState.errors.aiCapabilities ? (
+      {form.formState.errors.aiAgents ? (
         <p className="onboarding__field-error" role="alert">
-          {form.formState.errors.aiCapabilities.message}
+          {form.formState.errors.aiAgents.message}
         </p>
       ) : null}
 

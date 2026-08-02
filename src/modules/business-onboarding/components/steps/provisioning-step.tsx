@@ -31,7 +31,12 @@ export function ProvisioningStep() {
         reset: _r,
         ...payload
       } = state;
-      // TODO: WorkspaceProvisioningProvider.provision()
+      /**
+       * `mockProvisionWorkspace` is typed against
+       * `WorkspaceProvisioningProvider["provision"]` (see
+       * lib/workspace-provisioning.types.ts). Swapping in the real
+       * provider implementation requires no change to this call site.
+       */
       await mockProvisionWorkspace(payload);
       if (!cancelled) setStep(11);
     }

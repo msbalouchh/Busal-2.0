@@ -8,6 +8,7 @@ import {
   generateTenantId,
   generateWorkspaceSlug,
 } from "@/modules/business-onboarding/lib/workspace-identifiers";
+import type { WorkspaceProvisioningProvider } from "@/modules/business-onboarding/lib/workspace-provisioning.types";
 import type { ProvisionedWorkspace } from "@/modules/business-onboarding/types/workspace.types";
 import type {
   WorkspaceCreationData,
@@ -63,21 +64,31 @@ export const DEFAULT_WORKSPACE_DATA: WorkspaceCreationData = {
 /** @deprecated */
 export const DEFAULT_ONBOARDING_DATA = DEFAULT_WORKSPACE_DATA;
 
-/** TODO: Replace with WorkspaceProvisioningProvider.saveProgress */
-export async function mockSaveWorkspaceProgress(
+/**
+ * Mock implementation of `WorkspaceProvisioningProvider["saveProgress"]`.
+ * Typed against the future provider contract so the real
+ * `WorkspaceProvisioningProvider` implementation is a drop-in replacement.
+ */
+export const mockSaveWorkspaceProgress: WorkspaceProvisioningProvider["saveProgress"] = async (
   step: WorkspaceWizardStep,
   data: Partial<WorkspaceCreationData>,
-) {
+) => {
   await delay(300);
   void step;
   void data;
   return { success: true as const };
-}
+};
 
-/** TODO: Replace with DatabaseProvisioningAdapter + Stripe + AI init */
-export async function mockProvisionWorkspace(
+/**
+ * Mock implementation of `WorkspaceProvisioningProvider["provision"]`.
+ * Typed against the future provider contract (backed by
+ * `DatabaseProvisioningAdapter`, `StripeProvisioningAdapter`, and
+ * `AiInitializationAdapter`) so swapping in the real implementation
+ * requires no changes to callers.
+ */
+export const mockProvisionWorkspace: WorkspaceProvisioningProvider["provision"] = async (
   data: WorkspaceCreationData,
-): Promise<ProvisionedWorkspace> {
+): Promise<ProvisionedWorkspace> => {
   await delay(4000);
 
   const now = new Date().toISOString();
@@ -156,9 +167,18 @@ export async function mockProvisionWorkspace(
       themePreference: data.themePreference,
     },
   };
-}
+};
 
-/** TODO: Replace with team invitation API */
+/**
+ * Mock team invitation sender.
+ *
+ * Note: `WorkspaceProvisioningProvider["sendTeamInvites"]` expects
+ * `{ tenantId, invites }` and returns `{ sent }`. This mock intentionally
+ * keeps its original flat signature (invites-only, `{ success, sent }`)
+ * to avoid changing call-site behavior. When the real
+ * `WorkspaceProvisioningProvider` is wired in, the call site must adapt
+ * to the `{ tenantId, invites }` input shape defined by that interface.
+ */
 export async function mockSendTeamInvites(invites: WorkspaceCreationData["teamInvites"]) {
   await delay(400);
   void invites;

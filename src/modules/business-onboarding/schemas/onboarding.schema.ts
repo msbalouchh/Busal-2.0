@@ -72,6 +72,7 @@ export type OrganizationValues = z.infer<typeof organizationSchema>;
 export type BrandIdentityValues = z.infer<typeof brandIdentitySchema>;
 export type ModulesValues = z.infer<typeof modulesSchema>;
 export type AiConfigurationValues = z.infer<typeof aiConfigurationSchema>;
+export type TeamInviteValues = z.infer<typeof teamInviteSchema>;
 export type SubscriptionValues = z.infer<typeof subscriptionSchema>;
 
 /** @deprecated */

@@ -20,7 +20,7 @@ interface InviteTeamStepProps {
 
 export function InviteTeamStep({ onContinue, onSkip }: InviteTeamStepProps) {
   const data = useOnboardingStore();
-  const [draft, setDraft] = useState<TeamInvite>({ email: "", role: "staff" });
+  const [draft, setDraft] = useState<TeamInvite>({ email: "", role: "support" });
   const [error, setError] = useState<string | null>(null);
 
   function addInvite() {
@@ -35,7 +35,7 @@ export function InviteTeamStep({ onContinue, onSkip }: InviteTeamStepProps) {
     }
 
     data.patch({ teamInvites: [...data.teamInvites, draft] });
-    setDraft({ email: "", role: "staff" });
+    setDraft({ email: "", role: "support" });
     setError(null);
   }
 
