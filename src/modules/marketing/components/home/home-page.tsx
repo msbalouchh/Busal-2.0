@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
   Bot,
@@ -8,7 +7,6 @@ import {
   Building2,
   Calculator,
   CalendarCheck2,
-  ChevronDown,
   Dumbbell,
   GraduationCap,
   Hotel,
@@ -23,18 +21,19 @@ import {
   Workflow,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { HomeDashboard } from "@/modules/marketing/components/home/home-dashboard";
+import { HomeFaqSection } from "@/modules/marketing/components/home/home-faq-section";
+import { HomeFeatureShowcase } from "@/modules/marketing/components/home/home-feature-showcase";
+import { HomeFinalCta } from "@/modules/marketing/components/home/home-final-cta";
 import { FadeIn, Reveal } from "@/modules/marketing/components/home/home-motion";
 import { MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
 import {
   AI_AGENTS,
   BRAND,
   CUSTOMER_LOGOS,
-  FAQ_ITEMS,
   PRICING,
   TESTIMONIALS,
 } from "@/modules/marketing/content/site-copy";
@@ -113,107 +112,7 @@ const INDUSTRIES = [
   { name: "Services", icon: Briefcase, summary: "CRM, delivery, portals." },
 ] as const;
 
-const FEATURES = [
-  {
-    title: "One command center for every location",
-    summary:
-      "Managers open a single view of revenue, queues, reservations, and staffing—without exporting three systems into a Friday spreadsheet.",
-    points: ["Live branch switching", "Role-aware dashboards", "Exception alerts"],
-  },
-  {
-    title: "AI that understands service pressure",
-    summary:
-      "Domain agents read kitchen tickets, loyalty tiers, and cashflow signals so morning briefings are decisions—not more reading.",
-    points: ["Cross-module context", "Actionable recommendations", "Human approval paths"],
-  },
-  {
-    title: "Built for teams who cannot afford downtime",
-    summary:
-      "From first seating to close, Busal keeps orders, guests, and finance aligned so the floor stays calm when demand spikes.",
-    points: ["Offline-resilient flows", "Audit-ready history", "Fast onboarding"],
-  },
-] as const;
-
 const PLANS = PRICING.plans.filter((plan) => ["starter", "growth", "enterprise"].includes(plan.id));
-
-function FeaturePreview({ variant }: { variant: number }) {
-  const heights = [
-    [40, 65, 48, 80, 58, 90, 70],
-    [55, 42, 72, 60, 88, 50, 76],
-    [62, 70, 45, 84, 58, 92, 66],
-  ][variant % 3]!;
-
-  return (
-    <div className="home-card relative overflow-hidden p-5 sm:p-6">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(59,130,246,0.22),transparent_45%)]" />
-      <div className="relative space-y-3">
-        <div className="flex gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
-          <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
-          <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {[68, 52, 84].map((h) => (
-            <div key={h} className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="h-2 w-10 rounded bg-white/15" />
-              <div className="mt-3 h-8 rounded bg-gradient-to-r from-[#3B82F6]/50 to-[#8B5CF6]/40" />
-              <div className="mt-2 rounded bg-white/10" style={{ height: `${h / 4}px` }} />
-            </div>
-          ))}
-        </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
-          <div className="mb-3 h-2 w-24 rounded bg-white/15" />
-          <div className="flex h-16 items-end gap-1">
-            {heights.map((h, i) => (
-              <div
-                key={i}
-                className="min-w-0 flex-1 rounded-sm bg-gradient-to-t from-[#3B82F6]/30 to-[#8B5CF6]/80"
-                style={{ height: `${h}%` }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FaqItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
-  const reduced = useReducedMotion();
-
-  return (
-    <div className="border-b border-white/10 last:border-b-0">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-4 py-5 text-left"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className="text-base font-medium text-white sm:text-lg">{q}</span>
-        <ChevronDown
-          className={cn(
-            "h-5 w-5 shrink-0 text-white/50 transition-transform duration-300",
-            open && "rotate-180",
-          )}
-        />
-      </button>
-      <AnimatePresence initial={false}>
-        {open ? (
-          <motion.div
-            initial={reduced ? false : { height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={reduced ? undefined : { height: 0, opacity: 0 }}
-            transition={{ duration: 0.28 }}
-            className="overflow-hidden"
-          >
-            <p className="pb-5 text-sm leading-relaxed text-white/60 sm:text-base">{a}</p>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 export function HomePage() {
   const logos = [...CUSTOMER_LOGOS, ...CUSTOMER_LOGOS];
@@ -382,45 +281,7 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="home-section">
-        <div className="home-container">
-          <Reveal>
-            <p className="home-eyebrow">Features</p>
-            <h2 className="home-title">Product depth you can feel in the first week.</h2>
-            <p className="home-lead">
-              Alternating product moments that show how Busal looks in daily operations.
-            </p>
-          </Reveal>
-          <div className="mt-12">
-            {FEATURES.map((feature, index) => (
-              <Reveal key={feature.title}>
-                <div
-                  className={cn("home-feature-row", index % 2 === 1 && "home-feature-row--reverse")}
-                >
-                  <div className="min-w-0">
-                    <h3 className="font-marketing-display text-2xl tracking-tight text-white sm:text-3xl">
-                      {feature.title}
-                    </h3>
-                    <p className="mt-4 max-w-xl text-base leading-relaxed text-white/60">
-                      {feature.summary}
-                    </p>
-                    <ul className="mt-6 space-y-2.5">
-                      {feature.points.map((point) => (
-                        <li key={point} className="flex items-center gap-2.5 text-sm text-white/75">
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#3B82F6]" />
-                          {point}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <FeaturePreview variant={index} />
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      <HomeFeatureShowcase />
 
       {/* AI Assistants */}
       <section className="home-section home-section--tight">
@@ -552,48 +413,9 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="home-section">
-        <div className="home-container">
-          <Reveal>
-            <p className="home-eyebrow">FAQ</p>
-            <h2 className="home-title">Answers before the first call.</h2>
-          </Reveal>
-          <div className="home-card mx-auto mt-10 max-w-3xl px-5 sm:px-8">
-            {FAQ_ITEMS.map((item) => (
-              <FaqItem key={item.q} q={item.q} a={item.a} />
-            ))}
-          </div>
-        </div>
-      </section>
+      <HomeFaqSection />
 
-      {/* Final CTA */}
-      <section className="home-section" style={{ paddingBottom: "clamp(5rem, 10vw, 8rem)" }}>
-        <div className="home-container">
-          <Reveal>
-            <div className="home-card relative overflow-hidden px-6 py-14 text-center sm:px-12 sm:py-16">
-              <div className="pointer-events-none absolute -top-20 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-[#3B82F6]/25 blur-3xl" />
-              <div className="pointer-events-none absolute -right-10 -bottom-16 h-48 w-48 rounded-full bg-[#8B5CF6]/20 blur-3xl" />
-              <div className="relative">
-                <h2 className="font-marketing-display text-3xl tracking-tight text-white sm:text-4xl lg:text-5xl">
-                  Ready to run your business with AI?
-                </h2>
-                <p className="mx-auto mt-4 max-w-xl text-base text-white/60 sm:text-lg">
-                  Book a guided demo, or start free and configure your first location in minutes.
-                </p>
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-                  <Link href={MARKETING_ROUTES.bookDemo} className="home-btn home-btn--primary">
-                    Book Demo
-                  </Link>
-                  <Link href={ROUTES.signup} className="home-btn home-btn--secondary">
-                    Start Free
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <HomeFinalCta />
     </div>
   );
 }
