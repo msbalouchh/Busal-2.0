@@ -10,6 +10,7 @@ interface FormWrapperProps<T extends FieldValues> {
   onSubmit: (values: T) => void | Promise<void>;
   children: ReactNode;
   className?: string;
+  id?: string;
 }
 
 export function FormWrapper<T extends FieldValues>({
@@ -17,9 +18,15 @@ export function FormWrapper<T extends FieldValues>({
   onSubmit,
   children,
   className,
+  id,
 }: FormWrapperProps<T>) {
   return (
-    <form className={cn("space-y-6", className)} onSubmit={form.handleSubmit(onSubmit)} noValidate>
+    <form
+      id={id}
+      className={cn("space-y-6", className)}
+      onSubmit={form.handleSubmit(onSubmit)}
+      noValidate
+    >
       {children}
     </form>
   );

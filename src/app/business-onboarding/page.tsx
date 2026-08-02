@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
 
-import { BusinessSetupStepView } from "@/modules/business-onboarding/components/business-setup-step-view";
-import { ensureBusinessSetupAccess } from "@/modules/business-onboarding/actions/business-setup-actions";
+import { BusinessOnboardingWizard } from "@/modules/business-onboarding/components/business-onboarding-wizard";
 
 export const metadata: Metadata = {
-  title: "Business Setup",
+  title: "Create Your Workspace",
 };
 
-export const dynamic = "force-dynamic";
-
-export default async function BusinessOnboardingPage() {
-  const { user, profile } = await ensureBusinessSetupAccess();
-
-  return <BusinessSetupStepView profile={profile} userEmail={user.email} />;
+/** TODO: Restore ensureBusinessSetupAccess + server profile hydration when onboarding API is live. */
+export default function BusinessOnboardingPage() {
+  return <BusinessOnboardingWizard />;
 }
