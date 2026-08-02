@@ -579,7 +579,7 @@
   }
 }
 
-/* Homepage premium theme — scoped so other marketing pages stay unchanged */
+/* Marketing premium dark theme — shared across all marketing routes */
 .marketing-root.marketing-home {
   --home-ink: #0b1020;
   --home-accent: #3b82f6;
