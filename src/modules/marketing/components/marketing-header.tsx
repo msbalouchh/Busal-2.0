@@ -44,8 +44,10 @@ export function MarketingHeader() {
     >
       <div
         className={cn(
-          "mx-auto flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-10",
-          isHome ? "max-w-[1440px]" : "max-w-6xl lg:px-8",
+          "mx-auto flex h-16 w-full items-center justify-between gap-3 sm:gap-4",
+          isHome
+            ? "max-w-[1440px] px-[clamp(1.25rem,3.5vw,2.5rem)]"
+            : "max-w-6xl px-4 sm:px-6 lg:px-8",
         )}
       >
         <Link
