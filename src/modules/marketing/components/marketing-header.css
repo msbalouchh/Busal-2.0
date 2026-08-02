@@ -16,6 +16,7 @@
 .mkt-header--solid {
   border-bottom-color: rgba(255, 255, 255, 0.1);
   background-color: rgba(11, 16, 32, 0.75);
+  -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
 }
 

@@ -16,26 +16,18 @@ const NAV_ITEMS = [...MARKETING_NAV, { label: "About", href: MARKETING_ROUTES.ab
 
 export function MarketingHeader() {
   const pathname = usePathname();
-  const isHome = pathname === "/";
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(!isHome);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    if (!isHome) {
-      setScrolled(true);
-      return;
-    }
-
     const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [isHome]);
-
-  const isSolid = scrolled;
+  }, [pathname]);
 
   return (
-    <header className={cn("mkt-header", isSolid && "mkt-header--solid")}>
+    <header className={cn("mkt-header", scrolled && "mkt-header--solid")}>
       <div className="mkt-header__inner">
         <Link
           href={MARKETING_ROUTES.home}
