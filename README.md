@@ -1,90 +1,195 @@
 # Busal OS
 
-AI-first multi-tenant operating system for small businesses. Version 1 targets restaurants with an architecture designed to support future industries without redesign.
+> The AI Operating System for Modern Businesses.
 
-## Tech Stack
+---
 
-- **Frontend:** Next.js 15 (App Router), React, TypeScript
-- **Styling:** Tailwind CSS, shadcn/ui
-- **Backend:** Supabase (Auth + PostgreSQL)
-- **ORM:** Prisma
-- **State:** Zustand
-- **Data Fetching:** TanStack Query
-- **Forms:** React Hook Form + Zod
-- **Tables:** TanStack Table
-- **Deployment:** Vercel
+## Vision
 
-## Getting Started
+Busal OS is an enterprise AI Operating System designed to replace fragmented business software with one intelligent platform.
 
-### Prerequisites
+Instead of using dozens of disconnected applications, businesses run everything from a single operating system powered by AI.
 
-- Node.js 20+
-- pnpm 9+
-- Supabase project
+Our long-term vision is to become the operating system businesses rely on every day.
 
-### Setup
+---
 
-1. Clone the repository
-2. Copy environment variables:
+# Mission
 
-```bash
-cp .env.example .env.local
-```
+Help millions of businesses automate operations, improve productivity, and make better decisions through artificial intelligence.
 
-3. Fill in your Supabase credentials in `.env.local`
-4. Install dependencies:
+---
 
-```bash
-pnpm install
-```
+# What is Busal OS?
 
-5. Run database migrations:
+Busal OS combines:
 
-```bash
-pnpm db:migrate
-```
+- AI Agents
+- CRM
+- POS
+- Reservations
+- Inventory
+- Kitchen Display System
+- Staff Management
+- Finance
+- Marketing
+- Analytics
+- Automation
+- Voice AI
 
-6. Start the development server:
+into one unified enterprise platform.
 
-```bash
-pnpm dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000).
+# Core Principles
 
-## Scripts
+- AI First
+- Multi-Tenant
+- Cloud Native
+- Enterprise Ready
+- Modular
+- API First
+- Secure by Design
+- Scalable by Default
 
-| Script             | Description              |
-| ------------------ | ------------------------ |
-| `pnpm dev`         | Start development server |
-| `pnpm build`       | Production build         |
-| `pnpm lint`        | Run ESLint               |
-| `pnpm format`      | Run Prettier             |
-| `pnpm typecheck`   | TypeScript check         |
-| `pnpm db:generate` | Generate Prisma client   |
-| `pnpm db:migrate`  | Run database migrations  |
+---
 
-## Project Structure
+# Architecture
 
-```
-src/
-├── app/           # Next.js App Router pages and API routes
-├── components/    # Shared UI components (ui/, layout/, common/)
-├── features/      # Feature modules by business capability
-├── modules/       # Domain modules (auth, tenant, etc.)
-├── hooks/         # Custom React hooks
-├── lib/           # Core libraries (Supabase, Prisma, utils)
-├── services/      # Server-side business services
-├── types/         # Shared TypeScript types
-├── schemas/       # Zod validation schemas
-├── stores/        # Zustand state stores
-├── providers/     # React context providers
-├── config/        # App configuration and env validation
-├── constants/     # App-wide constants
-├── utils/         # Utility functions
-└── middleware.ts  # Auth middleware
-```
+The platform consists of six major layers.
 
-## License
+1. Marketing Website
+2. Authentication
+3. Business Provisioning
+4. Workspace Shell
+5. Business Modules
+6. AI Platform
 
-Private — All rights reserved.
+Detailed architecture:
+
+BUSAL_ARCHITECTURE.md
+
+---
+
+# Documentation
+
+Project documentation lives in:
+
+- CLINE.md
+- BUSAL_ARCHITECTURE.md
+- BUSAL_DATABASE.md
+- BUSAL_DESIGN_SYSTEM.md
+- BUSAL_RULES.md
+- BUSAL_ROADMAP.md
+
+These documents define how Busal OS is designed, developed, and maintained.
+
+---
+
+# Technology Stack
+
+Frontend
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+
+Backend
+
+- Next.js API
+- Prisma ORM
+
+Database
+
+- PostgreSQL
+
+Authentication
+
+- Future OAuth
+- Email Authentication
+- MFA
+
+Infrastructure
+
+- Vercel
+- GitHub
+
+---
+
+# Product Modules
+
+Current and planned modules include:
+
+- Dashboard
+- AI Platform
+- Business Management
+- Branch Management
+- Staff Management
+- CRM
+- POS
+- Reservations
+- Kitchen Display
+- QR Ordering
+- Inventory
+- Finance
+- Marketing
+- Analytics
+- Billing
+- Marketplace
+- Developer Platform
+
+---
+
+# Development Workflow
+
+Every milestone follows:
+
+1. Plan
+2. Architecture Review
+3. Development
+4. Local QA
+5. Production QA
+6. Approval
+7. Commit
+8. Push
+9. Deployment
+10. Live Verification
+
+---
+
+# Engineering Standards
+
+Every feature must:
+
+- Pass TypeScript
+- Pass Build
+- Be Responsive
+- Be Accessible
+- Avoid Technical Debt
+- Follow Busal Design System
+- Follow Busal Business Rules
+
+---
+
+# Roadmap
+
+See:
+
+BUSAL_ROADMAP.md
+
+---
+
+# Long-Term Goal
+
+Build the world's leading AI Operating System for businesses.
+
+One platform.
+
+One workspace.
+
+One intelligent operating system.
+
+---
+
+© Busal OS
