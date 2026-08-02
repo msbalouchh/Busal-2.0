@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 export default function SignupPage() {
   return (
     <AuthLayout
-      title="Create your account"
-      description="Get started with Busal OS as a business owner"
+      title="Create your workspace"
+      description="Launch Busal OS for your business in minutes"
     >
       <SignupForm />
     </AuthLayout>

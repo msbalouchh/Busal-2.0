@@ -16,11 +16,11 @@ interface AuthFormFieldProps {
 
 export function AuthFormField({ id, label, error, children, className }: AuthFormFieldProps) {
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("auth-field space-y-2", className)}>
       <Label htmlFor={id}>{label}</Label>
       {children}
       {error ? (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="auth-field__error" role="alert">
           {error.message}
         </p>
       ) : null}

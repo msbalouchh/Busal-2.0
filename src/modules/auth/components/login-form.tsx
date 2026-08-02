@@ -1,17 +1,18 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import { FormWrapper } from "@/components/common/form-wrapper";
-import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ROUTES } from "@/constants/routes";
+import { AuthDivider } from "@/modules/auth/components/auth-divider";
 import { AuthFormField } from "@/modules/auth/components/auth-form-field";
+import { AuthSubmitButton } from "@/modules/auth/components/auth-submit-button";
 import { GoogleSignInButton } from "@/modules/auth/components/google-sign-in-button";
 import { PasswordInput } from "@/modules/auth/components/password-input";
 import { useLogin } from "@/modules/auth/hooks/use-auth";
@@ -28,6 +29,7 @@ export function LoginForm() {
     defaultValues: {
       email: "",
       password: "",
+      rememberMe: false,
     },
   });
 
@@ -38,19 +40,14 @@ export function LoginForm() {
   }, [errorMessage, form]);
 
   return (
-    <div className="space-y-6">
-      <GoogleSignInButton />
+    <div className="auth-form">
+      {form.formState.errors.root ? (
+        <p className="auth-alert auth-alert--error" role="alert">
+          {form.formState.errors.root.message}
+        </p>
+      ) : null}
 
       <FormWrapper form={form} onSubmit={(values) => login.mutate({ ...values, redirectTo })}>
-        {form.formState.errors.root ? (
-          <p
-            className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm"
-            role="alert"
-          >
-            {form.formState.errors.root.message}
-          </p>
-        ) : null}
-
         <AuthFormField id="email" label="Email" error={form.formState.errors.email}>
           <Input
             id="email"
@@ -72,27 +69,36 @@ export function LoginForm() {
           />
         </AuthFormField>
 
-        <div className="flex justify-end">
+        <div className="auth-row">
+          <label className="auth-remember" htmlFor="rememberMe">
+            <Checkbox
+              id="rememberMe"
+              disabled={login.isPending}
+              checked={form.watch("rememberMe")}
+              onChange={(event) => form.setValue("rememberMe", event.target.checked)}
+            />
+            Remember me
+          </label>
           <Link
             href={ROUTES.forgotPassword}
-            className="text-primary text-sm hover:underline"
+            className="auth-link"
             tabIndex={login.isPending ? -1 : 0}
           >
             Forgot password?
           </Link>
         </div>
 
-        <Button type="submit" className="w-full" disabled={login.isPending}>
-          {login.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Sign in
-        </Button>
+        <AuthSubmitButton isLoading={login.isPending} loadingLabel="Signing in…">
+          Continue
+        </AuthSubmitButton>
       </FormWrapper>
 
-      <p className="text-muted-foreground text-center text-sm">
-        Don&apos;t have an account?{" "}
-        <Link href={ROUTES.signup} className="text-primary font-medium hover:underline">
-          Sign up
-        </Link>
+      <AuthDivider label="Or continue with" />
+
+      <GoogleSignInButton />
+
+      <p className="auth-footer-text">
+        Don&apos;t have an account? <Link href={ROUTES.signup}>Create Workspace</Link>
       </p>
     </div>
   );

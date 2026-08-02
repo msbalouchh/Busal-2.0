@@ -3,6 +3,8 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Bell, CalendarDays, ChartLine, Sparkles, Users, UtensilsCrossed } from "lucide-react";
 
+import { BusalLogoIcon } from "@/components/brand/busal-logo-icon";
+
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const METRICS = [
@@ -40,8 +42,8 @@ export function HomeDashboard() {
       >
         <div className="mb-3 flex items-center justify-between gap-3 px-0.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#3B82F6] to-[#8B5CF6] text-xs font-bold text-white">
-              B
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg">
+              <BusalLogoIcon className="busal-logo-icon--fill" aria-hidden />
             </span>
             <div className="min-w-0">
               <p className="truncate text-xs font-semibold text-white">Operations Command</p>

@@ -3,6 +3,8 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Bell, ChartLine, Sparkles, Users, UtensilsCrossed } from "lucide-react";
 
+import { BusalLogoIcon } from "@/components/brand/busal-logo-icon";
+
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const METRICS = [
@@ -34,7 +36,9 @@ export function FeaturesHeroDashboard() {
       >
         <div className="feat-dash__header">
           <div className="feat-dash__brand">
-            <span className="feat-dash__logo">B</span>
+            <span className="feat-dash__logo">
+              <BusalLogoIcon className="busal-logo-icon--fill" aria-hidden />
+            </span>
             <div>
               <p>Busal OS · Features</p>
               <span>Live platform preview</span>

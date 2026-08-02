@@ -1,17 +1,20 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import { FormWrapper } from "@/components/common/form-wrapper";
-import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ROUTES } from "@/constants/routes";
+import { MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
+import { AuthDivider } from "@/modules/auth/components/auth-divider";
 import { AuthFormField } from "@/modules/auth/components/auth-form-field";
+import { AuthSubmitButton } from "@/modules/auth/components/auth-submit-button";
 import { GoogleSignInButton } from "@/modules/auth/components/google-sign-in-button";
 import { PasswordInput } from "@/modules/auth/components/password-input";
+import { PasswordStrengthMeter } from "@/modules/auth/components/password-strength-meter";
 import { useSignup } from "@/modules/auth/hooks/use-auth";
 import { signupSchema, type SignupFormValues } from "@/schemas/auth.schema";
 
@@ -21,30 +24,47 @@ export function SignupForm() {
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
+      businessName: "",
       fullName: "",
       email: "",
       password: "",
       confirmPassword: "",
+      acceptTerms: false,
     },
   });
 
-  return (
-    <div className="space-y-6">
-      <GoogleSignInButton label="Sign up with Google" />
+  const passwordValue = form.watch("password");
 
+  return (
+    <div className="auth-form">
       <FormWrapper form={form} onSubmit={(values) => signup.mutate(values)}>
+        <AuthFormField
+          id="businessName"
+          label="Business name"
+          error={form.formState.errors.businessName}
+        >
+          <Input
+            id="businessName"
+            type="text"
+            autoComplete="organization"
+            placeholder="Harbour Kitchen Group"
+            disabled={signup.isPending}
+            {...form.register("businessName")}
+          />
+        </AuthFormField>
+
         <AuthFormField id="fullName" label="Full name" error={form.formState.errors.fullName}>
           <Input
             id="fullName"
             type="text"
             autoComplete="name"
-            placeholder="John Smith"
+            placeholder="Sarah Chen"
             disabled={signup.isPending}
             {...form.register("fullName")}
           />
         </AuthFormField>
 
-        <AuthFormField id="email" label="Email" error={form.formState.errors.email}>
+        <AuthFormField id="email" label="Business email" error={form.formState.errors.email}>
           <Input
             id="email"
             type="email"
@@ -63,6 +83,7 @@ export function SignupForm() {
             disabled={signup.isPending}
             {...form.register("password")}
           />
+          <PasswordStrengthMeter password={passwordValue} />
         </AuthFormField>
 
         <AuthFormField
@@ -79,22 +100,43 @@ export function SignupForm() {
           />
         </AuthFormField>
 
-        <p className="text-muted-foreground text-xs">
-          Password must be at least 8 characters with uppercase, lowercase, number, and special
-          character.
-        </p>
+        <div className="auth-terms">
+          <Checkbox
+            id="acceptTerms"
+            disabled={signup.isPending}
+            checked={form.watch("acceptTerms")}
+            onChange={(event) =>
+              form.setValue("acceptTerms", event.target.checked, { shouldValidate: true })
+            }
+          />
+          <label htmlFor="acceptTerms">
+            I accept the{" "}
+            <Link href={MARKETING_ROUTES.terms} target="_blank" rel="noopener noreferrer">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href={MARKETING_ROUTES.privacy} target="_blank" rel="noopener noreferrer">
+              Privacy Policy
+            </Link>
+          </label>
+        </div>
+        {form.formState.errors.acceptTerms ? (
+          <p className="auth-field__error" role="alert">
+            {form.formState.errors.acceptTerms.message}
+          </p>
+        ) : null}
 
-        <Button type="submit" className="w-full" disabled={signup.isPending}>
-          {signup.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Create account
-        </Button>
+        <AuthSubmitButton isLoading={signup.isPending} loadingLabel="Creating workspace…">
+          Create Workspace
+        </AuthSubmitButton>
       </FormWrapper>
 
-      <p className="text-muted-foreground text-center text-sm">
-        Already have an account?{" "}
-        <Link href={ROUTES.login} className="text-primary font-medium hover:underline">
-          Sign in
-        </Link>
+      <AuthDivider label="Or sign up with" />
+
+      <GoogleSignInButton label="Continue with Google" />
+
+      <p className="auth-footer-text">
+        Already have an account? <Link href={ROUTES.login}>Sign in</Link>
       </p>
     </div>
   );

@@ -2,6 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
+import { BusalLogoIcon } from "@/components/brand/busal-logo-icon";
+
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const NODES = [
@@ -63,9 +65,9 @@ export function AiHeroViz() {
           style={{ left: `${CENTER.x}%`, top: `${CENTER.y}%` }}
         >
           <div className="ai-viz__node-core ai-viz__node-core--center">
-            <span>AI</span>
+            <BusalLogoIcon className="busal-logo-icon--diagram" aria-hidden />
           </div>
-          <span className="ai-viz__node-label">Busal Core</span>
+          <span className="ai-viz__node-label">Busal OS</span>
         </div>
 
         {NODES.map((node) => (

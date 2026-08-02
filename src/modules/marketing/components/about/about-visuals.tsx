@@ -2,6 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
+import { BusalLogoIcon } from "@/components/brand/busal-logo-icon";
+
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const NETWORK_NODES = [
@@ -105,8 +107,10 @@ export function AboutHeroViz() {
           className="ab-viz__node ab-viz__node--core"
           style={{ left: `${CENTER.x}%`, top: `${CENTER.y}%` }}
         >
-          <div className="ab-viz__node-core">B</div>
-          <span className="ab-viz__node-label">Busal AI</span>
+          <div className="ab-viz__node-core">
+            <BusalLogoIcon className="busal-logo-icon--diagram" aria-hidden />
+          </div>
+          <span className="ab-viz__node-label">Busal OS</span>
         </div>
       </div>
     </div>

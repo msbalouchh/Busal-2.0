@@ -22,8 +22,8 @@ export const defaultMetadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   applicationName: siteConfig.name,
   icons: {
-    icon: [{ url: "/branding/logo.png", type: "image/png" }],
-    apple: [{ url: "/branding/logo.png", type: "image/png" }],
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/favicon.svg", type: "image/svg+xml" }],
   },
   manifest: "/manifest.webmanifest",
   openGraph: {

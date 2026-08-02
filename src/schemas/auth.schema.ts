@@ -16,11 +16,17 @@ export const passwordSchema = z
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Password is required"),
+  rememberMe: z.boolean().optional(),
   redirectTo: z.string().optional(),
 });
 
 export const signupSchema = z
   .object({
+    businessName: z
+      .string()
+      .min(1, "Business name is required")
+      .min(2, "Business name must be at least 2 characters")
+      .max(120, "Business name must be less than 120 characters"),
     fullName: z
       .string()
       .min(1, "Full name is required")
@@ -29,6 +35,9 @@ export const signupSchema = z
     email: emailSchema,
     password: passwordSchema,
     confirmPassword: z.string().min(1, "Please confirm your password"),
+    acceptTerms: z.boolean().refine((value) => value === true, {
+      message: "You must accept the Terms of Service and Privacy Policy",
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",

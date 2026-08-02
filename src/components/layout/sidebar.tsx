@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { BusalLogo } from "@/components/brand/busal-logo";
+import { BusalBrandMark } from "@/components/brand/busal-brand-mark";
 import { SidebarCollapseButton } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -210,7 +210,7 @@ export function Sidebar() {
           <div
             className={cn("flex items-center gap-2 font-semibold", isCollapsed && "justify-center")}
           >
-            <BusalLogo height={32} className="shrink-0" />
+            <BusalBrandMark compact={isCollapsed} height={32} />
           </div>
           {isMobile ? (
             <Button variant="ghost" size="icon" onClick={close} aria-label="Close menu">

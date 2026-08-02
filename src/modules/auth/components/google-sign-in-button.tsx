@@ -2,8 +2,6 @@
 
 import { Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useGoogleSignIn } from "@/modules/auth/hooks/use-auth";
 
 interface GoogleSignInButtonProps {
@@ -14,26 +12,19 @@ export function GoogleSignInButton({ label = "Continue with Google" }: GoogleSig
   const googleSignIn = useGoogleSignIn();
 
   return (
-    <div className="space-y-4">
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        disabled={googleSignIn.isPending}
-        onClick={() => googleSignIn.mutate()}
-      >
-        {googleSignIn.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon />}
-        {label}
-      </Button>
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <Separator />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card text-muted-foreground px-2">Or continue with email</span>
-        </div>
-      </div>
-    </div>
+    <button
+      type="button"
+      className="auth-oauth"
+      disabled={googleSignIn.isPending}
+      onClick={() => googleSignIn.mutate()}
+    >
+      {googleSignIn.isPending ? (
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <GoogleIcon />
+      )}
+      {label}
+    </button>
   );
 }
 

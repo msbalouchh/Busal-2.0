@@ -1,23 +1,19 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 
 import { AuthLayout } from "@/modules/auth/components/auth-layout";
-import { Button } from "@/components/ui/button";
-import { ROUTES } from "@/constants/routes";
+import { VerifyEmailPanel } from "@/modules/auth/components/verify-email-panel";
+
+export const metadata: Metadata = {
+  title: "Verify Email",
+};
 
 export default function VerifyEmailPage() {
   return (
     <AuthLayout
       title="Verify your email"
-      description="We sent a confirmation link to your inbox. Click the link to activate your account."
+      description="One more step before your Busal OS workspace goes live."
     >
-      <div className="space-y-4 text-center">
-        <p className="text-muted-foreground text-sm">
-          After verifying, sign in to complete your business setup and launch Busal OS.
-        </p>
-        <Button asChild className="w-full">
-          <Link href={ROUTES.login}>Back to sign in</Link>
-        </Button>
-      </div>
+      <VerifyEmailPanel />
     </AuthLayout>
   );
 }

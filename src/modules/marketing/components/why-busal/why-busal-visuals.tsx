@@ -2,6 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
+import { BusalLogoIcon } from "@/components/brand/busal-logo-icon";
+
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const FRAGMENTED = [
@@ -72,7 +74,9 @@ export function WhyBusalHeroViz() {
           className="wb-viz__node wb-viz__node--core"
           style={{ left: `${CENTER.x}%`, top: `${CENTER.y}%` }}
         >
-          <div className="wb-viz__node-core wb-viz__node-core--center">B</div>
+          <div className="wb-viz__node-core wb-viz__node-core--center">
+            <BusalLogoIcon className="busal-logo-icon--diagram" aria-hidden />
+          </div>
           <span className="wb-viz__node-label">Busal OS</span>
         </div>
       </div>

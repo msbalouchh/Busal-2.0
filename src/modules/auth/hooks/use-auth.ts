@@ -6,13 +6,18 @@ import { toast } from "sonner";
 
 import { QUERY_KEYS } from "@/constants/query";
 import { ROUTES } from "@/constants/routes";
+/**
+ * TODO: Swap mock imports for `@/modules/auth/lib/auth.client` when Supabase / Auth.js
+ * backend integration is enabled.
+ */
 import {
-  getGoogleSignInUrl,
-  loginWithEmail,
-  requestPasswordReset,
-  resetPassword,
-  signupWithEmail,
-} from "@/modules/auth/lib/auth.client";
+  mockGetGoogleSignInUrl,
+  mockLoginWithEmail,
+  mockRequestPasswordReset,
+  mockResendVerificationEmail,
+  mockResetPassword,
+  mockSignupWithEmail,
+} from "@/modules/auth/lib/auth.mock";
 import { useAuthStore } from "@/stores/auth.store";
 import type { LoginFormValues } from "@/schemas/auth.schema";
 
@@ -29,7 +34,7 @@ export function useLogin(redirectTo?: string) {
   const invalidateSession = useInvalidateSession();
 
   return useMutation({
-    mutationFn: (values: LoginFormValues) => loginWithEmail({ ...values, redirectTo }),
+    mutationFn: (values: LoginFormValues) => mockLoginWithEmail({ ...values, redirectTo }),
     onSuccess: (data) => {
       setUser(data.user);
       invalidateSession();
@@ -49,18 +54,18 @@ export function useSignup() {
   const invalidateSession = useInvalidateSession();
 
   return useMutation({
-    mutationFn: signupWithEmail,
+    mutationFn: mockSignupWithEmail,
     onSuccess: (data) => {
       if (data.user) {
         setUser(data.user);
         invalidateSession();
-        toast.success("Account created successfully!");
+        toast.success("Workspace created successfully!");
         router.push(ROUTES.businessOnboarding);
         router.refresh();
         return;
       }
 
-      toast.success("Check your email to confirm your account before signing in.");
+      toast.success("Check your email to verify your account.");
       router.push(ROUTES.verifyEmail);
     },
     onError: (error: Error) => {
@@ -71,8 +76,9 @@ export function useSignup() {
 
 export function useGoogleSignIn() {
   return useMutation({
-    mutationFn: getGoogleSignInUrl,
+    mutationFn: mockGetGoogleSignInUrl,
     onSuccess: (data) => {
+      // TODO: Microsoft OAuth, magic links
       window.location.href = data.url;
     },
     onError: (error: Error) => {
@@ -83,7 +89,7 @@ export function useGoogleSignIn() {
 
 export function useForgotPassword() {
   return useMutation({
-    mutationFn: requestPasswordReset,
+    mutationFn: mockRequestPasswordReset,
     onError: (error: Error) => {
       toast.error(error.message);
     },
@@ -96,13 +102,25 @@ export function useResetPassword() {
   const invalidateSession = useInvalidateSession();
 
   return useMutation({
-    mutationFn: resetPassword,
+    mutationFn: mockResetPassword,
     onSuccess: (data) => {
       setUser(data.user);
       invalidateSession();
       toast.success("Password updated successfully!");
-      router.push(ROUTES.dashboard);
+      router.push(ROUTES.login);
       router.refresh();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useResendVerificationEmail() {
+  return useMutation({
+    mutationFn: mockResendVerificationEmail,
+    onSuccess: () => {
+      toast.success("Verification email sent.");
     },
     onError: (error: Error) => {
       toast.error(error.message);

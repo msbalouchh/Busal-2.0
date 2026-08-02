@@ -1,15 +1,14 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import { FormWrapper } from "@/components/common/form-wrapper";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ROUTES } from "@/constants/routes";
 import { AuthFormField } from "@/modules/auth/components/auth-form-field";
+import { AuthSubmitButton } from "@/modules/auth/components/auth-submit-button";
 import { useForgotPassword } from "@/modules/auth/hooks/use-auth";
 import { forgotPasswordSchema, type ForgotPasswordFormValues } from "@/schemas/auth.schema";
 
@@ -25,21 +24,23 @@ export function ForgotPasswordForm() {
 
   if (forgotPassword.isSuccess) {
     return (
-      <div className="space-y-4 text-center">
-        <p className="text-muted-foreground text-sm">
-          If an account exists for{" "}
-          <span className="text-foreground font-medium">{form.getValues("email")}</span>, you will
-          receive a password reset link shortly.
-        </p>
-        <Button asChild variant="outline" className="w-full">
-          <Link href={ROUTES.login}>Back to sign in</Link>
-        </Button>
+      <div className="auth-form">
+        <div className="auth-alert auth-alert--success" role="status">
+          If an account exists for <strong className="text-white">{form.getValues("email")}</strong>
+          , you will receive a password reset link shortly.
+        </div>
+        <Link
+          href={ROUTES.login}
+          className="auth-submit inline-flex items-center justify-center no-underline"
+        >
+          Back to sign in
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="auth-form">
       <FormWrapper form={form} onSubmit={(values) => forgotPassword.mutate(values)}>
         <AuthFormField id="email" label="Email" error={form.formState.errors.email}>
           <Input
@@ -52,17 +53,13 @@ export function ForgotPasswordForm() {
           />
         </AuthFormField>
 
-        <Button type="submit" className="w-full" disabled={forgotPassword.isPending}>
-          {forgotPassword.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        <AuthSubmitButton isLoading={forgotPassword.isPending} loadingLabel="Sending link…">
           Send reset link
-        </Button>
+        </AuthSubmitButton>
       </FormWrapper>
 
-      <p className="text-muted-foreground text-center text-sm">
-        Remember your password?{" "}
-        <Link href={ROUTES.login} className="text-primary font-medium hover:underline">
-          Sign in
-        </Link>
+      <p className="auth-footer-text">
+        Remember your password? <Link href={ROUTES.login}>Sign in</Link>
       </p>
     </div>
   );

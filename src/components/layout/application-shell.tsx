@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, type ReactNode } from "react";
 
-import { BusalLogo } from "@/components/brand/busal-logo";
+import { BusalBrandMark } from "@/components/brand/busal-brand-mark";
 import { SkipToContent } from "@/components/common/skip-to-content";
 import {
   APPLICATION_SHELL_NAV_ITEMS,
@@ -41,7 +41,7 @@ interface ApplicationShellProps {
 }
 
 function ApplicationShellBrand({ collapsed }: { collapsed: boolean }) {
-  return <BusalLogo height={32} className={cn("shrink-0", collapsed && "mx-auto")} />;
+  return <BusalBrandMark compact={collapsed} height={32} className={cn(collapsed && "mx-auto")} />;
 }
 
 function ApplicationShellNavigation() {

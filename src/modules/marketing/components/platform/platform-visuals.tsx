@@ -2,6 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
+import { BusalLogoIcon } from "@/components/brand/busal-logo-icon";
+
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const NODES = [
@@ -57,7 +59,9 @@ export function PlatformArchitectureViz() {
         </svg>
 
         <div className="platform-arch__node" style={{ left: `${CENTER.x}%`, top: `${CENTER.y}%` }}>
-          <div className="platform-arch__node-core platform-arch__node-core--center">B</div>
+          <div className="platform-arch__node-core platform-arch__node-core--center">
+            <BusalLogoIcon className="busal-logo-icon--diagram" aria-hidden />
+          </div>
           <span>Busal OS</span>
         </div>
 
