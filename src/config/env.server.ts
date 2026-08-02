@@ -40,4 +40,13 @@ function validateServerEnv(): ServerEnv {
   return parsed.data;
 }
 
-export const serverEnv = validateServerEnv();
+let cachedServerEnv: ServerEnv | undefined;
+
+/** Validates server env on first access — avoids build-time failure when DB vars are runtime-only. */
+export function getServerEnv(): ServerEnv {
+  if (!cachedServerEnv) {
+    cachedServerEnv = validateServerEnv();
+  }
+
+  return cachedServerEnv;
+}

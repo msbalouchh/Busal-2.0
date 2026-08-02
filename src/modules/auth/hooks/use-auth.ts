@@ -6,18 +6,14 @@ import { toast } from "sonner";
 
 import { QUERY_KEYS } from "@/constants/query";
 import { ROUTES } from "@/constants/routes";
-/**
- * TODO: Swap mock imports for `@/modules/auth/lib/auth.client` when Supabase / Auth.js
- * backend integration is enabled.
- */
 import {
-  mockGetGoogleSignInUrl,
-  mockLoginWithEmail,
-  mockRequestPasswordReset,
-  mockResendVerificationEmail,
-  mockResetPassword,
-  mockSignupWithEmail,
-} from "@/modules/auth/lib/auth.mock";
+  getGoogleSignInUrl,
+  loginWithEmail,
+  requestPasswordReset,
+  resetPassword,
+  signupWithEmail,
+} from "@/modules/auth/lib/auth.client";
+import { mockResendVerificationEmail } from "@/modules/auth/lib/auth.mock";
 import { useAuthStore } from "@/stores/auth.store";
 import type { LoginFormValues } from "@/schemas/auth.schema";
 
@@ -34,7 +30,7 @@ export function useLogin(redirectTo?: string) {
   const invalidateSession = useInvalidateSession();
 
   return useMutation({
-    mutationFn: (values: LoginFormValues) => mockLoginWithEmail({ ...values, redirectTo }),
+    mutationFn: (values: LoginFormValues) => loginWithEmail({ ...values, redirectTo }),
     onSuccess: (data) => {
       setUser(data.user);
       invalidateSession();
@@ -54,7 +50,7 @@ export function useSignup() {
   const invalidateSession = useInvalidateSession();
 
   return useMutation({
-    mutationFn: mockSignupWithEmail,
+    mutationFn: signupWithEmail,
     onSuccess: (data) => {
       if (data.user) {
         setUser(data.user);
@@ -76,7 +72,7 @@ export function useSignup() {
 
 export function useGoogleSignIn() {
   return useMutation({
-    mutationFn: mockGetGoogleSignInUrl,
+    mutationFn: getGoogleSignInUrl,
     onSuccess: (data) => {
       // TODO: Microsoft OAuth, magic links
       window.location.href = data.url;
@@ -89,7 +85,7 @@ export function useGoogleSignIn() {
 
 export function useForgotPassword() {
   return useMutation({
-    mutationFn: mockRequestPasswordReset,
+    mutationFn: requestPasswordReset,
     onError: (error: Error) => {
       toast.error(error.message);
     },
@@ -102,7 +98,7 @@ export function useResetPassword() {
   const invalidateSession = useInvalidateSession();
 
   return useMutation({
-    mutationFn: mockResetPassword,
+    mutationFn: resetPassword,
     onSuccess: (data) => {
       setUser(data.user);
       invalidateSession();
