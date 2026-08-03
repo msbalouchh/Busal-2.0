@@ -34,10 +34,10 @@ export function WorkspaceStepEngine({
 
         <div className="onboarding__card">
           {step <= WORKSPACE_FORM_STEPS ? (
-            <header className="onboarding__card-header">
+            <div className="onboarding__card-header">
               <h1 className="onboarding__card-title">{meta.title}</h1>
               <p className="onboarding__card-description">{meta.description}</p>
-            </header>
+            </div>
           ) : null}
 
           <div className="onboarding__card-body">{children}</div>
