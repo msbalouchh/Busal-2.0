@@ -25,7 +25,6 @@ function useInvalidateSession() {
 }
 
 export function useLogin(redirectTo?: string) {
-  const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
   const invalidateSession = useInvalidateSession();
 
@@ -35,8 +34,9 @@ export function useLogin(redirectTo?: string) {
       setUser(data.user);
       invalidateSession();
       toast.success("Welcome back!");
-      router.push(data.redirectPath ?? redirectTo ?? ROUTES.application);
-      router.refresh();
+
+      const destination = data.redirectPath ?? redirectTo ?? ROUTES.authContinue;
+      window.location.assign(destination);
     },
     onError: (error: Error) => {
       toast.error(error.message);

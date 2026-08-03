@@ -15,7 +15,7 @@ export function Section({ title, description, children, className }: SectionProp
   return (
     <section className={cn("space-y-4", className)} aria-labelledby={headingId}>
       {title || description ? (
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           {title ? (
             <h2 id={headingId} className="text-xl font-semibold tracking-tight">
               {title}

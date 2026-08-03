@@ -27,13 +27,13 @@ export function WidgetContainer({
 }: WidgetContainerProps) {
   return (
     <Card
-      className={cn("h-full", className)}
+      className={cn("h-full min-w-0", className)}
       data-widget-id={id}
       aria-busy={loading}
       aria-live="polite"
     >
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <CardTitle className="text-base font-semibold">{title}</CardTitle>
           {description ? <CardDescription>{description}</CardDescription> : null}
         </div>

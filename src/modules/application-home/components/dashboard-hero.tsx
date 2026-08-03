@@ -40,17 +40,17 @@ export function DashboardHero({ hero, healthScore }: DashboardHeroProps) {
           <Badge variant={healthScore >= 80 ? "default" : "secondary"}>Health {healthScore}%</Badge>
         </div>
 
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           <p className="text-muted-foreground text-sm">
             {hero.greeting}, {hero.ownerName}
           </p>
           <h2
             id="dashboard-hero-title"
-            className="text-3xl font-semibold tracking-tight sm:text-4xl"
+            className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl"
           >
             {hero.businessName}
           </h2>
-          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed sm:text-base">
+          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed text-pretty sm:text-base">
             {hero.summary}
           </p>
         </div>

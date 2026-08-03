@@ -23,7 +23,7 @@ export function DashboardCard({
   return (
     <Card className={cn(className)}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <CardTitle className="text-base font-semibold">{title}</CardTitle>
           {description ? <CardDescription>{description}</CardDescription> : null}
         </div>

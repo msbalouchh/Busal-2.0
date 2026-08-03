@@ -106,7 +106,7 @@ export function ApplicationHomeDashboard({ data }: ApplicationHomeDashboardProps
   ];
 
   return (
-    <PageContainer className="mx-auto w-full max-w-7xl gap-10">
+    <PageContainer className="gap-10">
       <div className={motion.fadeInUp}>
         <Breadcrumb
           items={[

@@ -16,23 +16,27 @@ interface DashboardShellProps {
 
 export function DashboardShell({ children, greeting, userEmail }: DashboardShellProps) {
   const isMobile = useIsMobile();
-  const { isOpen, isCollapsed } = useSidebarStore();
+  const { isCollapsed } = useSidebarStore();
 
-  const sidebarOffset = !isMobile ? (isCollapsed ? "lg:ml-16" : "lg:ml-64") : isOpen ? "ml-64" : "";
+  const sidebarOffset = isMobile
+    ? "w-full"
+    : isCollapsed
+      ? "ml-16 w-[calc(100%-4rem)]"
+      : "ml-64 w-[calc(100%-16rem)]";
 
   return (
-    <div className="bg-background min-h-screen">
+    <div className="bg-background min-h-screen w-full overflow-x-clip">
       <Sidebar />
 
       <div
         className={cn(
-          "flex min-h-screen transition-[margin] duration-200 ease-in-out",
+          "flex min-h-screen min-w-0 transition-[margin,width] duration-200 ease-in-out",
           sidebarOffset,
         )}
       >
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <Header greeting={greeting} userEmail={userEmail} />
-          <main className="flex-1">{children}</main>
+          <main className="min-w-0 flex-1">{children}</main>
           <footer className="text-muted-foreground border-t px-4 py-3 text-xs">
             Busal OS · Production Dashboard Foundation
           </footer>

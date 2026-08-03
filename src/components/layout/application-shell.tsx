@@ -100,6 +100,8 @@ function ApplicationShellTopNav({
 }) {
   const pathname = usePathname();
 
+  const { isCollapsed, isMobile } = useNavigationSidebar();
+
   const pageTitle = useMemo(() => {
     const current = APPLICATION_SHELL_NAV_ITEMS.find((item) =>
       isApplicationShellPathActive(pathname, item.href),
@@ -108,9 +110,11 @@ function ApplicationShellTopNav({
     return current?.label ?? "Busal OS";
   }, [pathname]);
 
+  const headerOffset = isMobile ? "left-0" : isCollapsed ? "left-16" : "left-64";
+
   return (
     <TopNav
-      className="fixed top-0 right-0 left-0 z-40"
+      className={cn("fixed top-0 right-0 z-40", headerOffset)}
       leading={<SidebarTrigger />}
       title={<h1 className="truncate text-lg font-semibold tracking-tight">{pageTitle}</h1>}
       search={<CommandSearch />}
@@ -148,9 +152,9 @@ function ApplicationShellFrame({
         notifications={notifications}
       />
       <ApplicationShellSidebar />
-      <SidebarInset className={cn("pt-14", motion.transition)}>
-        <main id="main-content" className="min-h-[calc(100vh-3.5rem)] flex-1">
-          <PageTransition>{children}</PageTransition>
+      <SidebarInset className={cn("flex min-w-0 flex-col pt-14", motion.transition)}>
+        <main id="main-content" className="min-h-[calc(100vh-3.5rem)] w-full min-w-0 flex-1">
+          <PageTransition className="w-full min-w-0">{children}</PageTransition>
         </main>
       </SidebarInset>
     </div>

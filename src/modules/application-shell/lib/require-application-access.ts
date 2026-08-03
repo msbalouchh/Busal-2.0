@@ -4,9 +4,17 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import { ROUTES } from "@/constants/routes";
-import { getCurrentUser } from "@/services/auth.service";
-import { isBusinessSetupCompleted } from "@/services/business-setup.service";
+import { getWorkspaceAccessSnapshot } from "@/modules/auth/lib/workspace-access";
 import { findActiveStaffByEmail } from "@/modules/staff-auth/services/staff-auth.service";
+import { getCurrentUser } from "@/services/auth.service";
+
+function resolveBusinessOnboardingPath(businessSetupStep: number | null): string {
+  if (businessSetupStep && businessSetupStep > 1) {
+    return `${ROUTES.businessOnboarding}?step=${businessSetupStep}`;
+  }
+
+  return ROUTES.businessOnboarding;
+}
 
 export const requireApplicationAccess = cache(async () => {
   const user = await getCurrentUser();
@@ -21,10 +29,14 @@ export const requireApplicationAccess = cache(async () => {
     redirect(ROUTES.dashboard);
   }
 
-  const setupCompleted = await isBusinessSetupCompleted(user.id);
+  const workspace = await getWorkspaceAccessSnapshot(user.id);
 
-  if (!setupCompleted) {
+  if (workspace.state === "no_workspace") {
     redirect(ROUTES.businessOnboarding);
+  }
+
+  if (workspace.state === "provisioning_incomplete") {
+    redirect(resolveBusinessOnboardingPath(workspace.businessSetupStep));
   }
 
   return user;

@@ -86,11 +86,15 @@ export function redirectUnauthenticatedToLogin(
   return NextResponse.redirect(redirectUrl);
 }
 
-export function redirectAuthenticatedToDashboard(request: NextRequest): NextResponse {
+export function redirectAuthenticatedToAuthContinue(request: NextRequest): NextResponse {
   const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = ROUTES.application;
+  redirectUrl.pathname = ROUTES.authContinue;
   redirectUrl.search = "";
   return NextResponse.redirect(redirectUrl);
+}
+
+export function redirectAuthenticatedToDashboard(request: NextRequest): NextResponse {
+  return redirectAuthenticatedToAuthContinue(request);
 }
 
 export function redirectAuthenticatedToCustomerPortal(request: NextRequest): NextResponse {

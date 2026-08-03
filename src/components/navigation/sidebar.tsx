@@ -143,15 +143,19 @@ export function SidebarTrigger({ className }: { className?: string }) {
 }
 
 export function SidebarInset({ children, className }: { children: ReactNode; className?: string }) {
-  const { isOpen, isCollapsed, isMobile } = useNavigationSidebar();
+  const { isCollapsed, isMobile } = useNavigationSidebar();
 
-  const offsetClass = !isMobile ? (isCollapsed ? "lg:ml-16" : "lg:ml-64") : isOpen ? "ml-64" : "";
+  const insetClass = isMobile
+    ? "w-full"
+    : isCollapsed
+      ? "ml-16 w-[calc(100%-4rem)]"
+      : "ml-64 w-[calc(100%-16rem)]";
 
   return (
     <div
       className={cn(
-        "min-h-screen transition-[margin] duration-200 ease-in-out",
-        offsetClass,
+        "min-h-screen min-w-0 transition-[margin,width] duration-200 ease-in-out",
+        insetClass,
         className,
       )}
     >

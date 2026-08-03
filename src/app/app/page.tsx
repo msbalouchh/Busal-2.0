@@ -1,14 +1,16 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { ApplicationHomeDashboard } from "@/modules/application-home/components/application-home-dashboard";
-import { getApplicationHomeData } from "@/modules/application-home/lib/get-application-home-data";
+import { ROUTES } from "@/constants/routes";
+import { resolvePostAuthRedirect } from "@/modules/auth/lib/post-auth-redirect";
+import { getCurrentUser } from "@/services/auth.service";
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-};
+/** Resolves /app to the correct workspace destination — never a dead landing page. */
+export default async function ApplicationRootPage() {
+  const user = await getCurrentUser();
 
-export default async function ApplicationDashboardPage() {
-  const data = await getApplicationHomeData();
+  if (!user) {
+    redirect(`${ROUTES.login}?redirectTo=${ROUTES.application}`);
+  }
 
-  return <ApplicationHomeDashboard data={data} />;
+  redirect(await resolvePostAuthRedirect(user, null));
 }

@@ -9,7 +9,7 @@ export function WelcomeStep() {
   const nextStep = useOnboardingStore((state) => state.nextStep);
 
   return (
-    <div className="flex flex-col items-center gap-6 py-2 text-center">
+    <div className="flex w-full min-w-0 flex-col items-center gap-6 py-2 text-center">
       <p className="mx-auto max-w-2xl text-base leading-relaxed text-white/70">
         You&apos;re minutes away from a unified operating system for operations, customers, finance,
         and AI agents &mdash; built for modern service businesses.
