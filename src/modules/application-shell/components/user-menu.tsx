@@ -2,7 +2,6 @@
 
 import { ChevronDown, LogOut, Monitor, Moon, Settings, Sun, UserCircle } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState } from "react";
 
@@ -18,7 +17,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { API_ROUTES } from "@/constants/routes";
+import { API_ROUTES, ROUTES } from "@/constants/routes";
+import { assignAppPath } from "@/lib/app-navigation";
 import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { BUSINESS_ROUTES } from "@/modules/business/constants/routes";
@@ -43,7 +43,6 @@ function getInitials(name: string): string {
 }
 
 export function UserMenu({ userName, userEmail }: UserMenuProps) {
-  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -65,8 +64,7 @@ export function UserMenu({ userName, userEmail }: UserMenuProps) {
         method: "POST",
         credentials: "include",
       });
-      router.push("/login");
-      router.refresh();
+      assignAppPath(ROUTES.login);
     } finally {
       setIsSigningOut(false);
     }

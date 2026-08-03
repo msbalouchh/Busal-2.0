@@ -1,5 +1,6 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
+import { resolveCanonicalOriginForHost } from "@/config/app-url";
 import { USER_ROLES } from "@/constants/roles";
 import { createClient } from "@/lib/supabase/middleware";
 import {
@@ -21,6 +22,17 @@ function resolveUserRole(user: { user_metadata?: Record<string, unknown> }): str
 }
 
 export async function middleware(request: NextRequest) {
+  const canonicalOrigin = resolveCanonicalOriginForHost(request.headers.get("host"));
+
+  if (canonicalOrigin) {
+    const redirectUrl = new URL(
+      `${request.nextUrl.pathname}${request.nextUrl.search}`,
+      canonicalOrigin,
+    );
+
+    return NextResponse.redirect(redirectUrl, 308);
+  }
+
   const { supabase, supabaseResponse } = createClient(request);
   const pathname = request.nextUrl.pathname;
 

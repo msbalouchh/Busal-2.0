@@ -6,7 +6,7 @@ const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const productionUrl =
   process.env.PRODUCTION_URL?.trim() ||
   process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-  "https://busal-2-0.vercel.app";
+  "https://www.getbusal.com";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {

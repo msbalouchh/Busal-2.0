@@ -1,11 +1,11 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { QUERY_KEYS } from "@/constants/query";
 import { ROUTES } from "@/constants/routes";
+import { assignAppPath } from "@/lib/app-navigation";
 import {
   getGoogleSignInUrl,
   loginWithEmail,
@@ -36,7 +36,7 @@ export function useLogin(redirectTo?: string) {
       toast.success("Welcome back!");
 
       const destination = data.redirectPath ?? redirectTo ?? ROUTES.authContinue;
-      window.location.assign(destination);
+      assignAppPath(destination);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -45,7 +45,6 @@ export function useLogin(redirectTo?: string) {
 }
 
 export function useSignup() {
-  const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
   const invalidateSession = useInvalidateSession();
 
@@ -56,13 +55,12 @@ export function useSignup() {
         setUser(data.user);
         invalidateSession();
         toast.success("Workspace created successfully!");
-        router.push(ROUTES.businessOnboarding);
-        router.refresh();
+        assignAppPath(ROUTES.businessOnboarding);
         return;
       }
 
       toast.success("Check your email to verify your account.");
-      router.push(ROUTES.verifyEmail);
+      assignAppPath(ROUTES.verifyEmail);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -93,7 +91,6 @@ export function useForgotPassword() {
 }
 
 export function useResetPassword() {
-  const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
   const invalidateSession = useInvalidateSession();
 
@@ -103,8 +100,7 @@ export function useResetPassword() {
       setUser(data.user);
       invalidateSession();
       toast.success("Password updated successfully!");
-      router.push(ROUTES.login);
-      router.refresh();
+      assignAppPath(ROUTES.login);
     },
     onError: (error: Error) => {
       toast.error(error.message);

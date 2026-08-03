@@ -2,7 +2,6 @@
 
 import { ChevronDown, LogOut, Settings, UserCircle } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { API_ROUTES } from "@/constants/routes";
+import { API_ROUTES, ROUTES } from "@/constants/routes";
+import { assignAppPath } from "@/lib/app-navigation";
 import { CONTROL_CENTER_ROUTES } from "@/modules/control-center/constants/routes";
 
 interface ControlCenterProfileMenuProps {
@@ -22,7 +22,6 @@ interface ControlCenterProfileMenuProps {
 }
 
 export function ControlCenterProfileMenu({ operatorEmail }: ControlCenterProfileMenuProps) {
-  const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -33,8 +32,7 @@ export function ControlCenterProfileMenu({ operatorEmail }: ControlCenterProfile
         method: "POST",
         credentials: "include",
       });
-      router.push("/login");
-      router.refresh();
+      assignAppPath(ROUTES.login);
     } finally {
       setIsSigningOut(false);
     }
