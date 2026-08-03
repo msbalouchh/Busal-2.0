@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { normalizeEnvUrl, resolvePublicAppUrl } from "@/config/app-url";
+import { normalizeEnvUrl, PRODUCTION_APP_ORIGIN, resolvePublicAppUrl } from "@/config/app-url";
 
 function emptyToUndefined(value: unknown): unknown {
   if (typeof value === "string" && value.trim() === "") {
@@ -13,11 +13,15 @@ function emptyToUndefined(value: unknown): unknown {
 const requiredUrl = z.preprocess(emptyToUndefined, z.string().url());
 
 export const clientEnvSchema = z.object({
-  NEXT_PUBLIC_APP_URL: z.preprocess(
-    (value) =>
-      normalizeEnvUrl(typeof value === "string" ? value : undefined) ?? resolvePublicAppUrl(),
-    z.string().url(),
-  ),
+  NEXT_PUBLIC_APP_URL: z.preprocess((value) => {
+    const normalized = normalizeEnvUrl(typeof value === "string" ? value : undefined);
+
+    if (normalized?.includes(".vercel.app")) {
+      return PRODUCTION_APP_ORIGIN;
+    }
+
+    return normalized ?? resolvePublicAppUrl();
+  }, z.string().url()),
   NEXT_PUBLIC_SUPABASE_URL: requiredUrl,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.preprocess(emptyToUndefined, z.string().min(1)),
 });

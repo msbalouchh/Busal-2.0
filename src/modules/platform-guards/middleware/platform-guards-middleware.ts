@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { buildAppUrl } from "@/config/app-url";
 import { ROUTES } from "@/constants/routes";
 import {
   AUTH_ROUTES,
@@ -78,30 +79,24 @@ export function redirectUnauthenticatedToLogin(
   request: NextRequest,
   pathname: string,
 ): NextResponse {
-  const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = isCustomerPortalRoute(pathname)
-    ? ROUTES.customerPortalLogin
-    : ROUTES.login;
+  const redirectUrl = new URL(
+    isCustomerPortalRoute(pathname) ? ROUTES.customerPortalLogin : ROUTES.login,
+    buildAppUrl("/"),
+  );
   redirectUrl.searchParams.set("redirectTo", pathname);
   return NextResponse.redirect(redirectUrl);
 }
 
-export function redirectAuthenticatedToAuthContinue(request: NextRequest): NextResponse {
-  const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = ROUTES.authContinue;
-  redirectUrl.search = "";
-  return NextResponse.redirect(redirectUrl);
+export function redirectAuthenticatedToAuthContinue(_request: NextRequest): NextResponse {
+  return NextResponse.redirect(buildAppUrl(ROUTES.authContinue));
 }
 
 export function redirectAuthenticatedToDashboard(request: NextRequest): NextResponse {
   return redirectAuthenticatedToAuthContinue(request);
 }
 
-export function redirectAuthenticatedToCustomerPortal(request: NextRequest): NextResponse {
-  const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = ROUTES.customerPortal;
-  redirectUrl.search = "";
-  return NextResponse.redirect(redirectUrl);
+export function redirectAuthenticatedToCustomerPortal(_request: NextRequest): NextResponse {
+  return NextResponse.redirect(buildAppUrl(ROUTES.customerPortal));
 }
 
 export function unauthenticatedApiResponse(): NextResponse {

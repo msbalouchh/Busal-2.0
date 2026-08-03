@@ -1,13 +1,12 @@
 import { ROUTES } from "@/constants/routes";
-import { resolvePublicAppUrl } from "@/config/app-url";
+import { buildAppUrl, resolvePublicAppUrl } from "@/config/app-url";
 
 export function getAppOrigin(): string {
   return resolvePublicAppUrl();
 }
 
-export function buildAppUrl(path: string): string {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${getAppOrigin()}${normalizedPath}`;
+export function buildAppUrlFromOrigin(path: string): string {
+  return buildAppUrl(path);
 }
 
 export function getAuthCallbackUrl(next?: string): string {
