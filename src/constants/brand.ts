@@ -3,6 +3,16 @@ export const BUSAL_LOGO = {
   alt: "Busal OS",
   width: 1536,
   height: 1024,
+  aspectRatio: 1536 / 1024,
+} as const;
+
+/** Horizontal wordmark — same official asset, width-led sizing in UI. */
+export const BUSAL_LOGO_HORIZONTAL = {
+  src: "/branding/logo.png",
+  alt: "Busal OS",
+  width: 1536,
+  height: 1024,
+  aspectRatio: 1536 / 1024,
 } as const;
 
 /** Compact BS mark for favicon-sized surfaces, diagrams, and collapsed navigation. */

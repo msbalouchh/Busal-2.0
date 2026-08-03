@@ -35,8 +35,14 @@ export function useLogin(redirectTo?: string) {
       invalidateSession();
       toast.success("Welcome back!");
 
-      const destination = data.redirectPath ?? redirectTo ?? ROUTES.authContinue;
-      assignAppPath(destination);
+      const target = data.redirectPath ?? redirectTo;
+      if (target && target !== ROUTES.authContinue) {
+        const params = new URLSearchParams({ redirectTo: target });
+        assignAppPath(`${ROUTES.authContinue}?${params.toString()}`);
+        return;
+      }
+
+      assignAppPath(ROUTES.authContinue);
     },
     onError: (error: Error) => {
       toast.error(error.message);

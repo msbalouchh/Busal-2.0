@@ -1,0 +1,57 @@
+/* Shared layout fixes for Careers, Partners, Privacy, Terms */
+
+.marketing-content {
+  overflow-wrap: anywhere;
+}
+
+.marketing-content > h2 {
+  margin-top: 2rem;
+  padding-top: 0.25rem;
+}
+
+.marketing-content > h2:first-child {
+  margin-top: 0;
+}
+
+.marketing-content > p,
+.marketing-content > ul {
+  margin-top: 0;
+}
+
+.marketing-content ul {
+  padding-left: 1.25rem;
+}
+
+.marketing-content li {
+  text-wrap: pretty;
+}
+
+.marketing-content strong {
+  color: var(--marketing-ink);
+  font-weight: 600;
+}
+
+.marketing-role-card {
+  min-width: 0;
+}
+
+.marketing-role-card__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.marketing-role-card__title {
+  text-wrap: pretty;
+}
+
+.marketing-role-card__summary {
+  text-wrap: pretty;
+}
+
+.marketing-integration-list {
+  min-width: 0;
+}
+
+.marketing-integration-list li {
+  text-wrap: pretty;
+}

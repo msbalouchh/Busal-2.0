@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { authError, authSuccess, handleAuthRouteError } from "@/modules/auth/lib/api-response";
 import { resolvePostAuthRedirect } from "@/modules/auth/lib/post-auth-redirect";
+import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
 import { loginSchema } from "@/schemas/auth.schema";
 import { ACCOUNT_TYPES } from "@/modules/staff-auth/constants/session";
 import { completeLoginSession } from "@/modules/staff-auth/services/staff-auth.service";
@@ -18,7 +19,8 @@ export async function POST(request: Request) {
       return authError(message, 422);
     }
 
-    const session = await signInWithEmail(parsed.data.email, parsed.data.password);
+    const { supabase, applyCookiesToResponse } = await createRouteHandlerClient();
+    const session = await signInWithEmail(parsed.data.email, parsed.data.password, supabase);
     const loginResult = await completeLoginSession(session.user.id, session.user.email);
     await persistBusinessContextCookiesForLogin(session.user, loginResult);
 
@@ -27,13 +29,15 @@ export async function POST(request: Request) {
       parsed.data.redirectTo ?? null,
     );
 
-    return authSuccess({
-      user: session.user,
-      redirectPath,
-      accountType: loginResult.accountType,
-      staffSession:
-        loginResult.accountType === ACCOUNT_TYPES.STAFF ? loginResult.staffSession : null,
-    });
+    return applyCookiesToResponse(
+      authSuccess({
+        user: session.user,
+        redirectPath,
+        accountType: loginResult.accountType,
+        staffSession:
+          loginResult.accountType === ACCOUNT_TYPES.STAFF ? loginResult.staffSession : null,
+      }),
+    );
   } catch (error) {
     return handleAuthRouteError(error);
   }

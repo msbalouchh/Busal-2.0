@@ -3,7 +3,22 @@
 .busal-logo {
   display: block;
   width: auto;
-  max-width: none;
+  max-width: 100%;
   object-fit: contain;
   object-position: left center;
+}
+
+.busal-logo--horizontal {
+  height: auto;
+  max-height: 3.5rem;
+  width: clamp(7.5rem, 18vw, 11.5rem);
+  object-fit: contain;
+  object-position: left center;
+}
+
+@media (max-width: 639px) {
+  .busal-logo--horizontal {
+    width: clamp(6.5rem, 42vw, 9.5rem);
+    max-height: 3rem;
+  }
 }

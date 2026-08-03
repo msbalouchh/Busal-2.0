@@ -28,7 +28,6 @@ interface WorkspaceHeaderProps {
 export function WorkspaceHeader({ userName, userEmail, className }: WorkspaceHeaderProps) {
   const pathname = usePathname();
   const { isCollapsed, isMobile } = useNavigationSidebar();
-  const collapsed = !isMobile && isCollapsed;
 
   const pageTitle = useMemo(
     () => resolveActiveWorkspaceNavLabel(pathname, WORKSPACE_PRIMARY_NAV),
@@ -43,7 +42,7 @@ export function WorkspaceHeader({ userName, userEmail, className }: WorkspaceHea
       leading={
         <>
           <SidebarTrigger />
-          <BusalBrandMark compact={collapsed} height={28} className="shrink-0" />
+          <BusalBrandMark height={36} className="shrink-0" priority />
           <Separator orientation="vertical" className="hidden h-6 md:block" />
           <WorkspaceSwitcher className="min-w-0" />
         </>

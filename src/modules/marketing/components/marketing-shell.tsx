@@ -3,6 +3,8 @@
 import { MarketingFooter } from "@/modules/marketing/components/marketing-footer";
 import { MarketingHeader } from "@/modules/marketing/components/marketing-header";
 
+import "./marketing-content.css";
+
 export function MarketingShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="marketing-root marketing-home bg-marketing-surface text-marketing-ink min-h-screen">

@@ -39,8 +39,8 @@ export function MarketingHeading({
   return (
     <Tag
       className={cn(
-        "font-marketing-display text-marketing-ink text-balance",
-        Tag === "h1" && "text-4xl leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl",
+        "font-marketing-display text-marketing-ink max-w-4xl text-pretty",
+        Tag === "h1" && "text-4xl leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.25rem]",
         Tag === "h2" && "text-3xl leading-tight tracking-tight sm:text-4xl",
         Tag === "h3" && "text-xl leading-snug tracking-tight sm:text-2xl",
         className,

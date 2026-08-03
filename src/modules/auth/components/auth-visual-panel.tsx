@@ -19,7 +19,7 @@ export function AuthVisualPanel() {
       <div className="auth-visual__orb auth-visual__orb--b" />
 
       <div className="auth-visual__content">
-        <BusalLogo height={48} priority />
+        <BusalLogo height={56} priority variant="horizontal" />
         <h1 className="auth-visual__headline">{AUTH_HEADLINE}</h1>
         <p className="auth-visual__copy">{AUTH_SUPPORTING_COPY}</p>
 

@@ -26,7 +26,7 @@ export function AuthLayout({ title, description, children, footer, className }: 
       <div className="auth-panel">
         <main className={cn("auth-panel__inner", className)}>
           <div className="auth-panel__mobile-logo">
-            <BusalLogo height={44} priority />
+            <BusalLogo height={52} priority variant="horizontal" />
           </div>
 
           <AuthCard title={title} description={description} footer={footer}>

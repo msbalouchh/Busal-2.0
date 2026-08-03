@@ -92,7 +92,7 @@ export default function PartnersPage() {
           Technology partners integrate through payments, webhooks, API gateway, and document
           storage pathways.
         </MarketingLead>
-        <ul className="mt-10 flex flex-wrap gap-3">
+        <ul className="marketing-integration-list mt-10 flex flex-wrap gap-3">
           {INTEGRATIONS.map((item) => (
             <li
               key={item}

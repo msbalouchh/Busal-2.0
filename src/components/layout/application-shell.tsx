@@ -41,7 +41,14 @@ interface ApplicationShellProps {
 }
 
 function ApplicationShellBrand({ collapsed }: { collapsed: boolean }) {
-  return <BusalBrandMark compact={collapsed} height={32} className={cn(collapsed && "mx-auto")} />;
+  return (
+    <BusalBrandMark
+      compact={collapsed}
+      height={36}
+      className={cn(collapsed && "mx-auto")}
+      priority
+    />
+  );
 }
 
 function ApplicationShellNavigation() {

@@ -71,14 +71,18 @@ export function FeatureGrid({
   return (
     <div
       className={cn(
-        "mt-10 grid gap-x-8 gap-y-10",
+        "mt-10 grid min-w-0 gap-x-8 gap-y-10",
         columns === "two" ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3",
       )}
     >
       {items.map((item) => (
-        <article key={item.name} className="border-marketing-line border-t pt-5">
-          <h3 className="text-marketing-ink text-base font-semibold tracking-tight">{item.name}</h3>
-          <p className="text-marketing-muted mt-2 text-sm leading-relaxed">{item.summary}</p>
+        <article key={item.name} className="border-marketing-line min-w-0 border-t pt-5">
+          <h3 className="text-marketing-ink text-base font-semibold tracking-tight text-pretty">
+            {item.name}
+          </h3>
+          <p className="text-marketing-muted mt-2 text-sm leading-relaxed text-pretty">
+            {item.summary}
+          </p>
         </article>
       ))}
     </div>
@@ -87,9 +91,11 @@ export function FeatureGrid({
 
 export function ContentBlock({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <div className="prose-marketing max-w-3xl space-y-4 text-sm leading-relaxed sm:text-base">
+    <div className="marketing-content prose-marketing max-w-3xl min-w-0 space-y-5 text-sm leading-relaxed sm:text-base">
       {title ? (
-        <h2 className="font-marketing-display text-2xl tracking-tight sm:text-3xl">{title}</h2>
+        <h2 className="font-marketing-display text-2xl tracking-tight text-pretty sm:text-3xl">
+          {title}
+        </h2>
       ) : null}
       {children}
     </div>

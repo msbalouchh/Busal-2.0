@@ -57,7 +57,7 @@ export function MarketingFooter() {
         <div className="mkt-footer__top">
           <div className="mkt-footer__brand">
             <Link href={MARKETING_ROUTES.home} className="mkt-footer__logo">
-              <BusalLogo className="mkt-footer__logo-img" height={56} />
+              <BusalLogo className="mkt-footer__logo-img" height={52} variant="horizontal" />
             </Link>
             <p className="mkt-footer__description">{BRAND.description}</p>
             <div className="mkt-footer__newsletter">

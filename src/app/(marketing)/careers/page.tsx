@@ -45,10 +45,12 @@ export default function CareersPage() {
         <ul className="mt-10 space-y-4">
           {CAREERS.map((role) => (
             <li key={role.title}>
-              <article className="border-marketing-line bg-marketing-panel flex flex-col gap-4 rounded-3xl border px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-marketing-ink text-lg font-semibold">{role.title}</h3>
-                  <p className="text-marketing-muted mt-2 text-sm leading-relaxed">
+              <article className="marketing-role-card border-marketing-line bg-marketing-panel flex flex-col gap-4 rounded-3xl border px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
+                <div className="marketing-role-card__body">
+                  <h3 className="marketing-role-card__title text-marketing-ink text-lg font-semibold">
+                    {role.title}
+                  </h3>
+                  <p className="marketing-role-card__summary text-marketing-muted mt-2 text-sm leading-relaxed">
                     {role.summary}
                   </p>
                   <p className="text-marketing-muted mt-3 text-xs">

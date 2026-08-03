@@ -16,15 +16,22 @@ export function MarketingPrimaryCta({
   children?: React.ReactNode;
   className?: string;
 }) {
+  const classes = cn(
+    base,
+    "bg-marketing-accent text-white hover:bg-marketing-accent/90 focus-visible:ring-marketing-accent",
+    className,
+  );
+
+  if (href.startsWith("mailto:") || href.startsWith("http")) {
+    return (
+      <a href={href} className={classes}>
+        {children}
+      </a>
+    );
+  }
+
   return (
-    <Link
-      href={href}
-      className={cn(
-        base,
-        "bg-marketing-ink text-marketing-surface hover:bg-marketing-ink/90 focus-visible:ring-marketing-ink",
-        className,
-      )}
-    >
+    <Link href={href} className={classes}>
       {children}
     </Link>
   );

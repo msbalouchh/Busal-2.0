@@ -1,5 +1,4 @@
 import { BusalLogo } from "@/components/brand/busal-logo";
-import { BusalLogoIcon } from "@/components/brand/busal-logo-icon";
 import { cn } from "@/lib/utils";
 
 type BusalBrandMarkProps = {
@@ -11,13 +10,17 @@ type BusalBrandMarkProps = {
 
 export function BusalBrandMark({
   compact = false,
-  height = 32,
+  height = 40,
   className,
   priority,
 }: BusalBrandMarkProps) {
-  if (compact) {
-    return <BusalLogoIcon size={height} className={cn("shrink-0", className)} />;
-  }
-
-  return <BusalLogo height={height} className={cn("shrink-0", className)} priority={priority} />;
+  return (
+    <BusalLogo
+      variant="horizontal"
+      height={compact ? Math.min(height, 32) : height}
+      maxWidth={compact ? 120 : undefined}
+      className={cn("shrink-0", className)}
+      priority={priority}
+    />
+  );
 }

@@ -1,6 +1,11 @@
 import "server-only";
 
-import type { AuthError, Session as SupabaseSession, User } from "@supabase/supabase-js";
+import type {
+  AuthError,
+  Session as SupabaseSession,
+  SupabaseClient,
+  User,
+} from "@supabase/supabase-js";
 import { cache } from "react";
 
 import { USER_ROLES } from "@/constants/roles";
@@ -78,8 +83,12 @@ export async function requireSession(): Promise<Session> {
   return session;
 }
 
-export async function signInWithEmail(email: string, password: string): Promise<Session> {
-  const supabase = await getSupabaseClient();
+export async function signInWithEmail(
+  email: string,
+  password: string,
+  supabaseClient?: SupabaseClient,
+): Promise<Session> {
+  const supabase = supabaseClient ?? (await getSupabaseClient());
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {

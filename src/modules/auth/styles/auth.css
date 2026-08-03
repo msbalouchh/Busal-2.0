@@ -237,6 +237,11 @@
   margin-bottom: 1.5rem;
 }
 
+.auth-panel__mobile-logo .busal-logo--horizontal {
+  width: clamp(8rem, 55vw, 11rem);
+  max-height: 3.25rem;
+}
+
 @media (min-width: 1024px) {
   .auth-panel__mobile-logo {
     display: none;

@@ -210,7 +210,7 @@ export function Sidebar() {
           <div
             className={cn("flex items-center gap-2 font-semibold", isCollapsed && "justify-center")}
           >
-            <BusalBrandMark compact={isCollapsed} height={32} />
+            <BusalBrandMark compact={isCollapsed} height={36} priority />
           </div>
           {isMobile ? (
             <Button variant="ghost" size="icon" onClick={close} aria-label="Close menu">

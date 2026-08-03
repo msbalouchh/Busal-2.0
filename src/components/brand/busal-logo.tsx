@@ -1,25 +1,42 @@
 import Image from "next/image";
 
-import { BUSAL_LOGO } from "@/constants/brand";
+import { BUSAL_LOGO, BUSAL_LOGO_HORIZONTAL } from "@/constants/brand";
 import { cn } from "@/lib/utils";
 
 import "./busal-logo.css";
 
 type BusalLogoProps = {
   className?: string;
+  /** Max height in pixels — width scales from the official aspect ratio. */
   height?: number;
+  /** Optional max width cap for tight surfaces (sidebar, mobile). */
+  maxWidth?: number;
+  variant?: "horizontal" | "stacked";
   priority?: boolean;
 };
 
-export function BusalLogo({ className, height = 32, priority }: BusalLogoProps) {
+export function BusalLogo({
+  className,
+  height = 40,
+  maxWidth,
+  variant = "horizontal",
+  priority,
+}: BusalLogoProps) {
+  const asset = variant === "horizontal" ? BUSAL_LOGO_HORIZONTAL : BUSAL_LOGO;
+  const computedWidth = Math.round(height * asset.aspectRatio);
+
   return (
     <Image
-      src={BUSAL_LOGO.src}
-      alt={BUSAL_LOGO.alt}
-      width={BUSAL_LOGO.width}
-      height={BUSAL_LOGO.height}
-      className={cn("busal-logo", className)}
-      style={{ height, width: "auto" }}
+      src={asset.src}
+      alt={asset.alt}
+      width={asset.width}
+      height={asset.height}
+      className={cn("busal-logo", variant === "horizontal" && "busal-logo--horizontal", className)}
+      style={{
+        height,
+        width: "auto",
+        maxWidth: maxWidth ?? computedWidth,
+      }}
       priority={priority}
     />
   );
