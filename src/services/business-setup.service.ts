@@ -113,6 +113,118 @@ export async function saveBusinessSetupDraft(
   return mapBusinessSetupProfile(updated);
 }
 
+export interface WorkspaceOnboardingFinalizeInput {
+  businessName: string;
+  displayName: string;
+  businessType: string;
+  industry: string;
+  country: string;
+  timezone: string;
+  currency: string;
+  phone?: string;
+  businessEmail?: string;
+}
+
+function resolveBusinessType(value: string): BusinessType {
+  const normalized = value.trim().toUpperCase();
+  const allowed = new Set<string>([
+    "RESTAURANT",
+    "CAFE",
+    "BAKERY",
+    "GROCERY",
+    "RETAIL",
+    "SALON",
+    "CLINIC",
+    "HOTEL",
+    "GYM",
+    "PHARMACY",
+    "SERVICES",
+    "OTHER",
+  ]);
+
+  return allowed.has(normalized) ? (normalized as BusinessType) : "OTHER";
+}
+
+/** Persists workspace wizard output and marks business setup complete. */
+export async function finalizeWorkspaceSetup(
+  ownerId: string,
+  input: WorkspaceOnboardingFinalizeInput,
+): Promise<BusinessSetupProfile> {
+  const business = await getPrimaryBusinessByOwnerId(ownerId);
+
+  if (!business) {
+    throw new Error("Business not found for user");
+  }
+
+  if (business.businessSetupCompleted) {
+    return mapBusinessSetupProfile(business);
+  }
+
+  const businessName = input.displayName.trim() || input.businessName.trim();
+
+  if (!businessName) {
+    throw new Error("Business name is required");
+  }
+
+  if (!input.country.trim()) {
+    throw new Error("Country is required");
+  }
+
+  if (!input.currency.trim()) {
+    throw new Error("Currency is required");
+  }
+
+  if (!input.timezone.trim()) {
+    throw new Error("Timezone is required");
+  }
+
+  const businessCode = business.businessCode ?? (await allocateBusinessCode());
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.business.update({
+      where: { id: business.id },
+      data: {
+        businessName,
+        businessType: resolveBusinessType(input.businessType),
+        industry: input.industry.trim() || business.industry,
+        country: input.country.trim(),
+        currency: input.currency.trim(),
+        timezone: input.timezone.trim(),
+        phone: input.phone?.trim() || business.phone,
+        businessEmail: input.businessEmail?.trim() || business.businessEmail,
+        businessCode,
+        businessSetupCompleted: true,
+        businessSetupStep: 11,
+        onboardingCompleted: true,
+        onboardingStep: 11,
+      },
+    });
+
+    await tx.businessMember.upsert({
+      where: {
+        businessId_userId: {
+          businessId: result.id,
+          userId: ownerId,
+        },
+      },
+      create: {
+        businessId: result.id,
+        userId: ownerId,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+      update: {
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+    });
+
+    return result;
+  });
+
+  return mapBusinessSetupProfile(updated);
+}
+
 export async function completeBusinessSetup(ownerId: string): Promise<BusinessSetupProfile> {
   const business = await getPrimaryBusinessByOwnerId(ownerId);
 

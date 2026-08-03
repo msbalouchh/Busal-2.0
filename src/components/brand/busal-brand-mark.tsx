@@ -10,7 +10,7 @@ type BusalBrandMarkProps = {
 
 export function BusalBrandMark({
   compact = false,
-  height = 40,
+  height = 44,
   className,
   priority,
 }: BusalBrandMarkProps) {
@@ -18,7 +18,7 @@ export function BusalBrandMark({
     <BusalLogo
       variant="horizontal"
       height={compact ? Math.min(height, 32) : height}
-      maxWidth={compact ? 120 : undefined}
+      maxWidth={compact ? 128 : undefined}
       className={cn("shrink-0", className)}
       priority={priority}
     />

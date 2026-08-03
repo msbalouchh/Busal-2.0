@@ -6,10 +6,12 @@ import { ROUTES } from "@/constants/routes";
 import { getCurrentUser } from "@/services/auth.service";
 import {
   completeBusinessSetup,
+  finalizeWorkspaceSetup,
   getBusinessSetupProfile,
   isBusinessSetupCompleted,
   saveBusinessSetupDraft,
   updateBusinessSetupStep,
+  type WorkspaceOnboardingFinalizeInput,
 } from "@/services/business-setup.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { findActiveStaffByEmail } from "@/modules/staff-auth/services/staff-auth.service";
@@ -98,6 +100,19 @@ export async function saveBusinessContactAction(input: { phone: string; business
   const parsed = businessContactSchema.parse(input);
 
   const profile = await saveBusinessSetupDraft(user.id, parsed, 4);
+
+  return { success: true as const, profile };
+}
+
+export async function finalizeWorkspaceOnboardingAction(input: WorkspaceOnboardingFinalizeInput) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect(ROUTES.login);
+  }
+
+  await getOrCreateBusinessForOwner(user.id);
+  const profile = await finalizeWorkspaceSetup(user.id, input);
 
   return { success: true as const, profile };
 }

@@ -16,7 +16,6 @@ import { SubscriptionStep } from "@/modules/business-onboarding/components/steps
 import { TeamStep } from "@/modules/business-onboarding/components/steps/team-step";
 import { WelcomeStep } from "@/modules/business-onboarding/components/steps/welcome-step";
 import { useWorkspaceWizard } from "@/modules/business-onboarding/hooks/use-workspace-wizard";
-import { WORKSPACE_FORM_STEPS } from "@/modules/business-onboarding/types/onboarding.types";
 
 export function BusinessOnboardingWizard() {
   const { currentStep, isSaving, prevStep, persistAndAdvance, submitActiveForm } =
@@ -38,7 +37,7 @@ export function BusinessOnboardingWizard() {
 
   if (currentStep === 11) {
     return (
-      <WorkspaceStepEngine step={WORKSPACE_FORM_STEPS} hideProgress>
+      <WorkspaceStepEngine step={11} hideProgress>
         <CompleteStep />
       </WorkspaceStepEngine>
     );

@@ -28,7 +28,7 @@ export function WorkspaceStepEngine({
     <div className="onboarding">
       <div className="onboarding__inner">
         <header className="onboarding__header">
-          <BusalLogo height={44} priority />
+          <BusalLogo height={52} priority variant="horizontal" />
           {!hideProgress ? <WorkspaceProgress step={step} /> : null}
         </header>
 

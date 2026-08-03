@@ -187,6 +187,39 @@
   color: var(--ob-fg);
 }
 
+.onboarding__field .relative > select {
+  height: 2.75rem;
+  border-color: rgba(255, 255, 255, 0.14);
+  background-color: rgba(15, 23, 42, 0.92);
+  color: var(--ob-fg);
+  box-shadow: none;
+}
+
+.onboarding__field .relative > select:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.24);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.onboarding__field .relative > select:focus-visible {
+  border-color: rgba(59, 130, 246, 0.65);
+  outline: 2px solid rgba(59, 130, 246, 0.35);
+  outline-offset: 0;
+}
+
+.onboarding__field .relative > select option {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+.onboarding__field .relative > select option:checked {
+  background-color: #1e3a8a;
+  color: #f8fafc;
+}
+
+.onboarding__field .relative svg {
+  color: rgba(248, 250, 252, 0.55);
+}
+
 .onboarding__field textarea {
   height: auto;
   min-height: 5rem;
@@ -401,6 +434,8 @@
   max-width: none;
   min-width: 0;
   margin: 0;
+  text-wrap: pretty;
+  word-break: normal;
 }
 
 .onboarding__complete-copy--lead {
@@ -421,6 +456,23 @@
   min-width: 0;
   flex-direction: column;
   gap: 0.75rem;
+  align-items: stretch;
+}
+
+.onboarding__complete-actions .onboarding__cta {
+  width: 100%;
+  min-width: 0;
+}
+
+.onboarding__complete-actions .onboarding__cta--ghost {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 1.25rem;
+}
+
+.onboarding__complete .onboarding__card-title {
+  text-wrap: pretty;
+  word-break: normal;
 }
 
 .onboarding__complete-icon {

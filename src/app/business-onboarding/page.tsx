@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 
 import { BusinessOnboardingWizard } from "@/modules/business-onboarding/components/business-onboarding-wizard";
+import { ensureBusinessSetupAccess } from "@/modules/business-onboarding/actions/business-setup-actions";
 
 export const metadata: Metadata = {
   title: "Create Your Workspace",
 };
 
-/** TODO: Restore ensureBusinessSetupAccess + server profile hydration when onboarding API is live. */
-export default function BusinessOnboardingPage() {
+export default async function BusinessOnboardingPage() {
+  await ensureBusinessSetupAccess();
   return <BusinessOnboardingWizard />;
 }

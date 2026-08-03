@@ -1,20 +1,45 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { ROUTES } from "@/constants/routes";
+import { finalizeWorkspaceOnboardingAction } from "@/modules/business-onboarding/actions/business-setup-actions";
 import { OnboardingButton } from "@/modules/business-onboarding/components/onboarding-ui";
-import { MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
 import { useWorkspaceWizardStore } from "@/modules/business-onboarding/store/onboarding.store";
+import { MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
 
 export function CompleteStep() {
   const router = useRouter();
   const reset = useWorkspaceWizardStore((s) => s.reset);
   const displayName = useWorkspaceWizardStore((s) => s.displayName);
+  const wizardData = useWorkspaceWizardStore();
+  const [isEntering, setIsEntering] = useState(false);
+  const [enterError, setEnterError] = useState<string | null>(null);
 
-  function enterBusal() {
-    reset();
-    router.push(ROUTES.application);
+  async function enterBusal() {
+    setIsEntering(true);
+    setEnterError(null);
+
+    try {
+      await finalizeWorkspaceOnboardingAction({
+        businessName: wizardData.businessName,
+        displayName: wizardData.displayName,
+        businessType: wizardData.businessType,
+        industry: wizardData.industry,
+        country: wizardData.country,
+        timezone: wizardData.timezone,
+        currency: wizardData.currency,
+        phone: wizardData.phone,
+        businessEmail: wizardData.businessEmail,
+      });
+      reset();
+      router.push(ROUTES.dashboard);
+    } catch {
+      setEnterError("Could not finish setup. Please try again.");
+    } finally {
+      setIsEntering(false);
+    }
   }
 
   return (
@@ -30,8 +55,19 @@ export function CompleteStep() {
         {displayName ? `${displayName} is provisioned` : "Your workspace is provisioned"} with
         tenant, modules, permissions, and AI configuration.
       </p>
+      {enterError ? (
+        <p className="onboarding__field-error" role="alert">
+          {enterError}
+        </p>
+      ) : null}
       <div className="onboarding__complete-actions">
-        <OnboardingButton onClick={enterBusal}>Enter Busal OS</OnboardingButton>
+        <OnboardingButton
+          isLoading={isEntering}
+          loadingLabel="Entering Busal OS…"
+          onClick={() => void enterBusal()}
+        >
+          Enter Busal OS
+        </OnboardingButton>
         <OnboardingButton
           type="button"
           variant="ghost"

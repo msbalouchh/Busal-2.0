@@ -35,7 +35,7 @@ export function MarketingHeader() {
           className="mkt-header__logo"
           aria-label={`${BRAND.name} home`}
         >
-          <BusalLogo className="mkt-header__logo-img" height={44} priority variant="horizontal" />
+          <BusalLogo className="mkt-header__logo-img" height={52} priority variant="horizontal" />
         </Link>
 
         <nav className="mkt-header__nav" aria-label="Primary">
