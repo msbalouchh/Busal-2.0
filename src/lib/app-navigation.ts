@@ -1,7 +1,13 @@
-import { clientEnv } from "@/config/env.client";
+import { PRODUCTION_APP_ORIGIN } from "@/config/app-url";
 
 function getClientAppOrigin(): string {
-  return clientEnv.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+
+  return PRODUCTION_APP_ORIGIN;
 }
 
 /** Performs a full navigation to an in-app path on the canonical app origin. */

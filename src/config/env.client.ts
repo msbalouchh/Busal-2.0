@@ -21,4 +21,13 @@ function validateClientEnv(): ClientEnv {
   return parsed.data;
 }
 
-export const clientEnv = validateClientEnv();
+let cachedClientEnv: ClientEnv | undefined;
+
+/** Validates client env on first access — avoids build-time failure when vars are runtime-only. */
+export function getClientEnv(): ClientEnv {
+  if (!cachedClientEnv) {
+    cachedClientEnv = validateClientEnv();
+  }
+
+  return cachedClientEnv;
+}
