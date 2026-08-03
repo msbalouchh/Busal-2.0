@@ -23,14 +23,14 @@ export function CompleteStep() {
         🎉
       </span>
       <h2 className="onboarding__card-title">Congratulations</h2>
-      <p className="max-w-sm text-base font-medium text-white/85">
+      <p className="onboarding__complete-copy onboarding__complete-copy--lead">
         Your Business Workspace is Ready
       </p>
-      <p className="max-w-sm text-sm leading-relaxed text-white/55">
+      <p className="onboarding__complete-copy onboarding__complete-copy--detail">
         {displayName ? `${displayName} is provisioned` : "Your workspace is provisioned"} with
         tenant, modules, permissions, and AI configuration.
       </p>
-      <div className="flex w-full max-w-md flex-col gap-3">
+      <div className="onboarding__complete-actions">
         <OnboardingButton onClick={enterBusal}>Enter Busal OS</OnboardingButton>
         <OnboardingButton
           type="button"

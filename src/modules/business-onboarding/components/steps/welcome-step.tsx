@@ -9,8 +9,8 @@ export function WelcomeStep() {
   const nextStep = useOnboardingStore((state) => state.nextStep);
 
   return (
-    <div className="flex w-full min-w-0 flex-col items-stretch gap-6 py-2 text-center">
-      <p className="mx-auto w-full max-w-2xl text-base leading-relaxed text-pretty text-white/70">
+    <div className="onboarding__welcome-body">
+      <p className="onboarding__welcome-copy">
         You&apos;re minutes away from a unified operating system for operations, customers, finance,
         and AI agents &mdash; built for modern service businesses.
       </p>
@@ -20,7 +20,7 @@ export function WelcomeStep() {
         Estimated setup time: 2&ndash;3 minutes
       </p>
 
-      <OnboardingButton className="mt-2 max-w-sm" onClick={nextStep}>
+      <OnboardingButton className="onboarding__welcome-cta" onClick={nextStep}>
         Let&apos;s Build Your Workspace
       </OnboardingButton>
     </div>
