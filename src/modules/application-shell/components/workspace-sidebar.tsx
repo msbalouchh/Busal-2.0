@@ -144,7 +144,7 @@ function WorkspaceSidebarBrand() {
   const { isCollapsed, isMobile } = useNavigationSidebar();
   const compact = !isMobile && isCollapsed;
 
-  return <BusalBrandMark compact={compact} height={compact ? 30 : 44} priority />;
+  return <BusalBrandMark compact={compact} priority />;
 }
 
 export function WorkspaceSidebar() {

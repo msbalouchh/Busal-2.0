@@ -30,6 +30,7 @@ export function CompleteStep() {
         country: wizardData.country,
         timezone: wizardData.timezone,
         currency: wizardData.currency,
+        defaultBranchName: wizardData.defaultBranchName,
         phone: wizardData.phone,
         businessEmail: wizardData.businessEmail,
       });

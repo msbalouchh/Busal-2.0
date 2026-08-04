@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
 import { MenuNav } from "@/modules/menu/components/menu-nav";
 
 interface MenuLayoutProps {
@@ -8,9 +9,11 @@ interface MenuLayoutProps {
 
 export default function MenuLayout({ children }: MenuLayoutProps) {
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <MenuNav />
+    <DashboardSectionLayout
+      description="Manage categories, menu items, modifiers, and pricing."
+      nav={<MenuNav />}
+    >
       {children}
-    </div>
+    </DashboardSectionLayout>
   );
 }

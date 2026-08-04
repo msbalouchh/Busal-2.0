@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
 import { BusinessNav } from "@/modules/business/components/business-nav";
 
 interface BusinessLayoutProps {
@@ -8,9 +9,11 @@ interface BusinessLayoutProps {
 
 export default function BusinessLayout({ children }: BusinessLayoutProps) {
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <BusinessNav />
+    <DashboardSectionLayout
+      description="Business profile, settings, and organizational configuration."
+      nav={<BusinessNav />}
+    >
       {children}
-    </div>
+    </DashboardSectionLayout>
   );
 }

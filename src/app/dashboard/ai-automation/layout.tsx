@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
 import { AiAutomationNav } from "@/modules/ai-automation/components/ai-automation-nav";
 
 export const metadata: Metadata = {
@@ -8,15 +9,11 @@ export const metadata: Metadata = {
 
 export default function AiAutomationLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">AI Automation</h1>
-        <p className="text-muted-foreground text-sm">
-          Event-driven workflows with AI decisions, approvals, actions, and monitoring.
-        </p>
-      </div>
-      <AiAutomationNav />
+    <DashboardSectionLayout
+      description="Event-driven workflows with AI decisions, approvals, actions, and monitoring."
+      nav={<AiAutomationNav />}
+    >
       {children}
-    </div>
+    </DashboardSectionLayout>
   );
 }

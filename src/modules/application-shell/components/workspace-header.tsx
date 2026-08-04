@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 
-import { BusalBrandMark } from "@/components/brand/busal-brand-mark";
 import { SidebarTrigger, TopNav, useNavigationSidebar } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -42,7 +41,6 @@ export function WorkspaceHeader({ userName, userEmail, className }: WorkspaceHea
       leading={
         <>
           <SidebarTrigger />
-          <BusalBrandMark height={44} className="shrink-0" priority />
           <Separator orientation="vertical" className="hidden h-6 md:block" />
           <WorkspaceSwitcher className="min-w-0" />
         </>

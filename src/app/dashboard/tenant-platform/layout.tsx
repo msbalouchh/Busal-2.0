@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
 import { TenantPlatformNav } from "@/modules/tenant-platform/components/tenant-platform-nav";
 
 export const metadata: Metadata = {
@@ -8,16 +9,11 @@ export const metadata: Metadata = {
 
 export default function TenantPlatformLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Tenant Administration Platform</h1>
-        <p className="text-muted-foreground text-sm">
-          Central tenant management for lifecycle, resources, security, and analytics across Busal
-          OS.
-        </p>
-      </div>
-      <TenantPlatformNav />
+    <DashboardSectionLayout
+      description="Central tenant management for lifecycle, resources, security, and analytics across Busal OS."
+      nav={<TenantPlatformNav />}
+    >
       {children}
-    </div>
+    </DashboardSectionLayout>
   );
 }

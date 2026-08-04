@@ -2,7 +2,6 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
-import { PageContainer } from "@/components/common/page-container";
 import { Section } from "@/components/common/section";
 import { Breadcrumb, PageHeader } from "@/components/navigation";
 import type { BreadcrumbItem } from "@/components/navigation/types";
@@ -23,7 +22,7 @@ export function ApplicationPageTemplate({
   children,
 }: ApplicationPageTemplateProps) {
   return (
-    <PageContainer>
+    <div className="flex w-full min-w-0 flex-col gap-6">
       <Section>
         <PageHeader title={title} description={description} icon={icon} />
         <Breadcrumb items={breadcrumbs} />
@@ -37,6 +36,6 @@ export function ApplicationPageTemplate({
           />
         )}
       </Section>
-    </PageContainer>
+    </div>
   );
 }

@@ -3,8 +3,10 @@ import "server-only";
 import { type BusinessType, type Business } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { ensureMainBranch } from "@/services/business-management.service";
 import { allocateBusinessCode } from "@/services/business-code.service";
 import { getPrimaryBusinessByOwnerId } from "@/services/business-profile.service";
+import { ensureTenantPlatformDefaults } from "@/services/tenant-platform.service";
 
 export interface BusinessSetupDraft {
   businessName?: string;
@@ -121,6 +123,7 @@ export interface WorkspaceOnboardingFinalizeInput {
   country: string;
   timezone: string;
   currency: string;
+  defaultBranchName?: string;
   phone?: string;
   businessEmail?: string;
 }
@@ -221,6 +224,18 @@ export async function finalizeWorkspaceSetup(
 
     return result;
   });
+
+  const branchName = input.defaultBranchName?.trim() || "Main Branch";
+  await ensureMainBranch(updated.id);
+
+  if (branchName !== "Main Branch") {
+    await prisma.branch.updateMany({
+      where: { businessId: updated.id, isMain: true },
+      data: { name: branchName },
+    });
+  }
+
+  await ensureTenantPlatformDefaults(updated.id);
 
   return mapBusinessSetupProfile(updated);
 }

@@ -1,9 +1,15 @@
 import type { ReactNode } from "react";
 
+import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
+
 interface ReservationsLayoutProps {
   children: ReactNode;
 }
 
 export default function ReservationsLayout({ children }: ReservationsLayoutProps) {
-  return <div className="flex flex-1 flex-col gap-6 p-6">{children}</div>;
+  return (
+    <DashboardSectionLayout description="Manage bookings, waitlists, and table assignments.">
+      {children}
+    </DashboardSectionLayout>
+  );
 }

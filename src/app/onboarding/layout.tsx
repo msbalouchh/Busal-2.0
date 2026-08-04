@@ -11,7 +11,7 @@ export default function OnboardingRouteLayout({ children }: OnboardingRouteLayou
     <div className="bg-muted/30 flex min-h-screen flex-col">
       <header className="bg-background/80 border-b px-4 py-4 text-center backdrop-blur-sm">
         <div className="flex justify-center">
-          <BusalLogo height={44} priority />
+          <BusalLogo priority variant="horizontal" />
         </div>
         <p className="text-muted-foreground mt-2 text-sm">Onboarding</p>
       </header>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
 import { CommercialPlatformNav } from "@/modules/commercial-platform/components/commercial-platform-nav";
 
 interface CommercialPlatformLayoutProps {
@@ -8,9 +9,11 @@ interface CommercialPlatformLayoutProps {
 
 export default function CommercialPlatformLayout({ children }: CommercialPlatformLayoutProps) {
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <CommercialPlatformNav />
+    <DashboardSectionLayout
+      description="Enterprise commercial platform for pricing, catalogues, and revenue operations."
+      nav={<CommercialPlatformNav />}
+    >
       {children}
-    </div>
+    </DashboardSectionLayout>
   );
 }

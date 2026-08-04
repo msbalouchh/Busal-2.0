@@ -46,10 +46,8 @@
 }
 
 .mkt-header__logo-img {
-  height: auto;
-  max-height: 2.75rem;
-  width: clamp(7.5rem, 16vw, 10.5rem);
-  max-width: none;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 

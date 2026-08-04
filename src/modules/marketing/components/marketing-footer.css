@@ -65,8 +65,8 @@
 }
 
 .mkt-footer__logo-img {
-  height: clamp(2.75rem, 4vw, 3.25rem);
   width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 

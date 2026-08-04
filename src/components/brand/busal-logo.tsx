@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { BUSAL_LOGO, BUSAL_LOGO_HORIZONTAL } from "@/constants/brand";
+import { BUSAL_LOGO, BUSAL_LOGO_DISPLAY_HEIGHT, BUSAL_LOGO_HORIZONTAL } from "@/constants/brand";
 import { cn } from "@/lib/utils";
 
 import "./busal-logo.css";
@@ -17,7 +17,7 @@ type BusalLogoProps = {
 
 export function BusalLogo({
   className,
-  height = 40,
+  height = BUSAL_LOGO_DISPLAY_HEIGHT,
   maxWidth,
   variant = "horizontal",
   priority,

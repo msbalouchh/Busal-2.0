@@ -1,9 +1,15 @@
 import type { ReactNode } from "react";
 
+import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
+
 interface QRMenuLayoutProps {
   children: ReactNode;
 }
 
 export default function QRMenuLayout({ children }: QRMenuLayoutProps) {
-  return <div className="flex flex-1 flex-col gap-6 p-6">{children}</div>;
+  return (
+    <DashboardSectionLayout description="Configure and manage QR code menus for guest ordering.">
+      {children}
+    </DashboardSectionLayout>
+  );
 }

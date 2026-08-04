@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
 import { MarketplaceNav } from "@/modules/marketplace/components/marketplace-nav";
 
 export const metadata: Metadata = {
@@ -8,15 +9,11 @@ export const metadata: Metadata = {
 
 export default function MarketplaceLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Marketplace</h1>
-        <p className="text-muted-foreground text-sm">
-          Discover, install, and manage extensions that expand Busal OS.
-        </p>
-      </div>
-      <MarketplaceNav />
+    <DashboardSectionLayout
+      description="Discover, install, and manage extensions that expand Busal OS."
+      nav={<MarketplaceNav />}
+    >
       {children}
-    </div>
+    </DashboardSectionLayout>
   );
 }

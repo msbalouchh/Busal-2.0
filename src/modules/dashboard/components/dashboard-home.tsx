@@ -5,7 +5,6 @@ import { Bot, CalendarDays, Package, ShoppingCart, Sparkles, Users, Wallet } fro
 import Link from "next/link";
 import { useMemo } from "react";
 
-import { PageContainer } from "@/components/common/page-container";
 import { Button } from "@/components/ui/button";
 import { ActivityTimeline } from "@/modules/dashboard/components/activity-timeline";
 import { DashboardCard } from "@/modules/dashboard/components/dashboard-card";
@@ -76,7 +75,7 @@ export function DashboardHome({ business, userFullName, homeData }: DashboardHom
   const canViewTasks = hasPermission(permissions, PERMISSION_CODES.SUCCESS_VIEW);
 
   return (
-    <PageContainer className="gap-8">
+    <div className="flex flex-col gap-8">
       <DashboardCard
         title={`Welcome back, ${ownerName}`}
         description={`Busal is ready to help you run ${businessName}.`}
@@ -277,6 +276,6 @@ export function DashboardHome({ business, userFullName, homeData }: DashboardHom
           </div>
         </div>
       </DashboardCard>
-    </PageContainer>
+    </div>
   );
 }

@@ -45,13 +45,23 @@ export function resolveActiveWorkspaceNavLabel(
   pathname: string,
   sections: { items: WorkspaceNavItem[] }[],
 ): string {
+  let bestMatch: WorkspaceNavItem | null = null;
+  let bestMatchLength = 0;
+
   for (const section of sections) {
     for (const item of flattenWorkspaceNavItems(section.items)) {
-      if (item.href && isWorkspacePathActive(pathname, item.href)) {
-        return item.label;
+      if (!item.href || !isWorkspacePathActive(pathname, item.href)) {
+        continue;
+      }
+
+      const hrefLength = normalizePath(item.href).length;
+
+      if (hrefLength >= bestMatchLength) {
+        bestMatch = item;
+        bestMatchLength = hrefLength;
       }
     }
   }
 
-  return "Busal OS";
+  return bestMatch?.label ?? "Busal OS";
 }

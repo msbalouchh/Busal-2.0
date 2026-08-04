@@ -9,16 +9,12 @@
 }
 
 .busal-logo--horizontal {
-  height: auto;
-  max-height: 4rem;
-  width: clamp(9rem, 22vw, 14rem);
   object-fit: contain;
   object-position: left center;
 }
 
 @media (max-width: 639px) {
   .busal-logo--horizontal {
-    width: clamp(7.5rem, 48vw, 11rem);
-    max-height: 3.25rem;
+    max-width: min(100%, 11rem);
   }
 }

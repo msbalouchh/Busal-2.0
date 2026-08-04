@@ -1,3 +1,4 @@
+import { BUSAL_LOGO_DISPLAY_HEIGHT } from "@/constants/brand";
 import { BusalLogo } from "@/components/brand/busal-logo";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +11,7 @@ type BusalBrandMarkProps = {
 
 export function BusalBrandMark({
   compact = false,
-  height = 44,
+  height = BUSAL_LOGO_DISPLAY_HEIGHT,
   className,
   priority,
 }: BusalBrandMarkProps) {
