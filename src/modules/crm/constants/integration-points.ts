@@ -1,6 +1,5 @@
 /**
- * Future integration points for the Enterprise CRM Platform.
- * Architecture markers only — no runtime wiring.
+ * Production integration points for the Enterprise CRM Platform.
  */
 export const CRM_INTEGRATION_POINTS = {
   prisma: "prisma",
@@ -20,3 +19,19 @@ export const CRM_INTEGRATION_POINTS = {
 
 export type CrmIntegrationPoint =
   (typeof CRM_INTEGRATION_POINTS)[keyof typeof CRM_INTEGRATION_POINTS];
+
+export const CRM_INTEGRATION_STATUS = {
+  prisma: "connected",
+  supabase: "connected",
+  aiCore: "connected",
+  aiToolsPlatform: "connected",
+  rbac: "connected",
+  tenantFoundation: "connected",
+  marketing: "partial",
+  reservations: "connected",
+  pos: "connected",
+  finance: "partial",
+  notifications: "partial",
+  loyalty: "connected",
+  wallet: "partial",
+} as const;

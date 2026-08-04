@@ -4,4 +4,6 @@ export {
   generateMarketingRecommendations,
   buildCustomerHistorySummary,
   searchCustomersForAi,
+  generateCustomerAiInsights,
+  type CustomerAiInsights,
 } from "@/modules/crm/ai/crm-ai-context";

@@ -1,17 +1,14 @@
 import type { PosOrderType } from "@/modules/pos/constants/routes";
 
+import { DashboardPageHeading } from "@/components/layout/dashboard-page-heading";
+
 interface PosPageHeaderProps {
   title: string;
   description: string;
 }
 
 export function PosPageHeader({ title, description }: PosPageHeaderProps) {
-  return (
-    <div className="space-y-1">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="text-muted-foreground text-sm">{description}</p>
-    </div>
-  );
+  return <DashboardPageHeading title={title} description={description} />;
 }
 
 export function getPosOrderTypeLabel(orderType: PosOrderType): string {

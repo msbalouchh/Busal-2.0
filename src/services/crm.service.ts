@@ -2,13 +2,14 @@ import "server-only";
 
 import { type CustomerStatus, type CustomerTimelineEventType, type Prisma } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { customerRepository } from "@/modules/crm/repository/customer-repository";
+import { buildCrmScopeFromInput } from "@/modules/crm/lib/crm-scope";
+import { mapModuleStatusToPrisma } from "@/modules/crm/lib/crm-mappers";
 import { branchFilter } from "@/modules/business-context/utils/branch-scope";
-import { DEFAULT_CUSTOMER_GROUPS } from "@/modules/crm/constants/routes";
-import { logCrmAudit } from "@/modules/crm/utils/crm-audit";
 import { moneyDecimalToPence } from "@/modules/payments/utils/currency";
 import { recordTimelineEvent } from "@/services/crm-timeline.service";
 import { earnPointsForOrder } from "@/services/loyalty.service";
+import { prisma } from "@/lib/prisma";
 
 export interface CustomerData {
   id: string;
@@ -104,19 +105,7 @@ function mapCustomer(customer: CustomerRecord): CustomerData {
 }
 
 export async function ensureDefaultCustomerGroups(businessId: string): Promise<void> {
-  for (const [index, group] of DEFAULT_CUSTOMER_GROUPS.entries()) {
-    await prisma.customerGroup.upsert({
-      where: { businessId_slug: { businessId, slug: group.slug } },
-      create: {
-        businessId,
-        name: group.name,
-        slug: group.slug,
-        sortOrder: index,
-        isSystem: true,
-      },
-      update: {},
-    });
-  }
+  await customerRepository.ensureDefaultCustomerGroups(businessId);
 }
 
 export async function listCustomerGroups(businessId: string) {
@@ -156,37 +145,40 @@ export async function createCustomer(
   staffId: string | null,
   input: CustomerInput,
 ): Promise<CustomerData> {
-  const customer = await prisma.customer.create({
-    data: {
+  const scope = buildCrmScopeFromInput({ businessId, userId: staffId ?? "system" });
+  const nameParts = input.name.trim().split(/\s+/);
+  const record = await customerRepository.create(
+    scope,
+    {
+      tenantId: scope.tenantId,
+      workspaceId: scope.workspaceId,
       businessId,
-      groupId: input.groupId ?? null,
-      name: input.name.trim(),
-      phone: input.phone?.trim() || null,
-      email: input.email?.trim() || null,
-      dateOfBirth: input.dateOfBirth ?? null,
-      address: input.address?.trim() || null,
-      notes: input.notes?.trim() || null,
-      tags: input.tags ?? [],
-      status: input.status ?? "ACTIVE",
+      branchId: scope.branchId,
+      firstName: nameParts[0] ?? input.name,
+      lastName: nameParts.slice(1).join(" "),
+      email: input.email ?? null,
+      phone: input.phone ?? null,
+      tagIds: input.tags ?? [],
+      segmentIds: input.groupId ? [input.groupId] : [],
+      status: input.status ? (input.status.toLowerCase() as "active") : undefined,
     },
-    select: customerSelect,
-  });
-
-  await recordTimelineEvent(businessId, customer.id, {
     staffId,
-    eventType: "PROFILE",
-    title: "Customer created",
-    description: `${customer.name} profile created`,
-  });
+  );
 
-  await logCrmAudit(businessId, {
-    staffId,
-    entityType: "customer",
-    entityId: customer.id,
-    action: "CREATED",
-  });
+  if (input.address?.trim()) {
+    await customerRepository.addAddress(scope, {
+      customerId: record.customer.id,
+      label: "Primary",
+      line1: input.address.trim(),
+      isDefault: true,
+    });
+  }
 
-  return mapCustomer(customer);
+  if (input.notes?.trim()) {
+    await customerRepository.addNote(scope, record.customer.id, input.notes.trim(), staffId);
+  }
+
+  return getCustomer(record.customer.id, businessId);
 }
 
 export async function updateCustomer(
@@ -195,46 +187,31 @@ export async function updateCustomer(
   staffId: string | null,
   input: CustomerInput,
 ): Promise<CustomerData> {
-  const existing = await prisma.customer.findFirst({
-    where: { id: customerId, businessId, deletedAt: null },
-    select: { id: true },
-  });
+  const scope = buildCrmScopeFromInput({ businessId, userId: staffId ?? "system" });
+  const nameParts = input.name.trim().split(/\s+/);
 
-  if (!existing) {
+  const updated = await customerRepository.update(
+    scope,
+    {
+      customerId,
+      firstName: nameParts[0] ?? input.name,
+      lastName: nameParts.slice(1).join(" "),
+      email: input.email ?? null,
+      phone: input.phone ?? null,
+      tagIds: input.tags,
+      segmentIds: input.groupId ? [input.groupId] : undefined,
+      status: input.status
+        ? (input.status.toLowerCase() as "active" | "inactive" | "blocked")
+        : undefined,
+    },
+    staffId,
+  );
+
+  if (!updated) {
     throw new Error("Customer not found");
   }
 
-  const customer = await prisma.customer.update({
-    where: { id: customerId },
-    data: {
-      groupId: input.groupId ?? null,
-      name: input.name.trim(),
-      phone: input.phone?.trim() || null,
-      email: input.email?.trim() || null,
-      dateOfBirth: input.dateOfBirth ?? null,
-      address: input.address?.trim() || null,
-      notes: input.notes?.trim() || null,
-      tags: input.tags ?? [],
-      status: input.status ?? "ACTIVE",
-    },
-    select: customerSelect,
-  });
-
-  await recordTimelineEvent(businessId, customer.id, {
-    staffId,
-    eventType: "PROFILE",
-    title: "Profile updated",
-    description: "Customer profile details were updated",
-  });
-
-  await logCrmAudit(businessId, {
-    staffId,
-    entityType: "customer",
-    entityId: customer.id,
-    action: "UPDATED",
-  });
-
-  return mapCustomer(customer);
+  return getCustomer(customerId, businessId);
 }
 
 export async function deactivateCustomer(
@@ -242,21 +219,12 @@ export async function deactivateCustomer(
   businessId: string,
   staffId: string | null,
 ): Promise<void> {
-  const result = await prisma.customer.updateMany({
-    where: { id: customerId, businessId, deletedAt: null },
-    data: { status: "INACTIVE", deletedAt: new Date() },
-  });
+  const scope = buildCrmScopeFromInput({ businessId, userId: staffId ?? "system" });
+  const deleted = await customerRepository.softDelete(scope, customerId, staffId);
 
-  if (result.count === 0) {
+  if (!deleted) {
     throw new Error("Customer not found");
   }
-
-  await logCrmAudit(businessId, {
-    staffId,
-    entityType: "customer",
-    entityId: customerId,
-    action: "DEACTIVATED",
-  });
 }
 
 export async function addCustomerNote(
@@ -265,32 +233,11 @@ export async function addCustomerNote(
   staffId: string | null,
   content: string,
 ): Promise<CustomerNoteData> {
-  await getCustomer(customerId, businessId);
+  const scope = buildCrmScopeFromInput({ businessId, userId: staffId ?? "system" });
+  await customerRepository.addNote(scope, customerId, content, staffId);
 
-  const note = await prisma.customerNote.create({
-    data: {
-      customerId,
-      staffId,
-      content: content.trim(),
-    },
-    include: {
-      staff: { select: { firstName: true, lastName: true } },
-    },
-  });
-
-  await recordTimelineEvent(businessId, customerId, {
-    staffId,
-    eventType: "NOTE",
-    title: "Internal note added",
-    description: content.trim(),
-  });
-
-  return {
-    id: note.id,
-    content: note.content,
-    authorName: note.staff ? `${note.staff.firstName} ${note.staff.lastName}`.trim() : null,
-    createdAt: note.createdAt,
-  };
+  const notes = await listCustomerNotes(customerId, businessId);
+  return notes[0]!;
 }
 
 export async function listCustomerNotes(
@@ -377,59 +324,8 @@ export async function getCustomerOrderHistory(
 }
 
 export async function getCrmDashboard(businessId: string, branchId: string | null = null) {
-  const customers = await prisma.customer.findMany({
-    where: { businessId, deletedAt: null },
-    select: {
-      id: true,
-      name: true,
-      loyaltyPoints: true,
-      createdAt: true,
-      group: { select: { slug: true, name: true } },
-      legacyOrders: {
-        where: { status: "COMPLETED", ...branchFilter(branchId) },
-        select: { total: true },
-      },
-    },
-  });
-
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const newCustomers = customers.filter((customer) => customer.createdAt >= thirtyDaysAgo).length;
-  const returningCustomers = customers.filter(
-    (customer) => customer.legacyOrders.length > 1,
-  ).length;
-  const vipCustomers = customers.filter((customer) => customer.group?.slug === "vip").length;
-
-  const topSpenders = customers
-    .map((customer) => ({
-      id: customer.id,
-      name: customer.name,
-      totalSpentPence: customer.legacyOrders.reduce(
-        (sum, order) => sum + moneyDecimalToPence(order.total),
-        0,
-      ),
-      loyaltyPoints: customer.loyaltyPoints,
-    }))
-    .sort((a, b) => b.totalSpentPence - a.totalSpentPence)
-    .slice(0, 5);
-
-  const totalPoints = customers.reduce((sum, customer) => sum + customer.loyaltyPoints, 0);
-  const pointTransactions = await prisma.loyaltyPointTransaction.count({
-    where: { businessId },
-  });
-
-  return {
-    totalCustomers: customers.length,
-    newCustomers,
-    returningCustomers,
-    vipCustomers,
-    topSpenders,
-    loyaltyStatistics: {
-      totalPointsOutstanding: totalPoints,
-      totalPointTransactions: pointTransactions,
-    },
-  };
+  const scope = buildCrmScopeFromInput({ businessId, branchId });
+  return customerRepository.getDashboard(scope, branchId);
 }
 
 export async function findOrCreateCustomerFromOrder(
@@ -459,14 +355,10 @@ export async function findOrCreateCustomerFromOrder(
     return null;
   }
 
-  const customer = await prisma.customer.create({
-    data: {
-      businessId,
-      name: order.customerName,
-      phone: order.customerPhone,
-      status: "ACTIVE",
-    },
-    select: { id: true },
+  const customer = await createCustomer(businessId, null, {
+    name: order.customerName,
+    phone: order.customerPhone,
+    status: "ACTIVE",
   });
 
   return customer.id;
@@ -528,3 +420,5 @@ export async function processCrmForCompletedOrder(
 
   await earnPointsForOrder(businessId, customerId, orderId, staffId);
 }
+
+export { mapModuleStatusToPrisma };

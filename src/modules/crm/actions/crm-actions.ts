@@ -2,17 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 
-import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
 import { protectedAction } from "@/modules/platform-guards/guards/action.guards";
+import { CRM_PERMISSIONS } from "@/modules/crm/constants/permissions";
 import { CRM_ROUTES } from "@/modules/crm/constants/routes";
+import { resolveCrmScope, toCrmPlatformContext } from "@/modules/crm/lib/crm-scope";
+import { customerRepository } from "@/modules/crm/repository/customer-repository";
+import { customerService } from "@/modules/crm/services/customer.service";
 import type { CustomerStatus } from "@prisma/client";
 import type { RewardType } from "@prisma/client";
-import {
-  addCustomerNote,
-  createCustomer,
-  deactivateCustomer,
-  updateCustomer,
-} from "@/services/crm.service";
 import {
   adjustLoyaltyPoints,
   createReward,
@@ -38,14 +35,48 @@ export async function createCustomerAction(input: {
   tags?: string[];
   groupId?: string | null;
 }) {
-  return protectedAction(PERMISSION_CODES.CRM_MANAGE, async ({ business, platform }) => {
-    const customer = await createCustomer(
-      business.id,
+  return protectedAction(CRM_PERMISSIONS.CRM_CREATE, async ({ business, platform }) => {
+    const scope = resolveCrmScope(platform);
+    const nameParts = input.name.trim().split(/\s+/);
+    const firstName = nameParts[0] ?? input.name;
+    const lastName = nameParts.slice(1).join(" ");
+
+    const record = await customerService.create(
+      {
+        tenantId: scope.tenantId,
+        workspaceId: scope.workspaceId,
+        businessId: business.id,
+        branchId: scope.branchId,
+        firstName,
+        lastName,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        tagIds: input.tags ?? [],
+        segmentIds: input.groupId ? [input.groupId] : [],
+      },
       platform.staffSession?.staffId ?? null,
-      input,
     );
+
+    if (input.address?.trim()) {
+      await customerRepository.addAddress(scope, {
+        customerId: record.customer.id,
+        label: "Primary",
+        line1: input.address.trim(),
+        isDefault: true,
+      });
+    }
+
+    if (input.notes?.trim()) {
+      await customerRepository.addNote(
+        scope,
+        record.customer.id,
+        input.notes.trim(),
+        platform.staffSession?.staffId ?? null,
+      );
+    }
+
     revalidateCrmPaths();
-    return { success: true as const, customerId: customer.id };
+    return { success: true as const, customerId: record.customer.id };
   });
 }
 
@@ -62,8 +93,26 @@ export async function updateCustomerAction(
     status?: CustomerStatus;
   },
 ) {
-  return protectedAction(PERMISSION_CODES.CRM_MANAGE, async ({ business, platform }) => {
-    await updateCustomer(customerId, business.id, platform.staffSession?.staffId ?? null, input);
+  return protectedAction(CRM_PERMISSIONS.CRM_UPDATE, async ({ business, platform }) => {
+    const context = toCrmPlatformContext(resolveCrmScope(platform));
+    const nameParts = input.name.trim().split(/\s+/);
+    const firstName = nameParts[0] ?? input.name;
+    const lastName = nameParts.slice(1).join(" ");
+
+    await customerService.update(
+      {
+        customerId,
+        firstName,
+        lastName,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        tagIds: input.tags,
+        segmentIds: input.groupId ? [input.groupId] : undefined,
+      },
+      { ...context, businessId: business.id },
+      platform.staffSession?.staffId ?? null,
+    );
+
     revalidateCrmPaths();
     revalidatePath(CRM_ROUTES.customer(customerId));
     return { success: true as const };
@@ -71,12 +120,13 @@ export async function updateCustomerAction(
 }
 
 export async function addCustomerNoteAction(input: { customerId: string; content: string }) {
-  return protectedAction(PERMISSION_CODES.CRM_MANAGE, async ({ business, platform }) => {
-    await addCustomerNote(
+  return protectedAction(CRM_PERMISSIONS.CRM_UPDATE, async ({ business, platform }) => {
+    const context = toCrmPlatformContext(resolveCrmScope(platform));
+    await customerService.addNote(
       input.customerId,
-      business.id,
-      platform.staffSession?.staffId ?? null,
       input.content,
+      { ...context, businessId: business.id },
+      platform.staffSession?.staffId ?? null,
     );
     revalidatePath(CRM_ROUTES.customer(input.customerId));
     return { success: true as const };
@@ -88,7 +138,7 @@ export async function adjustLoyaltyPointsAction(input: {
   pointsChange: number;
   reason: string;
 }) {
-  return protectedAction(PERMISSION_CODES.CRM_MANAGE, async ({ business, platform }) => {
+  return protectedAction(CRM_PERMISSIONS.CRM_MANAGE, async ({ business, platform }) => {
     await adjustLoyaltyPoints(
       business.id,
       input.customerId,
@@ -109,7 +159,7 @@ export async function createRewardAction(input: {
   menuItemId?: string | null;
   pointsCost?: number;
 }) {
-  return protectedAction(PERMISSION_CODES.CRM_MANAGE, async ({ business, platform }) => {
+  return protectedAction(CRM_PERMISSIONS.CRM_MANAGE, async ({ business, platform }) => {
     await createReward(business.id, platform.staffSession?.staffId ?? null, input);
     revalidateCrmPaths();
     return { success: true as const };
@@ -121,7 +171,7 @@ export async function redeemRewardAction(input: {
   rewardId: string;
   orderId?: string | null;
 }) {
-  return protectedAction(PERMISSION_CODES.CRM_MANAGE, async ({ business, platform }) => {
+  return protectedAction(CRM_PERMISSIONS.CRM_MANAGE, async ({ business, platform }) => {
     await redeemReward(
       business.id,
       input.customerId,
@@ -139,7 +189,7 @@ export async function updateLoyaltyProgramAction(input: {
   earnPointsPerPound?: number;
   redeemPointsPerPence?: number;
 }) {
-  return protectedAction(PERMISSION_CODES.CRM_MANAGE, async ({ business, platform }) => {
+  return protectedAction(CRM_PERMISSIONS.CRM_MANAGE, async ({ business, platform }) => {
     await updateLoyaltyProgram(business.id, platform.staffSession?.staffId ?? null, input);
     revalidateCrmPaths();
     return { success: true as const };
@@ -147,9 +197,65 @@ export async function updateLoyaltyProgramAction(input: {
 }
 
 export async function deactivateCustomerAction(input: { customerId: string }) {
-  return protectedAction(PERMISSION_CODES.CRM_MANAGE, async ({ business, platform }) => {
-    await deactivateCustomer(input.customerId, business.id, platform.staffSession?.staffId ?? null);
+  return protectedAction(CRM_PERMISSIONS.CRM_DELETE, async ({ business, platform }) => {
+    const context = toCrmPlatformContext(resolveCrmScope(platform));
+    await customerService.softDelete(
+      input.customerId,
+      { ...context, businessId: business.id },
+      platform.staffSession?.staffId ?? null,
+    );
     revalidateCrmPaths();
     return { success: true as const };
+  });
+}
+
+export async function restoreCustomerAction(input: { customerId: string }) {
+  return protectedAction(CRM_PERMISSIONS.CRM_MANAGE, async ({ business, platform }) => {
+    const context = toCrmPlatformContext(resolveCrmScope(platform));
+    await customerService.restore(
+      input.customerId,
+      { ...context, businessId: business.id },
+      platform.staffSession?.staffId ?? null,
+    );
+    revalidateCrmPaths();
+    return { success: true as const };
+  });
+}
+
+export async function mergeCustomersAction(input: {
+  primaryCustomerId: string;
+  secondaryCustomerId: string;
+}) {
+  return protectedAction(CRM_PERMISSIONS.CRM_MANAGE, async ({ business, platform }) => {
+    const context = toCrmPlatformContext(resolveCrmScope(platform));
+    await customerService.merge(
+      input.primaryCustomerId,
+      input.secondaryCustomerId,
+      { ...context, businessId: business.id },
+      platform.staffSession?.staffId ?? null,
+    );
+    revalidateCrmPaths();
+    return { success: true as const };
+  });
+}
+
+export async function importCustomersAction(input: {
+  rows: Array<{
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    tags?: string;
+    group?: string;
+  }>;
+}) {
+  return protectedAction(CRM_PERMISSIONS.CRM_IMPORT, async ({ business, platform }) => {
+    const context = toCrmPlatformContext(resolveCrmScope(platform));
+    const result = await customerService.importCustomers(
+      input.rows,
+      { ...context, businessId: business.id },
+      platform.staffSession?.staffId ?? null,
+    );
+    revalidateCrmPaths();
+    return { success: true as const, ...result };
   });
 }

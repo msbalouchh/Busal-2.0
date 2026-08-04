@@ -1,0 +1,14 @@
+import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
+
+/** CRM permission aliases mapped to platform authorization codes. */
+export const CRM_PERMISSIONS = {
+  CRM_READ: PERMISSION_CODES.CRM_VIEW,
+  CRM_CREATE: PERMISSION_CODES.CUSTOMER_CREATE,
+  CRM_UPDATE: PERMISSION_CODES.CUSTOMER_UPDATE,
+  CRM_DELETE: PERMISSION_CODES.CUSTOMER_DELETE,
+  CRM_EXPORT: PERMISSION_CODES.CUSTOMER_EXPORT,
+  CRM_IMPORT: PERMISSION_CODES.CUSTOMER_IMPORT,
+  CRM_MANAGE: PERMISSION_CODES.CRM_MANAGE,
+} as const;
+
+export type CrmPermissionCode = (typeof CRM_PERMISSIONS)[keyof typeof CRM_PERMISSIONS];

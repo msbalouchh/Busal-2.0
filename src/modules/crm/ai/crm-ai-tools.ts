@@ -5,15 +5,16 @@ import {
 } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
 import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
-import { CRM_AI_TOOL_IDS } from "@/modules/crm/constants/customer-status";
-import { DEFAULT_CRM_SCOPE } from "@/modules/crm/constants/mock-data";
 import {
   buildCustomerAiContext,
   buildCustomerHistorySummary,
   generateMarketingRecommendations,
   searchCustomersForAi,
 } from "@/modules/crm/ai/crm-ai-context";
+import { buildCrmPlatformContext } from "@/modules/crm/services/crm-platform.service";
 import { customerService } from "@/modules/crm/services/customer.service";
+import { CRM_AI_TOOL_IDS } from "@/modules/crm/constants/customer-status";
+import type { CrmPlatformContext } from "@/modules/crm/types/customer";
 
 function defineCrmTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -36,6 +37,22 @@ function defineCrmTool(
     },
     handler,
   };
+}
+
+function resolveAiContext(input: Record<string, unknown>): CrmPlatformContext {
+  const businessId = typeof input.businessId === "string" ? input.businessId : "";
+  const tenantId = typeof input.tenantId === "string" ? input.tenantId : businessId;
+  const workspaceId = typeof input.workspaceId === "string" ? input.workspaceId : businessId;
+  const branchId = typeof input.branchId === "string" ? input.branchId : null;
+  const userId = typeof input.userId === "string" ? input.userId : "system";
+
+  return buildCrmPlatformContext({
+    tenantId,
+    workspaceId,
+    businessId: businessId || tenantId,
+    branchId,
+    userId,
+  });
 }
 
 const CRM_AGENT_SLUGS = [
@@ -71,7 +88,8 @@ export const CRM_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const query = typeof input.query === "string" ? input.query : "";
-      const results = searchCustomersForAi(query);
+      const context = resolveAiContext(input);
+      const results = await searchCustomersForAi(query, context);
       return {
         count: results.length,
         customers: results.map((record) => ({
@@ -115,11 +133,12 @@ export const CRM_AI_TOOLS: RegisteredPlatformTool[] = [
     async (input) => {
       const firstName = typeof input.firstName === "string" ? input.firstName : "Guest";
       const lastName = typeof input.lastName === "string" ? input.lastName : "Customer";
-      const record = customerService.create({
-        tenantId: DEFAULT_CRM_SCOPE.tenantId,
-        workspaceId: DEFAULT_CRM_SCOPE.workspaceId,
-        businessId: DEFAULT_CRM_SCOPE.businessId,
-        branchId: DEFAULT_CRM_SCOPE.branchId,
+      const context = resolveAiContext(input);
+      const record = await customerService.create({
+        tenantId: context.tenantId,
+        workspaceId: context.workspaceId,
+        businessId: context.businessId,
+        branchId: context.branchId,
         firstName,
         lastName,
         email: typeof input.email === "string" ? input.email : null,
@@ -160,17 +179,21 @@ export const CRM_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const customerId = typeof input.customerId === "string" ? input.customerId : "";
-      const updated = customerService.update({
-        customerId,
-        firstName: typeof input.firstName === "string" ? input.firstName : undefined,
-        lastName: typeof input.lastName === "string" ? input.lastName : undefined,
-        email: typeof input.email === "string" ? input.email : undefined,
-        phone: typeof input.phone === "string" ? input.phone : undefined,
-        status:
-          typeof input.status === "string"
-            ? (input.status as "active" | "inactive" | "prospect" | "vip" | "blocked")
-            : undefined,
-      });
+      const context = resolveAiContext(input);
+      const updated = await customerService.update(
+        {
+          customerId,
+          firstName: typeof input.firstName === "string" ? input.firstName : undefined,
+          lastName: typeof input.lastName === "string" ? input.lastName : undefined,
+          email: typeof input.email === "string" ? input.email : undefined,
+          phone: typeof input.phone === "string" ? input.phone : undefined,
+          status:
+            typeof input.status === "string"
+              ? (input.status as "active" | "inactive" | "prospect" | "vip" | "blocked")
+              : undefined,
+        },
+        context,
+      );
       return { updated: Boolean(updated), customerId };
     },
   ),
@@ -196,7 +219,12 @@ export const CRM_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const customerId = typeof input.customerId === "string" ? input.customerId : "";
-      return buildCustomerHistorySummary(customerId) ?? { error: "Customer not found." };
+      const context = resolveAiContext(input);
+      return (
+        (await buildCustomerHistorySummary(customerId, context)) ?? {
+          error: "Customer not found.",
+        }
+      );
     },
   ),
   defineCrmTool(
@@ -225,8 +253,9 @@ export const CRM_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const customerId = typeof input.customerId === "string" ? input.customerId : "";
-      const context = buildCustomerAiContext(customerId);
-      return (context ?? { error: "Customer not found." }) as Record<string, unknown>;
+      const context = resolveAiContext(input);
+      const aiContext = await buildCustomerAiContext(customerId, context);
+      return (aiContext ?? { error: "Customer not found." }) as Record<string, unknown>;
     },
   ),
   defineCrmTool(
@@ -254,14 +283,15 @@ export const CRM_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const customerId = typeof input.customerId === "string" ? input.customerId : "";
-      return { recommendations: generateMarketingRecommendations(customerId) };
+      const context = resolveAiContext(input);
+      return { recommendations: await generateMarketingRecommendations(customerId, context) };
     },
   ),
 ];
 
 let registered = false;
 
-/** Registers CRM tools with the AI Tool Platform (mock, idempotent). */
+/** Registers CRM tools with the AI Tool Platform (idempotent). */
 export function registerCrmAiTools(): void {
   if (registered) {
     return;

@@ -71,6 +71,7 @@ export interface CustomerSegment {
   businessId: string;
   memberCount: number;
   criteria: string[];
+  isSystem?: boolean;
 }
 
 export interface CustomerAddress {
@@ -180,6 +181,18 @@ export interface CustomerSearchQuery {
   segmentId?: string;
   tagId?: string;
   limit?: number;
+  page?: number;
+  pageSize?: number;
+  sortBy?: "name" | "createdAt" | "lastOrderAt" | "totalSpend";
+  sortOrder?: "asc" | "desc";
+  includeDeleted?: boolean;
+}
+
+export interface PaginatedCustomerResult {
+  records: CustomerRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface CreateCustomerInput {
