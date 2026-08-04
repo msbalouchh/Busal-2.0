@@ -8,13 +8,16 @@ import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-t
 import {
   analyzePopularMenuItems,
   detectDuplicateMenuItems,
+  generateMenuItemDescription,
   recommendMenuPricing,
   recommendMenuUpsells,
+  suggestMenuImprovements,
 } from "@/modules/menu/ai/menu-ai-context";
 import { MENU_AI_TOOL_IDS } from "@/modules/menu/constants/menu-status";
-import { MOCK_MENU_RECORD } from "@/modules/menu/constants/mock-data";
+import { buildMenuPlatformContext } from "@/modules/menu/services/menu-platform.service";
 import { menuService } from "@/modules/menu/services/menu.service";
 import type { MenuItemStatus } from "@/modules/menu/constants/menu-status";
+import type { MenuPlatformContext } from "@/modules/menu/types/menu";
 
 function defineMenuTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -39,6 +42,17 @@ function defineMenuTool(
   };
 }
 
+function resolveAiContext(input: Record<string, unknown>): MenuPlatformContext {
+  const businessId = typeof input.businessId === "string" ? input.businessId : "";
+  return buildMenuPlatformContext({
+    tenantId: typeof input.tenantId === "string" ? input.tenantId : businessId,
+    workspaceId: typeof input.workspaceId === "string" ? input.workspaceId : businessId,
+    businessId: businessId || (typeof input.tenantId === "string" ? input.tenantId : ""),
+    branchId: typeof input.branchId === "string" ? input.branchId : null,
+    userId: typeof input.userId === "string" ? input.userId : "system",
+  });
+}
+
 const MENU_AGENT_SLUGS = [
   BUILTIN_AGENT_SLUGS.BUSINESS_ASSISTANT,
   BUILTIN_AGENT_SLUGS.OPERATIONS,
@@ -58,12 +72,15 @@ export const MENU_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredBranchScope: "optional",
       inputSchema: {
         type: "object",
-        required: ["name", "basePricePence"],
+        required: ["name", "basePricePence", "menuId", "categoryId", "sectionId"],
         properties: {
           name: { type: "string" },
           description: { type: "string" },
           basePricePence: { type: "number" },
           prepTimeMinutes: { type: "number" },
+          menuId: { type: "string" },
+          categoryId: { type: "string" },
+          sectionId: { type: "string" },
         },
       },
       outputSchema: {
@@ -76,19 +93,30 @@ export const MENU_AI_TOOLS: RegisteredPlatformTool[] = [
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
     async (input) => {
-      const menu = MOCK_MENU_RECORD;
-      const categoryId = menu.categories[0]?.id ?? "cat-default";
-      const sectionId = menu.sections[0]?.id ?? "sec-default";
+      const context = resolveAiContext(input);
+      const menus = await menuService.listMenus(context);
+      const menu = menus.find((entry) => entry.menu.id === input.menuId) ?? menus[0];
 
-      const record = menuService.createItem({
-        menuId: menu.menu.id,
-        categoryId,
-        sectionId,
-        name: typeof input.name === "string" ? input.name : "New Item",
-        description: typeof input.description === "string" ? input.description : null,
-        basePricePence: typeof input.basePricePence === "number" ? input.basePricePence : 995,
-        prepTimeMinutes: typeof input.prepTimeMinutes === "number" ? input.prepTimeMinutes : 10,
-      });
+      if (!menu) {
+        return { error: "No menu available" };
+      }
+
+      const record = await menuService.createItem(
+        {
+          menuId: typeof input.menuId === "string" ? input.menuId : menu.menu.id,
+          categoryId:
+            typeof input.categoryId === "string"
+              ? input.categoryId
+              : (menu.categories[0]?.id ?? ""),
+          sectionId:
+            typeof input.sectionId === "string" ? input.sectionId : (menu.sections[0]?.id ?? ""),
+          name: typeof input.name === "string" ? input.name : "New Item",
+          description: typeof input.description === "string" ? input.description : null,
+          basePricePence: typeof input.basePricePence === "number" ? input.basePricePence : 995,
+          prepTimeMinutes: typeof input.prepTimeMinutes === "number" ? input.prepTimeMinutes : 10,
+        },
+        context,
+      );
 
       return { itemId: record.item.id, name: record.item.name };
     },
@@ -123,12 +151,17 @@ export const MENU_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const itemId = typeof input.itemId === "string" ? input.itemId : "";
-      const updated = menuService.updateItem({
-        itemId,
-        name: typeof input.name === "string" ? input.name : undefined,
-        status: typeof input.status === "string" ? (input.status as MenuItemStatus) : undefined,
-        basePricePence: typeof input.basePricePence === "number" ? input.basePricePence : undefined,
-      });
+      const context = resolveAiContext(input);
+      const updated = await menuService.updateItem(
+        {
+          itemId,
+          name: typeof input.name === "string" ? input.name : undefined,
+          status: typeof input.status === "string" ? (input.status as MenuItemStatus) : undefined,
+          basePricePence:
+            typeof input.basePricePence === "number" ? input.basePricePence : undefined,
+        },
+        context,
+      );
 
       return { updated: Boolean(updated), itemId };
     },
@@ -155,7 +188,11 @@ export const MENU_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const itemId = typeof input.itemId === "string" ? input.itemId : "";
-      return recommendMenuPricing(itemId) ?? { error: "Item not found." };
+      return (
+        (await recommendMenuPricing(itemId, resolveAiContext(input))) ?? {
+          error: "Item not found.",
+        }
+      );
     },
   ),
   defineMenuTool(
@@ -183,7 +220,9 @@ export const MENU_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const itemId = typeof input.itemId === "string" ? input.itemId : "";
-      return { recommendations: recommendMenuUpsells(itemId) };
+      return {
+        recommendations: await recommendMenuUpsells(itemId, resolveAiContext(input)),
+      };
     },
   ),
   defineMenuTool(
@@ -207,7 +246,7 @@ export const MENU_AI_TOOLS: RegisteredPlatformTool[] = [
     },
     async (input) => {
       const limit = typeof input.limit === "number" ? input.limit : 5;
-      return analyzePopularMenuItems(limit);
+      return analyzePopularMenuItems(resolveAiContext(input), limit);
     },
   ),
   defineMenuTool(
@@ -226,13 +265,13 @@ export const MENU_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => detectDuplicateMenuItems(),
+    async (input) => detectDuplicateMenuItems(resolveAiContext(input)),
   ),
 ];
 
 let registered = false;
 
-/** Registers Menu platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Menu platform tools with the AI Tool Platform (idempotent). */
 export function registerMenuAiTools(): void {
   if (registered) {
     return;
@@ -245,4 +284,4 @@ export function registerMenuAiTools(): void {
   registered = true;
 }
 
-registerMenuAiTools();
+export { generateMenuItemDescription, suggestMenuImprovements };

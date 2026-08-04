@@ -240,5 +240,3 @@ export function registerBillingAiTools(): void {
 
   registered = true;
 }
-
-registerBillingAiTools();

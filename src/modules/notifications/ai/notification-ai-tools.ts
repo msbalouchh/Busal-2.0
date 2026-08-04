@@ -282,5 +282,3 @@ export function registerNotificationAiTools(): void {
 
   registered = true;
 }
-
-registerNotificationAiTools();

@@ -275,5 +275,3 @@ export function registerFinanceAiTools(): void {
 
   registered = true;
 }
-
-registerFinanceAiTools();

@@ -219,5 +219,3 @@ export function registerKitchenAiTools(): void {
 
   registered = true;
 }
-
-registerKitchenAiTools();

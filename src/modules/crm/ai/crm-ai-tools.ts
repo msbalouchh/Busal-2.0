@@ -303,5 +303,3 @@ export function registerCrmAiTools(): void {
 
   registered = true;
 }
-
-registerCrmAiTools();

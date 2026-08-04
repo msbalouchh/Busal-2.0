@@ -276,5 +276,3 @@ export function registerPosAiTools(): void {
 
   registered = true;
 }
-
-registerPosAiTools();

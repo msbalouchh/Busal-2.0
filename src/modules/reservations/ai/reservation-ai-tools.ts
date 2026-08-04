@@ -309,5 +309,3 @@ export function registerReservationAiTools(): void {
 
   registered = true;
 }
-
-registerReservationAiTools();

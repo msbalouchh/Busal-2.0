@@ -1,6 +1,5 @@
 /**
- * Future integration points for the Enterprise Menu Management Platform.
- * Architecture markers only — no runtime wiring.
+ * Production integration points for the Menu Management Platform.
  */
 export const MENU_INTEGRATION_POINTS = {
   prisma: "prisma",
@@ -9,15 +8,26 @@ export const MENU_INTEGRATION_POINTS = {
   aiToolsPlatform: "ai-tools-platform",
   rbac: "rbac",
   tenantFoundation: "tenant-foundation",
-  orders: "orders",
   pos: "pos",
-  qrOrdering: "qr-ordering",
   kitchen: "kitchen",
-  delivery: "delivery",
   inventory: "inventory",
   analytics: "analytics",
-  mediaPlatform: "media-platform",
+  orders: "orders",
 } as const;
 
 export type MenuIntegrationPoint =
   (typeof MENU_INTEGRATION_POINTS)[keyof typeof MENU_INTEGRATION_POINTS];
+
+export const MENU_INTEGRATION_STATUS = {
+  prisma: "connected",
+  supabase: "connected",
+  aiCore: "connected",
+  aiToolsPlatform: "connected",
+  rbac: "connected",
+  tenantFoundation: "connected",
+  pos: "partial",
+  kitchen: "partial",
+  inventory: "partial",
+  analytics: "partial",
+  orders: "connected",
+} as const;

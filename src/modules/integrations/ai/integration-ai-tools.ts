@@ -261,5 +261,3 @@ export function registerIntegrationAiTools(): void {
 
   registered = true;
 }
-
-registerIntegrationAiTools();

@@ -1,5 +1,6 @@
 import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
 import { ensureBootstrapKnowledgeTools } from "@/modules/ai-knowledge/plugins/knowledge-tools";
+import { registerAllPlatformAiTools } from "@/modules/ai-tools/plugins/register-platform-ai-tools";
 import { registerTool } from "@/modules/ai-tools/registry/tool-registry";
 import { listCustomers } from "@/services/crm.service";
 import { getReportingDashboard } from "@/services/reporting.service";
@@ -236,6 +237,7 @@ export function ensureBootstrapAiTools(): void {
   }
 
   registerBootstrapAiTools();
+  registerAllPlatformAiTools();
   ensureBootstrapKnowledgeTools();
   bootstrapComplete = true;
 }

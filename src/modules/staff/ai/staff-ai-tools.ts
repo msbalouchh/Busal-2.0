@@ -276,5 +276,3 @@ export function registerStaffAiTools(): void {
 
   registered = true;
 }
-
-registerStaffAiTools();

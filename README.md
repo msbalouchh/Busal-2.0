@@ -115,6 +115,16 @@ Infrastructure
 - Vercel
 - GitHub
 
+### Vercel deployment
+
+Set this environment variable in the Vercel project settings (required for production builds):
+
+```
+NODE_OPTIONS=--max-old-space-size=8192
+```
+
+TypeScript and ESLint run in CI via `pnpm typecheck` and `pnpm lint`; they are skipped during the Vercel `next build` to reduce memory usage.
+
 ---
 
 # Product Modules

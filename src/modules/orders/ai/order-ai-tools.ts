@@ -295,5 +295,3 @@ export function registerOrderAiTools(): void {
 
   registered = true;
 }
-
-registerOrderAiTools();

@@ -265,5 +265,3 @@ export function registerInventoryAiTools(): void {
 
   registered = true;
 }
-
-registerInventoryAiTools();

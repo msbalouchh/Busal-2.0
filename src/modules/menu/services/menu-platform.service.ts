@@ -1,6 +1,13 @@
+import "server-only";
+
+import {
+  buildMenuScopeFromInput,
+  toMenuPlatformContext,
+  type MenuTenantScope,
+} from "@/modules/menu/lib/menu-scope";
 import { menuRepository } from "@/modules/menu/repository/menu-repository";
+import { menuService } from "@/modules/menu/services/menu.service";
 import type { MenuItemRecord, MenuPlatformContext, MenuRecord } from "@/modules/menu/types/menu";
-import { DEFAULT_MENU_SCOPE } from "@/modules/menu/constants/mock-data";
 
 export interface MenuPlatformSnapshot {
   context: MenuPlatformContext;
@@ -17,30 +24,21 @@ export interface MenuPlatformSnapshot {
 export interface MenuPlatformInput {
   tenantId?: string;
   workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
+  businessId: string;
+  branchId?: string | null;
   userId?: string;
 }
 
-export function buildMenuPlatformContext(input: MenuPlatformInput = {}): MenuPlatformContext {
-  return {
-    tenantId: input.tenantId ?? DEFAULT_MENU_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_MENU_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_MENU_SCOPE.businessId,
-    branchId: input.branchId ?? DEFAULT_MENU_SCOPE.branchId,
-    userId: input.userId ?? DEFAULT_MENU_SCOPE.userId,
-  };
+export function buildMenuPlatformContext(input: MenuPlatformInput): MenuPlatformContext {
+  return toMenuPlatformContext(buildMenuScopeFromInput(input));
 }
 
-export function buildMenuPlatformSnapshot(input: MenuPlatformInput = {}): MenuPlatformSnapshot {
+export async function buildMenuPlatformSnapshot(
+  input: MenuPlatformInput,
+): Promise<MenuPlatformSnapshot> {
   const context = buildMenuPlatformContext(input);
-  const menus = menuRepository
-    .listMenus()
-    .filter(
-      (record) =>
-        record.menu.tenantId === context.tenantId && record.menu.businessId === context.businessId,
-    );
-
+  const scope: MenuTenantScope = buildMenuScopeFromInput(input);
+  const menus = await menuRepository.listMenus(scope);
   const items = menus.flatMap((menu) => menu.items);
 
   const channelCoverage: Record<string, number> = {};
@@ -54,22 +52,26 @@ export function buildMenuPlatformSnapshot(input: MenuPlatformInput = {}): MenuPl
     context,
     menus,
     itemCount: items.length,
-    activeItemCount: items.filter((i) => i.item.status === "active").length,
-    draftItemCount: items.filter((i) => i.item.status === "draft").length,
-    hiddenItemCount: items.filter((i) => i.item.status === "hidden").length,
-    archivedItemCount: items.filter((i) => i.item.status === "archived").length,
-    seasonalItemCount: items.filter((i) => i.item.status === "seasonal").length,
+    activeItemCount: items.filter((entry) => entry.item.status === "active").length,
+    draftItemCount: items.filter((entry) => entry.item.status === "draft").length,
+    hiddenItemCount: items.filter((entry) => entry.item.status === "hidden").length,
+    archivedItemCount: items.filter((entry) => entry.item.status === "archived").length,
+    seasonalItemCount: items.filter((entry) => entry.item.status === "seasonal").length,
     channelCoverage,
   };
 }
 
-export function getDefaultMenuSnapshot(): MenuPlatformSnapshot {
-  return buildMenuPlatformSnapshot();
+export async function getDefaultMenuSnapshot(businessId: string): Promise<MenuPlatformSnapshot> {
+  return buildMenuPlatformSnapshot({ businessId });
 }
 
-export function getPopularItems(limit = 5): MenuItemRecord[] {
-  return menuRepository
-    .listItems()
-    .sort((a, b) => b.aiContext.popularityScore - a.aiContext.popularityScore)
+export async function getPopularItems(
+  context: MenuPlatformContext,
+  limit = 5,
+): Promise<MenuItemRecord[]> {
+  const result = await menuService.searchItems({ pageSize: 100 }, context);
+
+  return [...result.records]
+    .sort((left, right) => right.aiContext.popularityScore - left.aiContext.popularityScore)
     .slice(0, limit);
 }

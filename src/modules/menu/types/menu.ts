@@ -236,12 +236,23 @@ export interface MenuSearchQuery {
   status?: MenuItemStatus;
   channel?: MenuChannel;
   limit?: number;
+  page?: number;
+  pageSize?: number;
+  sortBy?: "name" | "createdAt" | "displayOrder" | "price";
+  sortOrder?: "asc" | "desc";
+}
+
+export interface PaginatedMenuItemResult {
+  records: MenuItemRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface CreateMenuItemInput {
   menuId: string;
   categoryId: string;
-  sectionId: string;
+  sectionId?: string;
   name: string;
   description?: string | null;
   sku?: string;

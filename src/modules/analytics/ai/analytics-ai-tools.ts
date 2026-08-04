@@ -269,5 +269,3 @@ export function registerAnalyticsAiTools(): void {
 
   registered = true;
 }
-
-registerAnalyticsAiTools();
