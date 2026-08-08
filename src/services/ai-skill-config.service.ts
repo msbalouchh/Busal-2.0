@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import { updateSkill } from "@/services/ai-skill-manager.service";
 
 export async function updateSkillConfiguration(

@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { WorkflowStepRecord } from "@/modules/ai-orchestrator-management/types/ai-orchestrator-types";
 
 export function routeStepExecution(step: WorkflowStepRecord): "skill" | "agent" | "noop" {

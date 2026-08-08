@@ -8,6 +8,9 @@ export {
   explainApiErrorsForAi,
   recommendRateLimitsForAi,
   generateIntegrationMappingForAi,
+  optimizeApiUsageForAi,
+  monitorApiHealthForAi,
+  analyzeWebhookFailuresForAi,
 } from "@/modules/integrations/ai/integration-ai-context";
 
 export {

@@ -13,7 +13,7 @@ import {
   updateQuantity,
   type CartData,
 } from "@/services/cart.service";
-import { getQueue } from "@/services/kitchen-queue.service";
+import { OMS_KITCHEN_ORDER_PREFIX } from "@/modules/kitchen/lib/kitchen-mappers";
 import {
   assignTable,
   createOrderSession,
@@ -22,7 +22,7 @@ import {
   markOrderSessionReady,
   updateOrderNotes,
 } from "@/services/order-session.service";
-import { createOrderFromSession } from "@/services/order.service";
+import { createOmsOrderFromSession } from "@/modules/orders/services/pos-oms-bridge.service";
 import {
   POS_HELD_ORDER_PREFIX,
   POS_ORDER_TYPE_PREFIX,
@@ -322,24 +322,14 @@ export async function sendPosOrderToKitchen(options: {
   }
 
   await markOrderSessionReady(session.id);
-  const order = await createOrderFromSession(session.id, options.branchId ?? null);
-
-  const queue = await getQueue(options.businessId, {
-    status: "NEW",
-    branchId: options.branchId ?? null,
-  });
-  const kitchenQueueItem = queue.find((entry) => entry.orderId === order.id);
+  const order = await createOmsOrderFromSession(session.id, options.branchId ?? null);
 
   await ensurePosTerminalCart(options.businessId, options.posSessionId);
-
-  if (!kitchenQueueItem) {
-    throw new Error("Kitchen queue entry not found");
-  }
 
   return {
     orderId: order.id,
     orderNumber: order.orderNumber,
-    kitchenQueueId: kitchenQueueItem.id,
+    kitchenQueueId: `${OMS_KITCHEN_ORDER_PREFIX}${order.id}`,
   };
 }
 

@@ -295,7 +295,10 @@ async function main() {
   console.log("  PASS");
 
   console.log("Middleware and guards");
-  const middlewareSource = readFileSync(join(root, "src/middleware.ts"), "utf8");
+  const middlewareSource = readFileSync(
+    join(root, "src/modules/platform-guards/middleware/platform-guards-middleware.ts"),
+    "utf8",
+  );
   const guardSource = readFileSync(
     join(root, "src/modules/staff-auth/guards/staff-auth-guard.ts"),
     "utf8",

@@ -20,16 +20,25 @@ export function branchFilter(branchId: string | null): { branchId?: string } {
   return { branchId };
 }
 
-export function mergeBranchWhere<T extends Prisma.LegacyOrderWhereInput>(
+export function mergeRestaurantOrderWhere<T extends Prisma.RestaurantOrderWhereInput>(
   businessId: string,
   branchId: string | null,
   extra?: T,
-): Prisma.LegacyOrderWhereInput {
+): Prisma.RestaurantOrderWhereInput {
   return {
     businessId,
     ...branchFilter(branchId),
     ...extra,
   };
+}
+
+/** @deprecated Use mergeRestaurantOrderWhere */
+export function mergeBranchWhere<T extends Prisma.RestaurantOrderWhereInput>(
+  businessId: string,
+  branchId: string | null,
+  extra?: T,
+): Prisma.RestaurantOrderWhereInput {
+  return mergeRestaurantOrderWhere(businessId, branchId, extra);
 }
 
 export interface BranchScopeInput {

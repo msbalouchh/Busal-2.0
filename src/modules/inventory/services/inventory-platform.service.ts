@@ -1,5 +1,8 @@
-import { INVENTORY_STOCK_STATUSES } from "@/modules/inventory/constants/inventory-status";
-import { DEFAULT_INVENTORY_SCOPE } from "@/modules/inventory/constants/mock-data";
+import "server-only";
+
+import { INVENTORY_STOCK_STATUSES, PURCHASE_ORDER_STATUSES } from "@/modules/inventory/constants/inventory-status";
+import { buildInventoryPlatformContext } from "@/modules/inventory/lib/inventory-platform-context";
+import { resolveInventoryScope, toInventoryPlatformContext } from "@/modules/inventory/lib/inventory-scope";
 import { inventoryRepository } from "@/modules/inventory/repository/inventory-repository";
 import type {
   InventoryPlatformContext,
@@ -23,51 +26,47 @@ export interface InventoryPlatformSnapshot {
 export interface InventoryPlatformInput {
   tenantId?: string;
   workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
+  businessId: string;
+  branchId: string;
   userId?: string;
   defaultLocationId?: string;
 }
 
-export function buildInventoryPlatformContext(
-  input: InventoryPlatformInput = {},
-): InventoryPlatformContext {
-  return {
-    tenantId: input.tenantId ?? DEFAULT_INVENTORY_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_INVENTORY_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_INVENTORY_SCOPE.businessId,
-    branchId: input.branchId ?? DEFAULT_INVENTORY_SCOPE.branchId,
-    userId: input.userId ?? DEFAULT_INVENTORY_SCOPE.userId,
-    defaultLocationId: input.defaultLocationId ?? DEFAULT_INVENTORY_SCOPE.defaultLocationId,
-  };
-}
+export { buildInventoryPlatformContext };
 
-export function buildInventoryPlatformSnapshot(
-  input: InventoryPlatformInput = {},
-): InventoryPlatformSnapshot {
-  const context = buildInventoryPlatformContext(input);
-  const records = inventoryRepository
-    .listRecords()
-    .filter(
-      (record) =>
-        record.item.tenantId === context.tenantId && record.item.businessId === context.businessId,
-    );
+export async function buildInventoryPlatformSnapshot(
+  context: InventoryPlatformContext,
+): Promise<InventoryPlatformSnapshot> {
+  const scope = {
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+    defaultLocationId: context.defaultLocationId,
+  };
+
+  const [records, purchaseOrders, expiring] = await Promise.all([
+    inventoryRepository.listRecords(scope),
+    inventoryRepository.listPurchaseOrders(scope),
+    inventoryRepository.getExpiringRecords(scope, 3),
+  ]);
 
   const countByStatus = (status: string) =>
     records.filter((record) => record.item.status === status).length;
 
-  const totalValueCents = records.reduce((sum, r) => sum + r.analytics.totalValueCents, 0);
+  const totalValueCents = records.reduce((sum, record) => sum + record.analytics.totalValueCents, 0);
   const wasteCostCents = records.reduce(
-    (sum, r) => sum + r.wasteRecords.reduce((ws, w) => ws + w.costCents, 0),
+    (sum, record) => sum + record.wasteRecords.reduce((total, waste) => total + waste.costCents, 0),
     0,
   );
 
-  const purchaseOrders = inventoryRepository.listPurchaseOrders();
   const pendingPurchaseOrders = purchaseOrders.filter(
-    (po) => po.status === "draft" || po.status === "submitted" || po.status === "ordered",
+    (order) =>
+      order.status === PURCHASE_ORDER_STATUSES.DRAFT ||
+      order.status === PURCHASE_ORDER_STATUSES.ORDERED ||
+      order.status === PURCHASE_ORDER_STATUSES.PARTIALLY_RECEIVED,
   ).length;
-
-  const expiringWithin3Days = inventoryRepository.getExpiringRecords(3).length;
 
   return {
     context,
@@ -80,14 +79,29 @@ export function buildInventoryPlatformSnapshot(
     totalValueCents,
     pendingPurchaseOrders,
     wasteCostCents,
-    expiringWithin3Days,
+    expiringWithin3Days: expiring.length,
   };
 }
 
-export function getDefaultInventorySnapshot(): InventoryPlatformSnapshot {
-  return buildInventoryPlatformSnapshot();
+export async function getCriticalStockItems(
+  context: InventoryPlatformContext,
+  limit = 10,
+): Promise<InventoryRecord[]> {
+  const scope = {
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+    defaultLocationId: context.defaultLocationId,
+  };
+
+  const records = await inventoryRepository.getLowStockRecords(scope);
+  return records.slice(0, limit);
 }
 
-export function getCriticalStockItems(limit = 10): InventoryRecord[] {
-  return inventoryRepository.getLowStockRecords().slice(0, limit);
+export function buildInventoryPlatformContextFromPlatform(
+  platform: Parameters<typeof resolveInventoryScope>[0],
+) {
+  return toInventoryPlatformContext(resolveInventoryScope(platform));
 }

@@ -13,6 +13,7 @@ import type {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { runInteractiveTransaction } from "@/lib/prisma-transaction";
 import { calculateQuotePricing } from "@/modules/quotes/utils/pricing-engine";
 import { logQuoteAudit } from "@/modules/quotes/utils/quote-audit";
 
@@ -357,7 +358,7 @@ export async function createQuote(
 
   const quoteNumber = await nextQuoteNumber(businessId);
 
-  const quote = await prisma.$transaction(async (tx) => {
+  const quote = await runInteractiveTransaction(async (tx) => {
     const created = await tx.quote.create({
       data: {
         businessId,
@@ -465,7 +466,7 @@ export async function createQuoteRevision(
     defaultTaxRateBps: input.taxRateBps ?? existing.versions[0]?.taxRateBps,
   });
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     const version = await tx.quoteVersion.create({
       data: {
         quoteId,
@@ -596,7 +597,7 @@ export async function requestQuoteApproval(
     throw new Error("Quote not found");
   }
 
-  const approval = await prisma.$transaction(async (tx) => {
+  const approval = await runInteractiveTransaction(async (tx) => {
     await tx.quote.update({
       where: { id: quoteId },
       data: { status: "PENDING_APPROVAL" },
@@ -651,7 +652,7 @@ export async function reviewQuoteApproval(
     throw new Error("Quote not found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.quoteApproval.update({
       where: { id: approval.id },
       data: {
@@ -700,7 +701,7 @@ export async function sendQuote(
 
   const deliveryToken = quote.deliveryToken ?? randomUUID();
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.quote.update({
       where: { id: quoteId },
       data: {
@@ -739,7 +740,7 @@ export async function acceptQuote(
     throw new Error("Quote not found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.quote.update({
       where: { id: quoteId },
       data: { status: "ACCEPTED" },
@@ -907,7 +908,7 @@ export async function generateProposalFromQuote(
 
   const quoteSnapshot = mapQuoteVersion(quote.currentVersion);
 
-  const proposalId = await prisma.$transaction(async (tx) => {
+  const proposalId = await runInteractiveTransaction(async (tx) => {
     const proposal = await tx.proposal.create({
       data: {
         businessId,
@@ -995,7 +996,7 @@ export async function createProposalRevision(
   const nextVersionNumber = (proposal.versions[0]?.versionNumber ?? 0) + 1;
   const quoteSnapshot = mapQuoteVersion(proposal.quote.currentVersion);
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     const version = await tx.proposalVersion.create({
       data: {
         proposalId,
@@ -1046,7 +1047,7 @@ export async function sendProposal(
 
   const deliveryToken = proposal.deliveryToken ?? randomUUID();
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.proposal.update({
       where: { id: proposalId },
       data: {
@@ -1084,7 +1085,7 @@ export async function recordProposalView(
     throw new Error("Proposal not found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.proposalViewHistory.create({
       data: {
         proposalId: proposal.id,
@@ -1116,7 +1117,7 @@ export async function acceptProposal(
     throw new Error("Proposal not found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.proposalAcceptance.update({
       where: { proposalId: proposal.id },
       data: {
@@ -1164,7 +1165,7 @@ export async function rejectProposal(
     throw new Error("Proposal not found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.proposalAcceptance.update({
       where: { proposalId: proposal.id },
       data: {

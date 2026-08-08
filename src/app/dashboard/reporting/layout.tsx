@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
+import { DASHBOARD_MODULE_DESCRIPTIONS } from "@/modules/dashboard/constants/module-descriptions";
 import { ReportingNav } from "@/modules/reporting/components/reporting-nav";
 
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function ReportingLayout({ children }: { children: React.ReactNode }) {
   return (
     <DashboardSectionLayout
-      description="Sales, orders, inventory, and staff performance analytics."
+      description={DASHBOARD_MODULE_DESCRIPTIONS.reporting}
       nav={<ReportingNav />}
     >
       {children}

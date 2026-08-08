@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { Prisma, SalesPriority } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";

@@ -9,6 +9,27 @@ import type {
   ScheduleType,
 } from "@/modules/notifications/constants/notification-status";
 
+/** Notification campaign batch send. */
+export interface NotificationCampaign {
+  id: string;
+  tenantId: string;
+  businessId: string;
+  branchId: string | null;
+  name: string;
+  description: string;
+  templateId: string | null;
+  channels: NotificationChannel[];
+  recipientIds: string[];
+  status: "draft" | "scheduled" | "running" | "completed" | "cancelled";
+  scheduledAt: string | null;
+  sentCount: number;
+  failedCount: number;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 /** Individual notification record. */
 export interface Notification {
   id: string;
@@ -227,6 +248,7 @@ export interface NotificationRecord {
   events: NotificationEvent[];
   schedules: NotificationSchedule[];
   recipients: NotificationRecipient[];
+  campaigns: NotificationCampaign[];
   analytics: NotificationAnalytics;
   aiContext: NotificationAiContext;
 }
@@ -240,7 +262,19 @@ export interface NotificationSearchQuery {
   status?: NotificationStatus;
   eventSource?: NotificationEventSource;
   isRead?: boolean;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
   limit?: number;
+}
+
+export interface NotificationSearchResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export interface SendNotificationInput {
@@ -280,6 +314,8 @@ export interface NotificationContextValue {
   selectedNotification: Notification | null;
   selectNotification: (notificationId: string | null) => void;
   refresh: () => void;
+  isRefreshing: boolean;
+  error: string | null;
 }
 
 export interface NotificationPreferencesContextValue {

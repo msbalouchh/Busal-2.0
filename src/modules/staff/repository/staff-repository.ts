@@ -1,368 +1,766 @@
+import "server-only";
+
+import type { Prisma } from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
+import { ATTENDANCE_STATUSES, LEAVE_STATUSES } from "@/modules/staff/constants/staff-status";
+import type { StaffTenantScope } from "@/modules/staff/lib/staff-scope";
 import {
-  EMPLOYMENT_STATUSES,
-  LEAVE_STATUSES,
-  STAFF_ACTIVITY_EVENT_TYPES,
-  STAFF_SHIFT_STATUSES,
-} from "@/modules/staff/constants/staff-status";
-import {
-  DEFAULT_STAFF_SCOPE,
-  MOCK_DEPARTMENTS,
-  MOCK_DESIGNATIONS,
-  MOCK_STAFF_RECORDS,
-} from "@/modules/staff/constants/mock-data";
+  createAttendanceRecord,
+  createLeaveRequest,
+  createScheduledShift,
+  defaultBranchStaffMeta,
+  mapDesignation,
+  mapStaffToRecord,
+  mapStringDepartment,
+  mergeProfileMeta,
+  type StaffWithRelations,
+  type StoredStaffBranchMeta,
+} from "@/modules/staff/lib/staff-mappers";
 import type {
   ApproveLeaveInput,
   AssignRoleInput,
   CreateEmployeeInput,
+  Department,
+  Designation,
   ScheduleShiftInput,
   StaffRecord,
   StaffSearchQuery,
   StaffShift,
 } from "@/modules/staff/types/staff-platform";
+import type {
+  ApproveStaffLeaveSchemaInput,
+  AssignStaffBranchSchemaInput,
+  AssignStaffRoleSchemaInput,
+  ClockStaffActionSchemaInput,
+  CreateStaffEmployeeSchemaInput,
+  CreateStaffLeaveSchemaInput,
+  ScheduleStaffShiftSchemaInput,
+  StaffBulkActionSchemaInput,
+  StaffSearchSchemaInput,
+  UpdateStaffEmployeeSchemaInput,
+} from "@/modules/staff/validation/staff-schemas";
 
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const DEFAULT_PAGE_SIZE = 25;
+
+const staffInclude = {
+  branch: { select: { id: true, name: true } },
+  staffRoles: {
+    include: { role: { select: { id: true, name: true, slug: true } } },
+  },
+  branchAssignments: {
+    include: { branch: { select: { id: true, name: true } } },
+  },
+  auditLogs: { orderBy: { createdAt: "desc" }, take: 20 },
+} satisfies Prisma.StaffInclude;
+
+export interface StaffSearchResult {
+  records: StaffRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
-function generateEmployeeNumber(): string {
-  return `EMP-${String(Math.floor(Math.random() * 900) + 100)}`;
+function scopeWhere(scope: StaffTenantScope, includeInactive = false): Prisma.StaffWhereInput {
+  return {
+    businessId: scope.businessId,
+    OR: [{ branchId: scope.branchId }, { branchAssignments: { some: { branchId: scope.branchId } } }],
+    ...(includeInactive ? {} : { isActive: true, employmentStatus: { not: "TERMINATED" } }),
+  };
 }
 
-/** In-memory staff repository (mock only, no backend). */
+function itemOrderBy(
+  sortBy?: StaffSearchSchemaInput["sortBy"],
+  sortDirection?: StaffSearchSchemaInput["sortDirection"],
+): Prisma.StaffOrderByWithRelationInput {
+  const direction = sortDirection === "desc" ? "desc" : "asc";
+  switch (sortBy) {
+    case "department":
+      return { department: direction };
+    case "createdAt":
+      return { createdAt: direction };
+    case "role":
+      return { staffRoles: { _count: direction } };
+    case "name":
+    default:
+      return { lastName: direction };
+  }
+}
+
+async function loadRolePermissions(staff: StaffWithRelations) {
+  const roleIds = staff.staffRoles.map((entry) => entry.roleId);
+  if (roleIds.length === 0) {
+    return [];
+  }
+
+  const assignments = await prisma.rolePermission.findMany({
+    where: { roleId: { in: roleIds } },
+    include: { permission: true },
+  });
+
+  const seen = new Set<string>();
+  return assignments
+    .map((entry) => entry.permission)
+    .filter((permission) => {
+      if (seen.has(permission.id)) {
+        return false;
+      }
+      seen.add(permission.id);
+      return true;
+    });
+}
+
+/** Prisma-backed staff repository with tenant scoping. */
 export class StaffRepository {
-  private records: StaffRecord[] = structuredClone(MOCK_STAFF_RECORDS);
-  private departments = structuredClone(MOCK_DEPARTMENTS);
-  private designations = structuredClone(MOCK_DESIGNATIONS);
+  private async loadBranchMeta(scope: StaffTenantScope): Promise<StoredStaffBranchMeta> {
+    const settings = await prisma.branchSettings.findUnique({
+      where: { branchId: scope.branchId },
+      select: { settings: true },
+    });
 
-  listRecords(): StaffRecord[] {
-    return structuredClone(this.records);
+    const raw = settings?.settings;
+    if (raw && typeof raw === "object" && raw !== null && "staffOperations" in raw) {
+      return (raw as unknown as { staffOperations: StoredStaffBranchMeta }).staffOperations;
+    }
+
+    return defaultBranchStaffMeta(scope);
   }
 
-  listDepartments() {
-    return structuredClone(this.departments);
+  private async saveBranchMeta(scope: StaffTenantScope, meta: StoredStaffBranchMeta): Promise<void> {
+    const existing = await prisma.branchSettings.findUnique({
+      where: { branchId: scope.branchId },
+      select: { settings: true },
+    });
+
+    const settingsObject =
+      existing?.settings && typeof existing.settings === "object" && existing.settings !== null
+        ? (existing.settings as Record<string, unknown>)
+        : {};
+
+    await prisma.branchSettings.upsert({
+      where: { branchId: scope.branchId },
+      create: {
+        branchId: scope.branchId,
+        settings: { ...settingsObject, staffOperations: meta } as unknown as Prisma.InputJsonValue,
+      },
+      update: {
+        settings: { ...settingsObject, staffOperations: meta } as unknown as Prisma.InputJsonValue,
+      },
+    });
   }
 
-  listDesignations() {
-    return structuredClone(this.designations);
+  private async loadDepartments(scope: StaffTenantScope): Promise<Department[]> {
+    const meta = await this.loadBranchMeta(scope);
+    const departments = [...(meta.departments ?? [])];
+    const staffDepartments = await prisma.staff.findMany({
+      where: { businessId: scope.businessId, department: { not: null } },
+      select: { department: true },
+      distinct: ["department"],
+    });
+
+    for (const entry of staffDepartments) {
+      if (!entry.department) continue;
+      const mapped = mapStringDepartment(scope, entry.department);
+      if (!departments.some((department) => department.id === mapped.id)) {
+        departments.push(mapped);
+      }
+    }
+
+    return departments;
   }
 
-  findById(staffId: string): StaffRecord | undefined {
-    return this.records.find((record) => record.member.id === staffId);
+  private async loadDesignations(
+    scope: StaffTenantScope,
+    departments: Department[],
+  ): Promise<Designation[]> {
+    const meta = await this.loadBranchMeta(scope);
+    const designations = [...(meta.designations ?? [])];
+    const staffTitles = await prisma.staff.findMany({
+      where: { businessId: scope.businessId, jobTitle: { not: null } },
+      select: { jobTitle: true, department: true },
+      distinct: ["jobTitle", "department"],
+    });
+
+    for (const entry of staffTitles) {
+      if (!entry.jobTitle) continue;
+      const department =
+        departments.find((item) => item.name === (entry.department ?? "General")) ??
+        mapStringDepartment(scope, entry.department ?? "General");
+      const mapped = mapDesignation(scope, entry.jobTitle, department.id);
+      if (!designations.some((designation) => designation.id === mapped.id)) {
+        designations.push(mapped);
+      }
+    }
+
+    return designations;
   }
 
-  search(query: StaffSearchQuery = {}): StaffRecord[] {
-    let results = this.listRecords();
+  private async buildRecord(scope: StaffTenantScope, staffId: string): Promise<StaffRecord | null> {
+    const staff = await prisma.staff.findFirst({
+      where: { id: staffId, businessId: scope.businessId },
+      include: staffInclude,
+    });
 
-    if (query.tenantId) {
-      results = results.filter((r) => r.member.tenantId === query.tenantId);
+    if (!staff) {
+      return null;
     }
 
-    if (query.businessId) {
-      results = results.filter((r) => r.member.businessId === query.businessId);
-    }
+    const [branchMeta, departments, designations, permissions] = await Promise.all([
+      this.loadBranchMeta(scope),
+      this.loadDepartments(scope),
+      this.loadDesignations(scope, await this.loadDepartments(scope)),
+      loadRolePermissions(staff as StaffWithRelations),
+    ]);
 
-    if (query.branchId) {
-      results = results.filter((r) =>
-        r.branchAssignments.some((ba) => ba.branchId === query.branchId),
-      );
-    }
+    return mapStaffToRecord(
+      scope,
+      staff as StaffWithRelations,
+      branchMeta,
+      departments,
+      designations,
+      permissions,
+    );
+  }
 
-    if (query.departmentId) {
-      results = results.filter((r) => r.profile.departmentId === query.departmentId);
-    }
+  async listRecords(scope: StaffTenantScope): Promise<StaffRecord[]> {
+    const result = await this.search(scope, { page: 1, pageSize: 500 });
+    return result.records;
+  }
 
-    if (query.employmentStatus) {
-      results = results.filter((r) => r.member.employmentStatus === query.employmentStatus);
-    }
+  async search(
+    scope: StaffTenantScope,
+    query: StaffSearchQuery | StaffSearchSchemaInput = {},
+  ): Promise<StaffSearchResult> {
+    const page = "page" in query && query.page ? query.page : 1;
+    const pageSize =
+      "limit" in query && query.limit
+        ? query.limit
+        : "pageSize" in query && query.pageSize
+          ? query.pageSize
+          : DEFAULT_PAGE_SIZE;
 
-    if (query.departmentType) {
-      results = results.filter((r) => r.department.departmentType === query.departmentType);
+    const where: Prisma.StaffWhereInput = {
+      ...scopeWhere(scope, "includeInactive" in query ? query.includeInactive : false),
+    };
+
+    if (query.isActive !== undefined) {
+      where.isActive = query.isActive;
     }
 
     if (query.roleId) {
-      results = results.filter((r) => r.roleAssignments.some((ra) => ra.roleId === query.roleId));
+      where.staffRoles = { some: { roleId: query.roleId } };
     }
 
-    if (query.isActive !== undefined) {
-      results = results.filter((r) => r.member.isActive === query.isActive);
+    if (query.departmentId) {
+      const departments = await this.loadDepartments(scope);
+      const department = departments.find((entry) => entry.id === query.departmentId);
+      if (department) {
+        where.department = department.name;
+      }
     }
 
     if (query.query) {
-      const term = query.query.toLowerCase();
-      results = results.filter(
-        (r) =>
-          r.member.displayName.toLowerCase().includes(term) ||
-          r.member.email.toLowerCase().includes(term) ||
-          r.member.employeeNumber.toLowerCase().includes(term) ||
-          r.designation.title.toLowerCase().includes(term),
-      );
-    }
-
-    if (query.limit) {
-      results = results.slice(0, query.limit);
-    }
-
-    return results;
-  }
-
-  createEmployee(input: CreateEmployeeInput): StaffRecord {
-    const now = new Date().toISOString();
-    const staffId = createId("staff");
-    const employeeNumber = generateEmployeeNumber();
-    const department = this.departments.find((d) => d.id === input.departmentId)!;
-    const designation = this.designations.find((d) => d.id === input.designationId)!;
-    const displayName = `${input.firstName} ${input.lastName}`;
-
-    const record: StaffRecord = {
-      member: {
-        id: staffId,
-        tenantId: DEFAULT_STAFF_SCOPE.tenantId,
-        workspaceId: DEFAULT_STAFF_SCOPE.workspaceId,
-        businessId: DEFAULT_STAFF_SCOPE.businessId,
-        userId: null,
-        employeeNumber,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        displayName,
-        email: input.email,
-        phone: input.phone ?? null,
-        avatarUrl: null,
-        employmentStatus: EMPLOYMENT_STATUSES.ACTIVE,
-        hireDate: input.hireDate,
-        terminationDate: null,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-      profile: {
-        staffId,
-        dateOfBirth: null,
-        nationalId: null,
-        address: null,
-        city: null,
-        postcode: null,
-        country: "GB",
-        departmentId: input.departmentId,
-        designationId: input.designationId,
-        managerStaffId: DEFAULT_STAFF_SCOPE.managerStaffId,
-        bio: null,
-        preferredLanguage: "en-GB",
-        timezone: "Europe/London",
-      },
-      department,
-      designation,
-      branchAssignments: [
+      where.AND = [
         {
-          id: createId("ba"),
-          staffId,
-          branchId: input.branchId,
-          branchName: "Main Branch",
-          isPrimary: true,
-          assignedAt: now,
-          assignedByStaffId: DEFAULT_STAFF_SCOPE.managerStaffId,
+          OR: [
+            { firstName: { contains: query.query, mode: "insensitive" } },
+            { lastName: { contains: query.query, mode: "insensitive" } },
+            { email: { contains: query.query, mode: "insensitive" } },
+            { employeeCode: { contains: query.query, mode: "insensitive" } },
+            { fullName: { contains: query.query, mode: "insensitive" } },
+            { department: { contains: query.query, mode: "insensitive" } },
+            { jobTitle: { contains: query.query, mode: "insensitive" } },
+          ],
         },
-      ],
-      roleAssignments: [],
-      permissionAssignments: [],
-      shifts: [],
-      schedules: [],
-      attendance: [],
-      leaveRequests: [],
-      payroll: {
-        staffId,
-        tenantId: DEFAULT_STAFF_SCOPE.tenantId,
-        businessId: DEFAULT_STAFF_SCOPE.businessId,
-        payFrequency: "monthly",
-        hourlyRateCents: input.hourlyRateCents ?? null,
-        salaryCents: input.salaryCents ?? null,
-        currency: "GBP",
-        taxCode: null,
-        bankAccountLast4: null,
-        isPayrollEnabled: true,
-        effectiveFrom: input.hireDate,
-      },
-      performanceReviews: [],
-      trainingRecords: [],
-      certifications: [],
-      emergencyContacts: [],
-      documents: [],
-      activityLog: [
-        {
-          id: createId("log"),
-          staffId,
-          tenantId: DEFAULT_STAFF_SCOPE.tenantId,
-          businessId: DEFAULT_STAFF_SCOPE.businessId,
-          eventType: STAFF_ACTIVITY_EVENT_TYPES.HIRED,
-          actorStaffId: DEFAULT_STAFF_SCOPE.managerStaffId,
-          message: `${displayName} hired`,
-          metadata: { department: department.name },
-          occurredAt: now,
-        },
-      ],
-      analytics: {
-        staffId,
-        attendanceRateBps: 10000,
-        punctualityRateBps: 10000,
-        overtimeHoursMonth: 0,
-        leaveDaysUsed: 0,
-        leaveDaysRemaining: 28,
-        avgPerformanceScoreBps: 0,
-        trainingCompletionRateBps: 0,
-        shiftCoverageRateBps: 10000,
-      },
-      aiContext: {
-        staffId,
-        summary: `${displayName} — ${designation.title}`,
-        labourDemandScore: 0.5,
-        staffingGapHours: 0,
-        attendanceRiskScore: 0,
-        performanceTrend: "stable",
-        recommendedShiftHours: 40,
-        insights: [],
-        recommendedActions: ["Schedule onboarding training"],
-        lastGeneratedAt: now,
-      },
-    };
-
-    this.records.push(record);
-    return structuredClone(record);
-  }
-
-  assignRole(input: AssignRoleInput): StaffRecord | null {
-    const record = this.findById(input.staffId);
-
-    if (!record) {
-      return null;
+      ];
     }
 
-    const now = new Date().toISOString();
+    const [branchMeta, departments, designations, total, staffMembers] = await Promise.all([
+      this.loadBranchMeta(scope),
+      this.loadDepartments(scope),
+      this.loadDesignations(scope, await this.loadDepartments(scope)),
+      prisma.staff.count({ where }),
+      prisma.staff.findMany({
+        where,
+        include: staffInclude,
+        orderBy: itemOrderBy(
+          "sortBy" in query ? query.sortBy : undefined,
+          "sortDirection" in query ? query.sortDirection : undefined,
+        ),
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
 
-    record.roleAssignments.push({
-      id: createId("ra"),
-      staffId: input.staffId,
-      roleId: input.roleId,
-      roleName: input.roleName,
-      scope: input.scope,
-      scopeId: input.scopeId,
-      assignedAt: now,
-      assignedByStaffId: input.assignedByStaffId,
-      expiresAt: null,
-    });
-
-    record.activityLog.push({
-      id: createId("log"),
-      staffId: input.staffId,
-      tenantId: record.member.tenantId,
-      businessId: record.member.businessId,
-      eventType: STAFF_ACTIVITY_EVENT_TYPES.ROLE_ASSIGNED,
-      actorStaffId: input.assignedByStaffId,
-      message: `Role ${input.roleName} assigned`,
-      metadata: { roleId: input.roleId },
-      occurredAt: now,
-    });
-
-    return structuredClone(record);
-  }
-
-  scheduleShift(input: ScheduleShiftInput): StaffShift | null {
-    const record = this.findById(input.staffId);
-
-    if (!record) {
-      return null;
-    }
-
-    const now = new Date().toISOString();
-    const shift: StaffShift = {
-      id: createId("shift"),
-      tenantId: DEFAULT_STAFF_SCOPE.tenantId,
-      businessId: DEFAULT_STAFF_SCOPE.businessId,
-      branchId: input.branchId,
-      staffId: input.staffId,
-      scheduleId: null,
-      status: STAFF_SHIFT_STATUSES.SCHEDULED,
-      shiftDate: input.shiftDate,
-      startTime: input.startTime,
-      endTime: input.endTime,
-      breakMinutes: input.breakMinutes ?? 30,
-      roleId: input.roleId ?? null,
-      notes: input.notes ?? null,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    record.shifts.push(shift);
-
-    record.activityLog.push({
-      id: createId("log"),
-      staffId: input.staffId,
-      tenantId: record.member.tenantId,
-      businessId: record.member.businessId,
-      eventType: STAFF_ACTIVITY_EVENT_TYPES.SHIFT_SCHEDULED,
-      actorStaffId: DEFAULT_STAFF_SCOPE.managerStaffId,
-      message: `Shift scheduled ${input.shiftDate} ${input.startTime}-${input.endTime}`,
-      metadata: { shiftId: shift.id },
-      occurredAt: now,
-    });
-
-    return structuredClone(shift);
-  }
-
-  approveLeave(input: ApproveLeaveInput): StaffRecord | null {
-    const record = this.records.find((r) =>
-      r.leaveRequests.some((lr) => lr.id === input.leaveRequestId),
+    let records = await Promise.all(
+      staffMembers.map(async (staff) => {
+        const permissions = await loadRolePermissions(staff as StaffWithRelations);
+        return mapStaffToRecord(
+          scope,
+          staff as StaffWithRelations,
+          branchMeta,
+          departments,
+          designations,
+          permissions,
+        );
+      }),
     );
 
+    if (query.employmentStatus) {
+      records = records.filter((record) => record.member.employmentStatus === query.employmentStatus);
+    }
+
+    if (query.departmentType) {
+      records = records.filter((record) => record.department.departmentType === query.departmentType);
+    }
+
+    return {
+      records,
+      total:
+        query.employmentStatus || query.departmentType ? records.length : total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
+  }
+
+  async findById(scope: StaffTenantScope, staffId: string): Promise<StaffRecord | null> {
+    return this.buildRecord(scope, staffId);
+  }
+
+  async listDepartments(scope: StaffTenantScope): Promise<Department[]> {
+    return this.loadDepartments(scope);
+  }
+
+  async listDesignations(scope: StaffTenantScope): Promise<Designation[]> {
+    const departments = await this.loadDepartments(scope);
+    return this.loadDesignations(scope, departments);
+  }
+
+  async createEmployee(
+    scope: StaffTenantScope,
+    input: CreateEmployeeInput | CreateStaffEmployeeSchemaInput,
+  ): Promise<StaffRecord> {
+    const departments = await this.loadDepartments(scope);
+    const designations = await this.loadDesignations(scope, departments);
+    const department =
+      departments.find((entry) => entry.id === input.departmentId) ??
+      mapStringDepartment(scope, input.departmentId);
+    const designation =
+      designations.find((entry) => entry.id === input.designationId) ??
+      mapDesignation(scope, input.designationId, department.id);
+
+    const count = await prisma.staff.count({ where: { businessId: scope.businessId } });
+    const employeeCode = `EMP-${String(count + 1).padStart(4, "0")}`;
+    const fullName = `${input.firstName} ${input.lastName}`.trim();
+    const staffProfile = mergeProfileMeta({}, {
+      departmentId: department.id,
+      designationId: designation.id,
+    });
+
+    const staff = await prisma.staff.create({
+      data: {
+        businessId: scope.businessId,
+        branchId: input.branchId,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        fullName,
+        email: input.email,
+        phone: input.phone ?? null,
+        employeeCode,
+        department: department.name,
+        jobTitle: designation.title,
+        hireDate: new Date(input.hireDate),
+        hourlyRate: input.hourlyRateCents ? input.hourlyRateCents / 100 : null,
+        monthlySalary: input.salaryCents ? input.salaryCents / 100 : null,
+        salaryType: input.hourlyRateCents ? "HOURLY" : input.salaryCents ? "MONTHLY" : null,
+        staffProfile: staffProfile as unknown as Prisma.InputJsonValue,
+        employmentStatus: "ACTIVE",
+        accountStatus: "ACTIVE",
+        isActive: true,
+      },
+      include: staffInclude,
+    });
+
+    await prisma.staffBranchAssignment.create({
+      data: {
+        staffId: staff.id,
+        branchId: input.branchId,
+        isPrimary: true,
+      },
+    });
+
+    if ("roleId" in input && input.roleId) {
+      await prisma.staffRole.create({
+        data: { staffId: staff.id, roleId: input.roleId },
+      });
+    }
+
+    await prisma.staffAuditLog.create({
+      data: {
+        businessId: scope.businessId,
+        staffId: staff.id,
+        eventType: "CREATED",
+        actorUserId: scope.userId,
+        actorStaffId: scope.actorStaffId,
+      },
+    });
+
+    const record = await this.buildRecord(scope, staff.id);
     if (!record) {
+      throw new Error("Failed to load created staff member");
+    }
+    return record;
+  }
+
+  async updateEmployee(
+    scope: StaffTenantScope,
+    input: UpdateStaffEmployeeSchemaInput,
+  ): Promise<StaffRecord | null> {
+    const existing = await prisma.staff.findFirst({
+      where: { id: input.staffId, businessId: scope.businessId },
+    });
+
+    if (!existing) {
       return null;
     }
 
-    const leave = record.leaveRequests.find((lr) => lr.id === input.leaveRequestId);
+    const departments = await this.loadDepartments(scope);
+    const designations = await this.loadDesignations(scope, departments);
+    const department =
+      input.departmentId !== undefined
+        ? (departments.find((entry) => entry.id === input.departmentId) ??
+          mapStringDepartment(scope, input.departmentId))
+        : null;
+    const designation =
+      input.designationId !== undefined
+        ? (designations.find((entry) => entry.id === input.designationId) ??
+          mapDesignation(scope, input.designationId, department?.id ?? "dept-general"))
+        : null;
+
+    await prisma.staff.update({
+      where: { id: existing.id },
+      data: {
+        ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
+        ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
+        ...(input.firstName !== undefined || input.lastName !== undefined
+          ? {
+              fullName: `${input.firstName ?? existing.firstName} ${input.lastName ?? existing.lastName}`.trim(),
+            }
+          : {}),
+        ...(input.email !== undefined ? { email: input.email } : {}),
+        ...(input.phone !== undefined ? { phone: input.phone ?? null } : {}),
+        ...(department ? { department: department.name } : {}),
+        ...(designation ? { jobTitle: designation.title } : {}),
+        ...(input.hireDate !== undefined ? { hireDate: new Date(input.hireDate) } : {}),
+        ...(input.hourlyRateCents !== undefined
+          ? { hourlyRate: input.hourlyRateCents / 100, salaryType: "HOURLY" }
+          : {}),
+        ...(input.salaryCents !== undefined
+          ? { monthlySalary: input.salaryCents / 100, salaryType: "MONTHLY" }
+          : {}),
+        staffProfile: mergeProfileMeta(existing.staffProfile, {
+          ...(department ? { departmentId: department.id } : {}),
+          ...(designation ? { designationId: designation.id } : {}),
+        }) as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    await prisma.staffAuditLog.create({
+      data: {
+        businessId: scope.businessId,
+        staffId: existing.id,
+        eventType: "UPDATED",
+        actorUserId: scope.userId,
+        actorStaffId: scope.actorStaffId,
+      },
+    });
+
+    return this.buildRecord(scope, existing.id);
+  }
+
+  async deactivateEmployee(scope: StaffTenantScope, staffId: string): Promise<StaffRecord | null> {
+    const existing = await prisma.staff.findFirst({
+      where: { id: staffId, businessId: scope.businessId },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    await prisma.staff.update({
+      where: { id: staffId },
+      data: {
+        isActive: false,
+        employmentStatus: "TERMINATED",
+        terminationDate: new Date(),
+        accountStatus: "SUSPENDED",
+      },
+    });
+
+    await prisma.staffAuditLog.create({
+      data: {
+        businessId: scope.businessId,
+        staffId,
+        eventType: "DEACTIVATED",
+        actorUserId: scope.userId,
+        actorStaffId: scope.actorStaffId,
+      },
+    });
+
+    return this.buildRecord(scope, staffId);
+  }
+
+  async restoreEmployee(scope: StaffTenantScope, staffId: string): Promise<StaffRecord | null> {
+    const existing = await prisma.staff.findFirst({
+      where: { id: staffId, businessId: scope.businessId },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    await prisma.staff.update({
+      where: { id: staffId },
+      data: {
+        isActive: true,
+        employmentStatus: "ACTIVE",
+        terminationDate: null,
+        accountStatus: "ACTIVE",
+      },
+    });
+
+    await prisma.staffAuditLog.create({
+      data: {
+        businessId: scope.businessId,
+        staffId,
+        eventType: "REACTIVATED",
+        actorUserId: scope.userId,
+        actorStaffId: scope.actorStaffId,
+      },
+    });
+
+    return this.buildRecord(scope, staffId);
+  }
+
+  async bulkAction(scope: StaffTenantScope, input: StaffBulkActionSchemaInput): Promise<number> {
+    let affected = 0;
+
+    for (const staffId of input.staffIds) {
+      if (input.action === "deactivate" || input.action === "delete") {
+        const result = await this.deactivateEmployee(scope, staffId);
+        if (result) affected += 1;
+      } else if (input.action === "restore") {
+        const result = await this.restoreEmployee(scope, staffId);
+        if (result) affected += 1;
+      }
+    }
+
+    return affected;
+  }
+
+  async assignRole(
+    scope: StaffTenantScope,
+    input: AssignRoleInput | AssignStaffRoleSchemaInput,
+  ): Promise<StaffRecord | null> {
+    const existing = await prisma.staff.findFirst({
+      where: { id: input.staffId, businessId: scope.businessId },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    await prisma.staffRole.deleteMany({ where: { staffId: input.staffId } });
+    await prisma.staffRole.create({
+      data: { staffId: input.staffId, roleId: input.roleId },
+    });
+
+    await prisma.staffAuditLog.create({
+      data: {
+        businessId: scope.businessId,
+        staffId: input.staffId,
+        eventType: "ROLE_CHANGED",
+        actorUserId: scope.userId,
+        actorStaffId: scope.actorStaffId,
+        metadata: { roleId: input.roleId, roleName: input.roleName },
+      },
+    });
+
+    return this.buildRecord(scope, input.staffId);
+  }
+
+  async assignBranch(
+    scope: StaffTenantScope,
+    input: AssignStaffBranchSchemaInput,
+  ): Promise<StaffRecord | null> {
+    const existing = await prisma.staff.findFirst({
+      where: { id: input.staffId, businessId: scope.businessId },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    if (input.isPrimary) {
+      await prisma.staffBranchAssignment.updateMany({
+        where: { staffId: input.staffId },
+        data: { isPrimary: false },
+      });
+      await prisma.staff.update({
+        where: { id: input.staffId },
+        data: { branchId: input.branchId },
+      });
+    }
+
+    await prisma.staffBranchAssignment.upsert({
+      where: { staffId_branchId: { staffId: input.staffId, branchId: input.branchId } },
+      create: {
+        staffId: input.staffId,
+        branchId: input.branchId,
+        isPrimary: input.isPrimary,
+      },
+      update: { isPrimary: input.isPrimary },
+    });
+
+    await prisma.staffAuditLog.create({
+      data: {
+        businessId: scope.businessId,
+        staffId: input.staffId,
+        eventType: "BRANCH_CHANGED",
+        actorUserId: scope.userId,
+        actorStaffId: scope.actorStaffId,
+        metadata: { branchId: input.branchId },
+      },
+    });
+
+    return this.buildRecord(scope, input.staffId);
+  }
+
+  async scheduleShift(
+    scope: StaffTenantScope,
+    input: ScheduleShiftInput | ScheduleStaffShiftSchemaInput,
+  ): Promise<StaffShift | null> {
+    const existing = await prisma.staff.findFirst({
+      where: { id: input.staffId, businessId: scope.businessId },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    const branchMeta = await this.loadBranchMeta(scope);
+    const shift = createScheduledShift(scope, input);
+    branchMeta.shifts = [...(branchMeta.shifts ?? []), shift];
+    await this.saveBranchMeta(scope, branchMeta);
+    return shift;
+  }
+
+  async clockIn(
+    scope: StaffTenantScope,
+    input: ClockStaffActionSchemaInput,
+  ): Promise<StaffRecord | null> {
+    const branchMeta = await this.loadBranchMeta(scope);
+    const attendance = createAttendanceRecord(scope, {
+      staffId: input.staffId,
+      branchId: input.branchId,
+      shiftId: input.shiftId ?? null,
+      clockInAt: new Date().toISOString(),
+    });
+    branchMeta.attendance = [...(branchMeta.attendance ?? []), attendance];
+    await this.saveBranchMeta(scope, branchMeta);
+    return this.buildRecord(scope, input.staffId);
+  }
+
+  async clockOut(
+    scope: StaffTenantScope,
+    input: ClockStaffActionSchemaInput,
+  ): Promise<StaffRecord | null> {
+    const branchMeta = await this.loadBranchMeta(scope);
+    const openEntry = [...(branchMeta.attendance ?? [])]
+      .reverse()
+      .find((entry) => entry.staffId === input.staffId && !entry.clockOutAt);
+
+    if (!openEntry) {
+      return null;
+    }
+
+    openEntry.clockOutAt = new Date().toISOString();
+    openEntry.workedMinutes = Math.max(
+      0,
+      Math.round(
+        (new Date(openEntry.clockOutAt).getTime() - new Date(openEntry.clockInAt!).getTime()) /
+          60_000,
+      ),
+    );
+    openEntry.overtimeMinutes = Math.max(0, openEntry.workedMinutes - openEntry.scheduledMinutes);
+    await this.saveBranchMeta(scope, branchMeta);
+    return this.buildRecord(scope, input.staffId);
+  }
+
+  async createLeaveRequest(
+    scope: StaffTenantScope,
+    input: CreateStaffLeaveSchemaInput,
+  ): Promise<StaffRecord | null> {
+    const branchMeta = await this.loadBranchMeta(scope);
+    const leave = createLeaveRequest(scope, input);
+    branchMeta.leaveRequests = [...(branchMeta.leaveRequests ?? []), leave];
+    await this.saveBranchMeta(scope, branchMeta);
+    return this.buildRecord(scope, input.staffId);
+  }
+
+  async approveLeave(
+    scope: StaffTenantScope,
+    input: ApproveLeaveInput | ApproveStaffLeaveSchemaInput,
+  ): Promise<StaffRecord | null> {
+    const branchMeta = await this.loadBranchMeta(scope);
+    const leave = (branchMeta.leaveRequests ?? []).find(
+      (entry) => entry.id === input.leaveRequestId,
+    );
 
     if (!leave || leave.status !== LEAVE_STATUSES.PENDING) {
       return null;
     }
 
-    const now = new Date().toISOString();
     leave.status = LEAVE_STATUSES.APPROVED;
-    leave.approvedByStaffId = input.approvedByStaffId;
-    leave.approvedAt = now;
-    leave.updatedAt = now;
+    leave.approvedByStaffId = scope.actorStaffId ?? scope.userId;
+    leave.approvedAt = new Date().toISOString();
+    leave.updatedAt = leave.approvedAt;
+    await this.saveBranchMeta(scope, branchMeta);
 
-    record.activityLog.push({
-      id: createId("log"),
-      staffId: record.member.id,
-      tenantId: record.member.tenantId,
-      businessId: record.member.businessId,
-      eventType: STAFF_ACTIVITY_EVENT_TYPES.LEAVE_APPROVED,
-      actorStaffId: input.approvedByStaffId,
-      message: `Leave approved ${leave.startDate} to ${leave.endDate}`,
-      metadata: { leaveRequestId: input.leaveRequestId },
-      occurredAt: now,
+    await prisma.staff.update({
+      where: { id: leave.staffId },
+      data: { employmentStatus: "ON_LEAVE" },
     });
 
-    return structuredClone(record);
+    return this.buildRecord(scope, leave.staffId);
   }
 
-  getPendingLeaveRequests(): StaffRecord[] {
-    return this.records.filter((r) =>
-      r.leaveRequests.some((lr) => lr.status === LEAVE_STATUSES.PENDING),
+  async getPendingLeaveRequests(scope: StaffTenantScope): Promise<StaffRecord[]> {
+    const records = await this.listRecords(scope);
+    return records.filter((record) =>
+      record.leaveRequests.some((leave) => leave.status === LEAVE_STATUSES.PENDING),
     );
   }
 
-  getUpcomingShifts(limit = 20): StaffShift[] {
-    const today = "2026-02-15";
-    const shifts: StaffShift[] = [];
-
-    for (const record of this.records) {
-      shifts.push(...record.shifts.filter((s) => s.shiftDate >= today));
-    }
-
-    return shifts.sort((a, b) => a.shiftDate.localeCompare(b.shiftDate)).slice(0, limit);
+  async getUpcomingShifts(scope: StaffTenantScope, limit = 20): Promise<StaffShift[]> {
+    const meta = await this.loadBranchMeta(scope);
+    const today = new Date().toISOString().slice(0, 10);
+    return (meta.shifts ?? [])
+      .filter((shift) => shift.shiftDate >= today)
+      .sort((a, b) => a.shiftDate.localeCompare(b.shiftDate))
+      .slice(0, limit);
   }
 
-  getAttendanceIssues(): StaffRecord[] {
-    return this.records.filter((r) =>
-      r.attendance.some((a) => a.status === "late" || a.status === "absent"),
+  async getAttendanceIssues(scope: StaffTenantScope): Promise<StaffRecord[]> {
+    const records = await this.listRecords(scope);
+    return records.filter((record) =>
+      record.attendance.some(
+        (entry) =>
+          entry.status === ATTENDANCE_STATUSES.LATE ||
+          entry.status === ATTENDANCE_STATUSES.ABSENT,
+      ),
     );
   }
 }

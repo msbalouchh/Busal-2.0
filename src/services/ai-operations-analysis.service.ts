@@ -1,5 +1,8 @@
 import "server-only";
 
+/** Orchestrates domain AI inference via delegated services. */
+
+
 import { prisma } from "@/lib/prisma";
 import { generateWorkflowInsights } from "@/services/ai-operations-workflow-analysis.service";
 import { generateResourceOptimizationInsights } from "@/services/ai-operations-resource-optimization.service";

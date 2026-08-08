@@ -10,4 +10,8 @@ export {
   generateFinancialReports,
   predictRevenue,
   recommendCostSavings,
+  analyzeExpenses,
+  analyzeProfitability,
+  recommendBudget,
+  detectFinancialRisk,
 } from "@/modules/finance/ai/finance-ai-context";

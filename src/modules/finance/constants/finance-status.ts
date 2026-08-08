@@ -5,6 +5,7 @@ export const ACCOUNT_TYPES = {
   EQUITY: "equity",
   REVENUE: "revenue",
   EXPENSE: "expense",
+  COGS: "cogs",
 } as const;
 
 export type AccountType = (typeof ACCOUNT_TYPES)[keyof typeof ACCOUNT_TYPES];
@@ -115,6 +116,10 @@ export const FINANCE_AI_TOOL_IDS = {
   GENERATE_REPORTS: "finance.generate-reports",
   PREDICT_REVENUE: "finance.predict-revenue",
   RECOMMEND_SAVINGS: "finance.recommend-savings",
+  ANALYZE_EXPENSES: "finance.analyze-expenses",
+  ANALYZE_PROFITABILITY: "finance.analyze-profitability",
+  RECOMMEND_BUDGET: "finance.recommend-budget",
+  DETECT_FINANCIAL_RISK: "finance.detect-financial-risk",
 } as const;
 
 export type FinanceAiToolId = (typeof FINANCE_AI_TOOL_IDS)[keyof typeof FINANCE_AI_TOOL_IDS];
@@ -148,6 +153,7 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   equity: "Equity",
   revenue: "Revenue",
   expense: "Expense",
+  cogs: "Cost of Goods Sold",
 };
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {

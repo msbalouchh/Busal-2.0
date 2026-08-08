@@ -12,7 +12,7 @@ export function DashboardPageHeading({ title, description, className }: Dashboar
     <div className={cn("space-y-1", className)}>
       <h2 className="text-lg font-semibold tracking-tight sm:text-xl">{title}</h2>
       {description ? (
-        <p className="text-muted-foreground text-sm text-pretty">{description}</p>
+        <p className="text-muted-foreground text-sm leading-relaxed">{description}</p>
       ) : null}
     </div>
   );

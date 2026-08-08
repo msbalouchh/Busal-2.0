@@ -27,6 +27,9 @@ const CATEGORY_VARIANT: Record<
   ai: "default",
   erp: "secondary",
   custom: "outline",
+  productivity: "secondary",
+  analytics: "default",
+  automation: "outline",
 };
 
 export function IntegrationCategoryBadge({ category, className }: IntegrationCategoryBadgeProps) {

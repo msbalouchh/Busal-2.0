@@ -11,13 +11,16 @@ interface KitchenStatusBadgeProps {
 }
 
 const STATUS_VARIANT: Record<KitchenStatus, "default" | "secondary" | "outline" | "destructive"> = {
+  pending: "outline",
   queued: "outline",
   accepted: "secondary",
   preparing: "default",
   ready: "default",
   served: "secondary",
+  completed: "secondary",
   delayed: "destructive",
   cancelled: "destructive",
+  held: "destructive",
 };
 
 export function KitchenStatusBadge({ status, className }: KitchenStatusBadgeProps) {

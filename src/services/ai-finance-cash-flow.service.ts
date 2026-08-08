@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getRevopsDashboard, getRevenueAnalytics } from "@/services/revops.service";
 import { getFinancialReport } from "@/services/reporting.service";
 import { createFinanceInsight } from "@/services/ai-finance-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -43,36 +44,20 @@ export async function getCashFlowSnapshot(ownerId: string): Promise<CashFlowSnap
 }
 
 export async function generateCashFlowInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getCashFlowSnapshot(ownerId);
-  let created = 0;
-
-  await createFinanceInsight(businessId, {
-    title: "Cash flow summary",
-    description: `Net cash flow: £${(snapshot.netCashFlowPence / 100).toFixed(2)}. Outstanding receivables: £${(snapshot.outstandingPence / 100).toFixed(2)}.`,
-    category: "cash_flow",
-    priority: snapshot.netCashFlowPence < 0 ? "CRITICAL" : "MEDIUM",
-    recommendation:
-      snapshot.netCashFlowPence < 0
-        ? "Negative cash flow — accelerate collections and defer non-essential spending."
-        : "Maintain collection discipline and monitor outstanding invoices weekly.",
-    metadata: { netCashFlowPence: snapshot.netCashFlowPence },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "finance",
+    task: "cash-flow-insights",
+    loadContext: getCashFlowSnapshot,
+    persistInsight: (businessId, insight) =>
+      createFinanceInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "cash_flow",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  if (snapshot.overdueInvoices > 0) {
-    await createFinanceInsight(businessId, {
-      title: "Overdue invoices impacting cash flow",
-      description: `${snapshot.overdueInvoices} invoices are overdue.`,
-      category: "invoice",
-      priority: "HIGH",
-      recommendation: "Follow up on overdue invoices and escalate open collection cases.",
-      metadata: { overdueInvoices: snapshot.overdueInvoices },
-    });
-    created += 1;
-  }
-
-  return created;
 }
 
 export async function analyzePaymentTrends(ownerId: string) {
@@ -96,22 +81,18 @@ export async function analyzePaymentTrends(ownerId: string) {
 }
 
 export async function generatePaymentInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const trends = await analyzePaymentTrends(ownerId);
-  let created = 0;
-
-  if (trends.length > 0) {
-    const top = trends.sort((a, b) => b.totalPence - a.totalPence)[0]!;
-    await createFinanceInsight(businessId, {
-      title: "Payment method analysis",
-      description: `Primary payment method: ${top.method} (${top.count} transactions this month).`,
-      category: "payment",
-      priority: "LOW",
-      recommendation: "Ensure payment processing fees align with your most-used methods.",
-      metadata: { topMethod: top.method },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "finance",
+    task: "payment-insights",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createFinanceInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "payment",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+  });
 }

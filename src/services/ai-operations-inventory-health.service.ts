@@ -3,6 +3,7 @@ import "server-only";
 import { getInventoryDashboard } from "@/services/restaurant-analytics.service";
 import { getInventoryDashboard as getLegacyInventoryDashboard } from "@/services/inventory.service";
 import { createOperationInsight } from "@/services/ai-operations-efficiency-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import {
   defaultAnalyticsFilters,
   getOwnedBusinessId,
@@ -42,33 +43,18 @@ export async function getInventoryHealthSnapshot(
 }
 
 export async function generateInventoryHealthInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getInventoryHealthSnapshot(ownerId);
-  let created = 0;
-
-  if (snapshot.lowStockCount > 0) {
-    await createOperationInsight(businessId, {
-      title: "Inventory shortages affecting operations",
-      description: `${snapshot.lowStockCount} items at or below reorder level.`,
-      category: "inventory",
-      priority: snapshot.lowStockCount > 5 ? "CRITICAL" : "HIGH",
-      recommendation: snapshot.affectedItems.slice(0, 5).join(", ") || "Review purchase orders.",
-      metadata: { lowStockCount: snapshot.lowStockCount },
-    });
-    created += 1;
-  }
-
-  if (snapshot.outOfStockCount > 0) {
-    await createOperationInsight(businessId, {
-      title: "Out-of-stock items",
-      description: `${snapshot.outOfStockCount} ingredients out of stock.`,
-      category: "inventory",
-      priority: "CRITICAL",
-      recommendation: "Expedite purchase orders and update menu availability.",
-      metadata: { outOfStockCount: snapshot.outOfStockCount },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "operations",
+    task: "inventory-health-insights",
+    loadContext: getInventoryHealthSnapshot,
+    persistInsight: (businessId, insight) =>
+      createOperationInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "inventory",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+  });
 }

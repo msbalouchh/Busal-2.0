@@ -5,6 +5,8 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient() {
+  // Use DATABASE_URL pooler (port 6543) for runtime queries.
+  // Use DIRECT_URL (port 5432) only for migrations via schema.prisma.
   return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });

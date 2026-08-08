@@ -85,6 +85,17 @@ export async function getGoogleSignInUrl() {
   return parseAuthResponse<{ url: string }>(response);
 }
 
+export async function resendVerificationEmail(email: string) {
+  const response = await fetch(API_ROUTES.resendVerification, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email }),
+  });
+
+  return parseAuthResponse<{ message: string }>(response);
+}
+
 export async function fetchSession() {
   const response = await fetch(API_ROUTES.session, {
     method: "GET",

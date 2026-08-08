@@ -1,6 +1,6 @@
 import "server-only";
 
-import { type FulfilmentType, type PaymentMethod, type Prisma } from "@prisma/client";
+import { type FulfilmentType, type OrderType, type PaymentMethod, type Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
 import { prisma } from "@/lib/prisma";
@@ -142,14 +142,14 @@ function completedOrderWhere(
   businessId: string,
   branchId: string | null = null,
   range?: DateRange,
-): Prisma.LegacyOrderWhereInput {
+): Prisma.RestaurantOrderWhereInput {
   return {
     businessId,
     ...branchFilter(branchId),
     status: "COMPLETED",
     ...(range
       ? {
-          createdAt: {
+          completedAt: {
             gte: range.from,
             lte: range.to,
           },
@@ -158,8 +158,12 @@ function completedOrderWhere(
   };
 }
 
+function mapOrderTypeToFulfilment(type: OrderType): FulfilmentType {
+  return type as FulfilmentType;
+}
+
 function sumOrderMetrics(
-  orders: Array<{ subtotal: Prisma.Decimal; total: Prisma.Decimal }>,
+  orders: Array<{ subtotal: Prisma.Decimal; totalAmount: Prisma.Decimal }>,
 ): SalesMetrics {
   const totalOrders = orders.length;
 
@@ -176,7 +180,10 @@ function sumOrderMetrics(
     (sum, order) => sum + moneyDecimalToPence(order.subtotal),
     0,
   );
-  const netRevenuePence = orders.reduce((sum, order) => sum + moneyDecimalToPence(order.total), 0);
+  const netRevenuePence = orders.reduce(
+    (sum, order) => sum + moneyDecimalToPence(order.totalAmount),
+    0,
+  );
 
   return {
     grossRevenuePence,
@@ -191,9 +198,9 @@ async function getSalesMetricsForRange(
   range: DateRange,
   branchId: string | null = null,
 ): Promise<SalesMetrics> {
-  const orders = await prisma.legacyOrder.findMany({
+  const orders = await prisma.restaurantOrder.findMany({
     where: completedOrderWhere(businessId, branchId, range),
-    select: { subtotal: true, total: true },
+    select: { subtotal: true, totalAmount: true },
   });
 
   return sumOrderMetrics(orders);
@@ -228,47 +235,47 @@ export async function getOrderAnalytics(
   const effectiveRange = range ?? getDateRangeForPeriod("month");
 
   const [orders, payments, cancelledCount, refundPayments] = await Promise.all([
-    prisma.legacyOrder.findMany({
+    prisma.restaurantOrder.findMany({
       where: {
         businessId,
         ...branchFilter(branchId),
-        createdAt: { gte: effectiveRange.from, lte: effectiveRange.to },
+        placedAt: { gte: effectiveRange.from, lte: effectiveRange.to },
       },
       select: {
         id: true,
         status: true,
-        fulfilmentType: true,
-        createdAt: true,
+        orderType: true,
+        placedAt: true,
       },
     }),
-    prisma.payment.findMany({
+    prisma.orderPayment.findMany({
       where: {
         businessId,
         ...branchFilter(branchId),
         createdAt: { gte: effectiveRange.from, lte: effectiveRange.to },
       },
       select: {
-        method: true,
-        amount: true,
+        paymentMethod: true,
+        amountPaid: true,
         status: true,
       },
     }),
-    prisma.legacyOrder.count({
+    prisma.restaurantOrder.count({
       where: {
         businessId,
         ...branchFilter(branchId),
         status: "CANCELLED",
-        createdAt: { gte: effectiveRange.from, lte: effectiveRange.to },
+        placedAt: { gte: effectiveRange.from, lte: effectiveRange.to },
       },
     }),
-    prisma.payment.findMany({
+    prisma.orderPayment.findMany({
       where: {
         businessId,
         ...branchFilter(branchId),
         status: "REFUNDED",
         createdAt: { gte: effectiveRange.from, lte: effectiveRange.to },
       },
-      select: { amount: true },
+      select: { amountPaid: true },
     }),
   ]);
 
@@ -277,25 +284,27 @@ export async function getOrderAnalytics(
   const dayBuckets = dayLabels.map((day) => ({ day, count: 0 }));
 
   for (const order of orders.filter((entry) => entry.status === "COMPLETED")) {
-    hourBuckets[order.createdAt.getHours()]!.count += 1;
+    hourBuckets[order.placedAt.getHours()]!.count += 1;
 
-    const jsDay = order.createdAt.getDay();
+    const jsDay = order.placedAt.getDay();
     const index = jsDay === 0 ? 6 : jsDay - 1;
     dayBuckets[index]!.count += 1;
   }
 
   const paymentMethodMap = new Map<PaymentMethod, { count: number; totalPence: number }>();
-  for (const payment of payments.filter((entry) => entry.status === "COMPLETED")) {
-    const existing = paymentMethodMap.get(payment.method) ?? { count: 0, totalPence: 0 };
-    paymentMethodMap.set(payment.method, {
+  for (const payment of payments.filter((entry) => entry.status === "PAID")) {
+    const method = payment.paymentMethod as PaymentMethod;
+    const existing = paymentMethodMap.get(method) ?? { count: 0, totalPence: 0 };
+    paymentMethodMap.set(method, {
       count: existing.count + 1,
-      totalPence: existing.totalPence + payment.amount,
+      totalPence: existing.totalPence + moneyDecimalToPence(payment.amountPaid),
     });
   }
 
   const fulfilmentMap = new Map<FulfilmentType, number>();
   for (const order of orders.filter((entry) => entry.status === "COMPLETED")) {
-    fulfilmentMap.set(order.fulfilmentType, (fulfilmentMap.get(order.fulfilmentType) ?? 0) + 1);
+    const fulfilmentType = mapOrderTypeToFulfilment(order.orderType);
+    fulfilmentMap.set(fulfilmentType, (fulfilmentMap.get(fulfilmentType) ?? 0) + 1);
   }
 
   return {
@@ -310,7 +319,10 @@ export async function getOrderAnalytics(
       count,
     })),
     cancelledOrders: cancelledCount,
-    refundsPence: refundPayments.reduce((sum, payment) => sum + payment.amount, 0),
+    refundsPence: refundPayments.reduce(
+      (sum, payment) => sum + moneyDecimalToPence(payment.amountPaid),
+      0,
+    ),
     refundCount: refundPayments.length,
   };
 }
@@ -320,16 +332,16 @@ async function aggregateProductItems(
   range: DateRange,
   branchId: string | null = null,
 ): Promise<ProductAnalyticsItem[]> {
-  const items = await prisma.legacyOrderItem.findMany({
+  const items = await prisma.restaurantOrderItem.findMany({
     where: {
       order: completedOrderWhere(businessId, branchId, range),
     },
     select: {
-      menuItemId: true,
-      nameSnapshot: true,
+      productId: true,
+      productNameSnapshot: true,
       quantity: true,
-      totalPrice: true,
-      menuItem: {
+      totalAmount: true,
+      product: {
         select: {
           category: { select: { name: true } },
         },
@@ -340,18 +352,18 @@ async function aggregateProductItems(
   const map = new Map<string, ProductAnalyticsItem>();
 
   for (const item of items) {
-    const existing = map.get(item.menuItemId) ?? {
-      menuItemId: item.menuItemId,
-      name: item.nameSnapshot,
-      categoryName: item.menuItem.category?.name ?? null,
+    const existing = map.get(item.productId) ?? {
+      menuItemId: item.productId,
+      name: item.productNameSnapshot,
+      categoryName: item.product.category?.name ?? null,
       quantitySold: 0,
       revenuePence: 0,
     };
 
-    map.set(item.menuItemId, {
+    map.set(item.productId, {
       ...existing,
       quantitySold: existing.quantitySold + item.quantity,
-      revenuePence: existing.revenuePence + moneyDecimalToPence(item.totalPrice),
+      revenuePence: existing.revenuePence + moneyDecimalToPence(item.totalAmount),
     });
   }
 
@@ -407,9 +419,9 @@ export async function getCustomerAnalytics(
       name: true,
       loyaltyPoints: true,
       createdAt: true,
-      legacyOrders: {
+      restaurantOrders: {
         where: { status: "COMPLETED", ...branchFilter(branchId) },
-        select: { total: true, createdAt: true },
+        select: { totalAmount: true, completedAt: true, placedAt: true },
       },
     },
   });
@@ -418,10 +430,10 @@ export async function getCustomerAnalytics(
     (customer) => customer.createdAt >= effectiveRange.from,
   ).length;
   const returningCustomers = customers.filter(
-    (customer) => customer.legacyOrders.length > 1,
+    (customer) => customer.restaurantOrders.length > 1,
   ).length;
   const customersWithOrders = customers.filter(
-    (customer) => customer.legacyOrders.length > 0,
+    (customer) => customer.restaurantOrders.length > 0,
   ).length;
   const retentionRatePercent =
     customersWithOrders === 0 ? 0 : Math.round((returningCustomers / customersWithOrders) * 100);
@@ -430,8 +442,8 @@ export async function getCustomerAnalytics(
     .map((customer) => ({
       id: customer.id,
       name: customer.name,
-      totalSpentPence: customer.legacyOrders.reduce(
-        (sum, order) => sum + moneyDecimalToPence(order.total),
+      totalSpentPence: customer.restaurantOrders.reduce(
+        (sum, order) => sum + moneyDecimalToPence(order.totalAmount),
         0,
       ),
     }))
@@ -534,34 +546,35 @@ export async function getStaffAnalytics(
 ): Promise<StaffAnalyticsItem[]> {
   const effectiveRange = range ?? getDateRangeForPeriod("month");
 
-  const payments = await prisma.payment.findMany({
+  const payments = await prisma.orderPayment.findMany({
     where: {
       businessId,
       ...branchFilter(branchId),
-      status: "COMPLETED",
-      staffId: { not: null },
+      status: "PAID",
+      processedByStaffId: { not: null },
       createdAt: { gte: effectiveRange.from, lte: effectiveRange.to },
     },
     select: {
-      staffId: true,
-      amount: true,
+      processedByStaffId: true,
+      amountPaid: true,
       orderId: true,
-      staff: { select: { firstName: true, lastName: true } },
+      processedBy: { select: { firstName: true, lastName: true } },
     },
   });
 
-  const kitchenQueues = await prisma.kitchenQueue.findMany({
+  const restaurantOrders = await prisma.restaurantOrder.findMany({
     where: {
       businessId,
       ...branchFilter(branchId),
-      queuedAt: { gte: effectiveRange.from, lte: effectiveRange.to },
-      servedAt: { not: null },
+      kitchenServedAt: { not: null, gte: effectiveRange.from, lte: effectiveRange.to },
+      placedAt: { gte: effectiveRange.from, lte: effectiveRange.to },
     },
     select: {
-      orderId: true,
-      queuedAt: true,
-      servedAt: true,
-      order: { select: { payments: { select: { staffId: true } } } },
+      id: true,
+      placedAt: true,
+      kitchenServedAt: true,
+      staffId: true,
+      staff: { select: { firstName: true, lastName: true } },
     },
   });
 
@@ -576,37 +589,38 @@ export async function getStaffAnalytics(
   >();
 
   for (const payment of payments) {
-    if (!payment.staffId || !payment.staff) {
+    if (!payment.processedByStaffId || !payment.processedBy) {
       continue;
     }
 
-    const existing = staffMap.get(payment.staffId) ?? {
-      staffName: `${payment.staff.firstName} ${payment.staff.lastName}`.trim(),
+    const existing = staffMap.get(payment.processedByStaffId) ?? {
+      staffName: `${payment.processedBy.firstName} ${payment.processedBy.lastName}`.trim(),
       orderIds: new Set<string>(),
       salesProcessedPence: 0,
       processingMinutes: [],
     };
 
     existing.orderIds.add(payment.orderId);
-    existing.salesProcessedPence += payment.amount;
-    staffMap.set(payment.staffId, existing);
+    existing.salesProcessedPence += moneyDecimalToPence(payment.amountPaid);
+    staffMap.set(payment.processedByStaffId, existing);
   }
 
-  for (const queue of kitchenQueues) {
-    if (!queue.servedAt) {
+  for (const order of restaurantOrders) {
+    if (!order.kitchenServedAt || !order.staffId) {
       continue;
     }
 
-    const minutes = (queue.servedAt.getTime() - queue.queuedAt.getTime()) / 60000;
-    const staffId = queue.order.payments.find((payment) => payment.staffId)?.staffId;
-
-    if (!staffId) {
-      continue;
-    }
-
-    const existing = staffMap.get(staffId);
+    const minutes = (order.kitchenServedAt.getTime() - order.placedAt.getTime()) / 60000;
+    const existing = staffMap.get(order.staffId);
     if (existing) {
       existing.processingMinutes.push(minutes);
+    } else if (order.staff) {
+      staffMap.set(order.staffId, {
+        staffName: `${order.staff.firstName} ${order.staff.lastName}`.trim(),
+        orderIds: new Set([order.id]),
+        salesProcessedPence: 0,
+        processingMinutes: [minutes],
+      });
     }
   }
 
@@ -644,31 +658,35 @@ export async function getFinancialReport(
   const range = getDateRangeForPeriod(mappedPeriod);
 
   const [orders, payments] = await Promise.all([
-    prisma.legacyOrder.findMany({
+    prisma.restaurantOrder.findMany({
       where: completedOrderWhere(businessId, branchId, range),
-      select: { subtotal: true, total: true, tax: true, discount: true },
+      select: { subtotal: true, totalAmount: true, taxAmount: true, discountAmount: true },
     }),
-    prisma.payment.findMany({
+    prisma.orderPayment.findMany({
       where: {
         businessId,
         ...branchFilter(branchId),
-        status: "COMPLETED",
+        status: "PAID",
         createdAt: { gte: range.from, lte: range.to },
       },
-      select: { method: true, amount: true },
+      select: { paymentMethod: true, amountPaid: true },
     }),
   ]);
 
   const metrics = sumOrderMetrics(orders);
-  const taxPence = orders.reduce((sum, order) => sum + moneyDecimalToPence(order.tax), 0);
-  const discountPence = orders.reduce((sum, order) => sum + moneyDecimalToPence(order.discount), 0);
+  const taxPence = orders.reduce((sum, order) => sum + moneyDecimalToPence(order.taxAmount), 0);
+  const discountPence = orders.reduce(
+    (sum, order) => sum + moneyDecimalToPence(order.discountAmount),
+    0,
+  );
 
   const paymentMethodMap = new Map<PaymentMethod, { count: number; totalPence: number }>();
   for (const payment of payments) {
-    const existing = paymentMethodMap.get(payment.method) ?? { count: 0, totalPence: 0 };
-    paymentMethodMap.set(payment.method, {
+    const method = payment.paymentMethod as PaymentMethod;
+    const existing = paymentMethodMap.get(method) ?? { count: 0, totalPence: 0 };
+    paymentMethodMap.set(method, {
       count: existing.count + 1,
-      totalPence: existing.totalPence + payment.amount,
+      totalPence: existing.totalPence + moneyDecimalToPence(payment.amountPaid),
     });
   }
 

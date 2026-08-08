@@ -1,15 +1,23 @@
+import "server-only";
+
+import type { Prisma } from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
+import { runInteractiveTransaction } from "@/lib/prisma-transaction";
+import type { InventoryTenantScope } from "@/modules/inventory/lib/inventory-scope";
 import {
-  INVENTORY_STOCK_STATUSES,
-  PURCHASE_ORDER_STATUSES,
-} from "@/modules/inventory/constants/inventory-status";
-import {
-  DEFAULT_INVENTORY_SCOPE,
-  MOCK_INVENTORY_CATEGORIES,
-  MOCK_INVENTORY_LOCATIONS,
-  MOCK_INVENTORY_RECORDS,
-  MOCK_INVENTORY_SUPPLIERS,
-  MOCK_PURCHASE_ORDERS,
-} from "@/modules/inventory/constants/mock-data";
+  defaultBranchInventoryMeta,
+  mapIngredientCategory,
+  mapInventoryItemToRecord,
+  mapPurchaseOrder,
+  mapRecipeMappings,
+  mapStringCategory,
+  mapSupplier,
+  synthesizeGrnFromReceive,
+  type PurchaseOrderWithRelations,
+  type RecipeWithRelations,
+  type StoredInventoryBranchMeta,
+} from "@/modules/inventory/lib/inventory-mappers";
 import type {
   CreateInventoryItemInput,
   CreatePurchaseOrderInput,
@@ -19,350 +27,813 @@ import type {
   InventorySearchQuery,
   InventorySupplier,
   PurchaseOrder,
+  RecipeIngredientMapping,
   RecordWasteInput,
   UpdateStockInput,
 } from "@/modules/inventory/types/inventory-platform";
+import type {
+  CreateInventoryItemSchemaInput,
+  CreateInventoryPurchaseOrderSchemaInput,
+  CreateInventoryTransferSchemaInput,
+  InventoryBulkActionSchemaInput,
+  InventorySearchSchemaInput,
+  ReceiveInventoryGoodsSchemaInput,
+  RecordInventoryWasteSchemaInput,
+  UpdateInventoryItemSchemaInput,
+  UpdateInventoryStockSchemaInput,
+} from "@/modules/inventory/validation/inventory-schemas";
+import { applyStockChange } from "@/services/restaurant-inventory.service";
 
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const DEFAULT_PAGE_SIZE = 25;
+
+const itemInclude = {
+  transactions: {
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  },
+} satisfies Prisma.InventoryItemInclude;
+
+const purchaseOrderInclude = {
+  supplier: { select: { id: true, name: true } },
+  items: {
+    include: {
+      inventoryItem: { select: { id: true, name: true, sku: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  },
+} satisfies Prisma.PurchaseOrderInclude;
+
+const recipeInclude = {
+  menuItem: { select: { id: true, name: true } },
+  lines: {
+    include: {
+      ingredient: { select: { id: true, name: true } },
+    },
+  },
+} satisfies Prisma.RecipeInclude;
+
+export interface InventorySearchResult {
+  records: InventoryRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
-function resolveStockStatus(
-  quantity: number,
-  reorderPoint: number,
-): InventoryRecord["item"]["status"] {
-  if (quantity <= 0) {
-    return INVENTORY_STOCK_STATUSES.OUT_OF_STOCK;
-  }
-
-  if (quantity <= reorderPoint) {
-    return INVENTORY_STOCK_STATUSES.LOW_STOCK;
-  }
-
-  return INVENTORY_STOCK_STATUSES.IN_STOCK;
+function roundQuantity(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
 }
 
-/** In-memory inventory repository (mock only, no backend). */
+function scopeItemWhere(
+  scope: InventoryTenantScope,
+  includeArchived = false,
+): Prisma.InventoryItemWhereInput {
+  return {
+    businessId: scope.businessId,
+    branchId: scope.branchId,
+    ...(includeArchived ? {} : { deletedAt: null, status: { not: "ARCHIVED" } }),
+  };
+}
+
+function itemOrderBy(
+  sortBy?: InventorySearchSchemaInput["sortBy"],
+  sortDirection?: InventorySearchSchemaInput["sortDirection"],
+): Prisma.InventoryItemOrderByWithRelationInput {
+  const direction = sortDirection === "asc" ? "asc" : "desc";
+
+  switch (sortBy) {
+    case "sku":
+      return { sku: direction };
+    case "stock":
+      return { currentStock: direction };
+    case "updatedAt":
+      return { updatedAt: direction };
+    case "name":
+    default:
+      return { name: direction };
+  }
+}
+
+/** Prisma-backed inventory repository with tenant scoping. */
 export class InventoryRepository {
-  private records: InventoryRecord[] = structuredClone(MOCK_INVENTORY_RECORDS);
-  private categories: InventoryCategory[] = structuredClone(MOCK_INVENTORY_CATEGORIES);
-  private locations: InventoryLocation[] = structuredClone(MOCK_INVENTORY_LOCATIONS);
-  private suppliers: InventorySupplier[] = structuredClone(MOCK_INVENTORY_SUPPLIERS);
-  private purchaseOrders: PurchaseOrder[] = structuredClone(MOCK_PURCHASE_ORDERS);
+  private async loadBranchMeta(scope: InventoryTenantScope): Promise<StoredInventoryBranchMeta> {
+    const settings = await prisma.branchSettings.findUnique({
+      where: { branchId: scope.branchId },
+      select: { settings: true },
+    });
 
-  listRecords(): InventoryRecord[] {
-    return structuredClone(this.records);
-  }
-
-  listCategories(): InventoryCategory[] {
-    return structuredClone(this.categories);
-  }
-
-  listLocations(): InventoryLocation[] {
-    return structuredClone(this.locations);
-  }
-
-  listSuppliers(): InventorySupplier[] {
-    return structuredClone(this.suppliers);
-  }
-
-  listPurchaseOrders(): PurchaseOrder[] {
-    return structuredClone(this.purchaseOrders);
-  }
-
-  findById(itemId: string): InventoryRecord | undefined {
-    return this.records.find((record) => record.item.id === itemId);
-  }
-
-  search(query: InventorySearchQuery = {}): InventoryRecord[] {
-    let results = this.listRecords();
-
-    if (query.tenantId) {
-      results = results.filter((r) => r.item.tenantId === query.tenantId);
+    const raw = settings?.settings;
+    if (raw && typeof raw === "object" && raw !== null && "inventoryOperations" in raw) {
+      return (raw as unknown as { inventoryOperations: StoredInventoryBranchMeta }).inventoryOperations;
     }
 
-    if (query.businessId) {
-      results = results.filter((r) => r.item.businessId === query.businessId);
+    return defaultBranchInventoryMeta(scope);
+  }
+
+  private async saveBranchMeta(
+    scope: InventoryTenantScope,
+    meta: StoredInventoryBranchMeta,
+  ): Promise<void> {
+    const existing = await prisma.branchSettings.findUnique({
+      where: { branchId: scope.branchId },
+      select: { settings: true },
+    });
+
+    const settingsObject =
+      existing?.settings && typeof existing.settings === "object" && existing.settings !== null
+        ? (existing.settings as Record<string, unknown>)
+        : {};
+
+    await prisma.branchSettings.upsert({
+      where: { branchId: scope.branchId },
+      create: {
+        branchId: scope.branchId,
+        settings: { ...settingsObject, inventoryOperations: meta } as unknown as Prisma.InputJsonValue,
+      },
+      update: {
+        settings: { ...settingsObject, inventoryOperations: meta } as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  private async loadCategories(scope: InventoryTenantScope): Promise<InventoryCategory[]> {
+    const [ingredientCategories, itemCategories] = await Promise.all([
+      prisma.ingredientCategory.findMany({
+        where: { businessId: scope.businessId },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      }),
+      prisma.inventoryItem.findMany({
+        where: scopeItemWhere(scope, true),
+        select: { category: true },
+        distinct: ["category"],
+      }),
+    ]);
+
+    const categories = ingredientCategories.map((category) =>
+      mapIngredientCategory(scope, category),
+    );
+
+    for (const entry of itemCategories) {
+      if (!entry.category) {
+        continue;
+      }
+
+      const mapped = mapStringCategory(scope, entry.category);
+      if (!categories.some((category) => category.id === mapped.id)) {
+        categories.push(mapped);
+      }
     }
 
-    if (query.branchId) {
-      results = results.filter((r) => r.item.branchId === query.branchId);
+    return categories;
+  }
+
+  private async loadRecipeMappings(scope: InventoryTenantScope): Promise<RecipeIngredientMapping[]> {
+    const recipes = await prisma.recipe.findMany({
+      where: { businessId: scope.businessId },
+      include: recipeInclude,
+    });
+
+    return mapRecipeMappings(recipes as RecipeWithRelations[]);
+  }
+
+  private async buildRecord(
+    scope: InventoryTenantScope,
+    itemId: string,
+    branchMeta: StoredInventoryBranchMeta,
+    categories: InventoryCategory[],
+    recipeMappings: RecipeIngredientMapping[],
+  ): Promise<InventoryRecord | null> {
+    const item = await prisma.inventoryItem.findFirst({
+      where: { id: itemId, ...scopeItemWhere(scope, true) },
+      include: itemInclude,
+    });
+
+    if (!item) {
+      return null;
+    }
+
+    return mapInventoryItemToRecord(scope, item, branchMeta, categories, recipeMappings);
+  }
+
+  async listRecords(scope: InventoryTenantScope): Promise<InventoryRecord[]> {
+    const [branchMeta, categories, recipeMappings, items] = await Promise.all([
+      this.loadBranchMeta(scope),
+      this.loadCategories(scope),
+      this.loadRecipeMappings(scope),
+      prisma.inventoryItem.findMany({
+        where: scopeItemWhere(scope),
+        include: itemInclude,
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    return items.map((item) =>
+      mapInventoryItemToRecord(scope, item, branchMeta, categories, recipeMappings),
+    );
+  }
+
+  async search(
+    scope: InventoryTenantScope,
+    query: InventorySearchQuery | InventorySearchSchemaInput = {},
+  ): Promise<InventorySearchResult> {
+    const page = "page" in query && query.page ? query.page : 1;
+    const pageSize =
+      "limit" in query && query.limit
+        ? query.limit
+        : "pageSize" in query && query.pageSize
+          ? query.pageSize
+          : DEFAULT_PAGE_SIZE;
+    const where: Prisma.InventoryItemWhereInput = {
+      ...scopeItemWhere(scope, "includeArchived" in query ? query.includeArchived : false),
+    };
+
+    if (query.query) {
+      where.OR = [
+        { name: { contains: query.query, mode: "insensitive" } },
+        { sku: { contains: query.query, mode: "insensitive" } },
+        { barcode: { contains: query.query, mode: "insensitive" } },
+      ];
     }
 
     if (query.categoryId) {
-      results = results.filter((r) => r.item.categoryId === query.categoryId);
+      const categories = await this.loadCategories(scope);
+      const category = categories.find((entry) => entry.id === query.categoryId);
+      if (category) {
+        where.category = category.name;
+      }
     }
 
-    if (query.locationId) {
-      results = results.filter((r) => r.stocks.some((s) => s.locationId === query.locationId));
-    }
+    const [branchMeta, categories, recipeMappings, total, items] = await Promise.all([
+      this.loadBranchMeta(scope),
+      this.loadCategories(scope),
+      this.loadRecipeMappings(scope),
+      prisma.inventoryItem.count({ where }),
+      prisma.inventoryItem.findMany({
+        where,
+        include: itemInclude,
+        orderBy: itemOrderBy(
+          "sortBy" in query ? query.sortBy : undefined,
+          "sortDirection" in query ? query.sortDirection : undefined,
+        ),
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    let records = items.map((item) =>
+      mapInventoryItemToRecord(scope, item, branchMeta, categories, recipeMappings),
+    );
 
     if (query.status) {
-      results = results.filter((r) => r.item.status === query.status);
+      records = records.filter((record) => record.item.status === query.status);
     }
 
     if (query.isPerishable !== undefined) {
-      results = results.filter((r) => r.item.isPerishable === query.isPerishable);
+      records = records.filter((record) => record.item.isPerishable === query.isPerishable);
     }
 
     if (query.isLowStock) {
-      results = results.filter((r) =>
-        r.stocks.some((s) => s.quantityOnHand <= r.item.reorderPoint),
+      records = records.filter((record) => record.lowStockAlerts.length > 0);
+    }
+
+    if (query.locationId) {
+      records = records.filter((record) =>
+        record.stocks.some((stock) => stock.locationId === query.locationId),
       );
     }
 
-    if (query.query) {
-      const term = query.query.toLowerCase();
-      results = results.filter(
-        (r) =>
-          r.item.name.toLowerCase().includes(term) ||
-          r.item.sku.toLowerCase().includes(term) ||
-          (r.item.barcode?.toLowerCase().includes(term) ?? false),
-      );
-    }
-
-    if (query.limit) {
-      results = results.slice(0, query.limit);
-    }
-
-    return results;
+    return {
+      records,
+      total: query.status || query.isLowStock || query.isPerishable ? records.length : total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
-  createItem(input: CreateInventoryItemInput): InventoryRecord {
-    const now = new Date().toISOString();
-    const itemId = createId("inv");
-    const locationId = input.locationId ?? DEFAULT_INVENTORY_SCOPE.defaultLocationId;
-    const initialQty = input.initialQuantity ?? 0;
-    const category = this.categories.find((c) => c.id === input.categoryId)!;
-    const unit = { id: input.unitId, abbreviation: "ea" };
+  async findById(scope: InventoryTenantScope, itemId: string): Promise<InventoryRecord | null> {
+    const [branchMeta, categories, recipeMappings] = await Promise.all([
+      this.loadBranchMeta(scope),
+      this.loadCategories(scope),
+      this.loadRecipeMappings(scope),
+    ]);
 
-    const record: InventoryRecord = {
-      item: {
-        id: itemId,
-        tenantId: DEFAULT_INVENTORY_SCOPE.tenantId,
-        workspaceId: DEFAULT_INVENTORY_SCOPE.workspaceId,
-        businessId: DEFAULT_INVENTORY_SCOPE.businessId,
-        branchId: input.branchId,
-        categoryId: input.categoryId,
-        unitId: input.unitId,
+    return this.buildRecord(scope, itemId, branchMeta, categories, recipeMappings);
+  }
+
+  async listCategories(scope: InventoryTenantScope): Promise<InventoryCategory[]> {
+    return this.loadCategories(scope);
+  }
+
+  async listLocations(scope: InventoryTenantScope): Promise<InventoryLocation[]> {
+    const meta = await this.loadBranchMeta(scope);
+    return meta.locations ?? [];
+  }
+
+  async listSuppliers(scope: InventoryTenantScope): Promise<InventorySupplier[]> {
+    const suppliers = await prisma.supplier.findMany({
+      where: { businessId: scope.businessId, deletedAt: null },
+      orderBy: { name: "asc" },
+    });
+
+    return suppliers.map((supplier) => mapSupplier(scope, supplier));
+  }
+
+  async listPurchaseOrders(scope: InventoryTenantScope): Promise<PurchaseOrder[]> {
+    const orders = await prisma.purchaseOrder.findMany({
+      where: { businessId: scope.businessId, branchId: scope.branchId },
+      include: purchaseOrderInclude,
+      orderBy: { createdAt: "desc" },
+    });
+
+    return orders.map((order) => mapPurchaseOrder(scope, order as PurchaseOrderWithRelations));
+  }
+
+  async listRecipeMappings(scope: InventoryTenantScope): Promise<RecipeIngredientMapping[]> {
+    return this.loadRecipeMappings(scope);
+  }
+
+  async createItem(
+    scope: InventoryTenantScope,
+    input: CreateInventoryItemInput | CreateInventoryItemSchemaInput,
+  ): Promise<InventoryRecord> {
+    const branchMeta = await this.loadBranchMeta(scope);
+    const categories = await this.loadCategories(scope);
+    const category =
+      categories.find((entry) => entry.id === input.categoryId) ??
+      mapStringCategory(scope, input.categoryId);
+    const unitAbbreviation = input.unitId.replace(/^unit-/, "").replace(/-/g, " ") || "each";
+
+    const existingSku = await prisma.inventoryItem.findFirst({
+      where: {
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+        sku: input.sku,
+        deletedAt: null,
+      },
+    });
+
+    if (existingSku) {
+      throw new Error("SKU already exists for this branch");
+    }
+
+    const initialQty = roundQuantity(input.initialQuantity ?? 0);
+    const item = await prisma.inventoryItem.create({
+      data: {
+        businessId: scope.businessId,
+        branchId: scope.branchId,
         sku: input.sku,
         barcode: input.barcode ?? null,
         name: input.name,
         description: input.description ?? null,
-        status: resolveStockStatus(initialQty, input.reorderPoint),
-        reorderPoint: input.reorderPoint,
-        reorderQuantity: input.reorderQuantity,
-        parLevel: input.parLevel,
-        costPerUnitCents: input.costPerUnitCents,
-        currency: "GBP",
-        isPerishable: input.isPerishable ?? false,
+        category: category.name,
+        unit: unitAbbreviation,
+        currentStock: initialQty,
+        minimumStock: roundQuantity(input.reorderPoint),
+        maximumStock: roundQuantity(input.parLevel),
+        reorderLevel: roundQuantity(input.reorderPoint),
+        averageCost: roundQuantity(input.costPerUnitCents / 100),
+        status: "ACTIVE",
+        trackStock: true,
+      },
+      include: itemInclude,
+    });
+
+    branchMeta.itemMeta = {
+      ...(branchMeta.itemMeta ?? {}),
+      [item.id]: {
+        isPerishable: input.isPerishable,
         shelfLifeDays: input.shelfLifeDays ?? null,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      },
-      category,
-      unit: {
-        id: input.unitId,
-        tenantId: DEFAULT_INVENTORY_SCOPE.tenantId,
-        name: unit.abbreviation,
-        unitType: "each",
-        abbreviation: unit.abbreviation,
-        conversionFactor: 1,
-        baseUnitId: null,
-      },
-      stocks: [
-        {
-          id: createId("stock"),
-          itemId,
-          locationId,
-          tenantId: DEFAULT_INVENTORY_SCOPE.tenantId,
-          businessId: DEFAULT_INVENTORY_SCOPE.businessId,
-          branchId: input.branchId,
-          quantityOnHand: initialQty,
-          quantityReserved: 0,
-          quantityAvailable: initialQty,
-          status: resolveStockStatus(initialQty, input.reorderPoint),
-          lastCountedAt: null,
-          updatedAt: now,
-        },
-      ],
-      batches: [],
-      movements: [],
-      adjustments: [],
-      recipeMappings: [],
-      lowStockAlerts: [],
-      wasteRecords: [],
-      expiryTracking: [],
-      analytics: {
-        itemId,
-        turnoverRate: 0,
-        daysOfSupply: 0,
-        wasteRateBps: 0,
-        stockoutCount: 0,
-        avgCostPerUnitCents: input.costPerUnitCents,
-        totalValueCents: input.costPerUnitCents * initialQty,
-        reorderFrequencyDays: 7,
-      },
-      aiContext: {
-        itemId,
-        summary: `${input.name} (${input.sku})`,
-        demandForecastUnits: input.reorderQuantity,
-        suggestedReorderQuantity: input.reorderQuantity,
-        wasteRiskScore: 0,
-        stockOptimizationScore: 0.5,
-        insights: [],
-        recommendedActions: [],
-        lastGeneratedAt: now,
+        parLevel: input.parLevel,
+        reorderQuantity: input.reorderQuantity,
+        categoryId: category.id,
+        unitId: input.unitId,
       },
     };
+    await this.saveBranchMeta(scope, branchMeta);
 
-    this.records.push(record);
-    return structuredClone(record);
+    if (initialQty > 0) {
+      await applyStockChange(item.id, initialQty, {
+        transactionType: "ADJUSTMENT",
+        notes: "Initial stock",
+        performedByStaffId: scope.userId,
+      });
+    }
+
+    const recipeMappings = await this.loadRecipeMappings(scope);
+    const record = mapInventoryItemToRecord(scope, item, branchMeta, categories, recipeMappings);
+    return record;
   }
 
-  updateStock(input: UpdateStockInput): InventoryRecord | null {
-    const record = this.findById(input.itemId);
+  async updateItem(
+    scope: InventoryTenantScope,
+    input: UpdateInventoryItemSchemaInput,
+  ): Promise<InventoryRecord | null> {
+    const existing = await prisma.inventoryItem.findFirst({
+      where: { id: input.itemId, ...scopeItemWhere(scope, true) },
+    });
 
-    if (!record) {
+    if (!existing) {
       return null;
     }
 
-    const now = new Date().toISOString();
-    const stock = record.stocks.find((s) => s.locationId === input.locationId);
+    const branchMeta = await this.loadBranchMeta(scope);
+    const categories = await this.loadCategories(scope);
+    const meta = branchMeta.itemMeta?.[existing.id] ?? {};
+    const category =
+      input.categoryId !== undefined
+        ? (categories.find((entry) => entry.id === input.categoryId) ??
+          mapStringCategory(scope, input.categoryId))
+        : null;
 
-    if (!stock) {
+    const item = await prisma.inventoryItem.update({
+      where: { id: existing.id },
+      data: {
+        ...(input.sku !== undefined ? { sku: input.sku } : {}),
+        ...(input.barcode !== undefined ? { barcode: input.barcode } : {}),
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(category ? { category: category.name } : {}),
+        ...(input.unitId !== undefined
+          ? { unit: input.unitId.replace(/^unit-/, "").replace(/-/g, " ") || existing.unit }
+          : {}),
+        ...(input.reorderPoint !== undefined
+          ? {
+              minimumStock: roundQuantity(input.reorderPoint),
+              reorderLevel: roundQuantity(input.reorderPoint),
+            }
+          : {}),
+        ...(input.parLevel !== undefined ? { maximumStock: roundQuantity(input.parLevel) } : {}),
+        ...(input.costPerUnitCents !== undefined
+          ? { averageCost: roundQuantity(input.costPerUnitCents / 100) }
+          : {}),
+      },
+      include: itemInclude,
+    });
+
+    branchMeta.itemMeta = {
+      ...(branchMeta.itemMeta ?? {}),
+      [item.id]: {
+        ...meta,
+        ...(input.isPerishable !== undefined ? { isPerishable: input.isPerishable } : {}),
+        ...(input.shelfLifeDays !== undefined ? { shelfLifeDays: input.shelfLifeDays } : {}),
+        ...(input.parLevel !== undefined ? { parLevel: input.parLevel } : {}),
+        ...(input.reorderQuantity !== undefined ? { reorderQuantity: input.reorderQuantity } : {}),
+        ...(category ? { categoryId: category.id } : {}),
+        ...(input.unitId !== undefined ? { unitId: input.unitId } : {}),
+      },
+    };
+    await this.saveBranchMeta(scope, branchMeta);
+
+    const recipeMappings = await this.loadRecipeMappings(scope);
+    return mapInventoryItemToRecord(scope, item, branchMeta, categories, recipeMappings);
+  }
+
+  async archiveItem(scope: InventoryTenantScope, itemId: string): Promise<InventoryRecord | null> {
+    const existing = await prisma.inventoryItem.findFirst({
+      where: { id: itemId, ...scopeItemWhere(scope, true) },
+    });
+
+    if (!existing) {
       return null;
     }
 
-    const quantityBefore = stock.quantityOnHand;
-    stock.quantityOnHand = Math.max(0, quantityBefore + input.quantityDelta);
-    stock.quantityAvailable = Math.max(0, stock.quantityOnHand - stock.quantityReserved);
-    stock.status = resolveStockStatus(stock.quantityOnHand, record.item.reorderPoint);
-    stock.updatedAt = now;
+    await prisma.inventoryItem.update({
+      where: { id: itemId },
+      data: { status: "ARCHIVED", deletedAt: new Date() },
+    });
 
-    record.item.status = stock.status;
-    record.item.updatedAt = now;
+    return this.findById(scope, itemId);
+  }
 
-    record.movements.push({
-      id: createId("mov"),
-      tenantId: record.item.tenantId,
-      businessId: record.item.businessId,
-      branchId: record.item.branchId,
-      itemId: input.itemId,
-      locationId: input.locationId,
-      batchId: input.batchId ?? null,
-      movementType: input.movementType,
-      quantity: input.quantityDelta,
+  async restoreItem(scope: InventoryTenantScope, itemId: string): Promise<InventoryRecord | null> {
+    const existing = await prisma.inventoryItem.findFirst({
+      where: { id: itemId, businessId: scope.businessId, branchId: scope.branchId },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    await prisma.inventoryItem.update({
+      where: { id: itemId },
+      data: { status: "ACTIVE", deletedAt: null },
+    });
+
+    return this.findById(scope, itemId);
+  }
+
+  async bulkAction(
+    scope: InventoryTenantScope,
+    input: InventoryBulkActionSchemaInput,
+  ): Promise<number> {
+    let affected = 0;
+
+    for (const itemId of input.itemIds) {
+      if (input.action === "archive" || input.action === "delete") {
+        const result = await this.archiveItem(scope, itemId);
+        if (result) {
+          affected += 1;
+        }
+      } else if (input.action === "restore") {
+        const result = await this.restoreItem(scope, itemId);
+        if (result) {
+          affected += 1;
+        }
+      }
+    }
+
+    return affected;
+  }
+
+  async updateStock(
+    scope: InventoryTenantScope,
+    input: UpdateStockInput | UpdateInventoryStockSchemaInput,
+  ): Promise<InventoryRecord | null> {
+    const existing = await prisma.inventoryItem.findFirst({
+      where: { id: input.itemId, ...scopeItemWhere(scope) },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    const transactionType =
+      input.movementType === "waste"
+        ? "WASTE"
+        : input.movementType === "receipt"
+          ? "PURCHASE"
+          : input.movementType === "sale"
+            ? "SALE"
+            : input.movementType === "transfer_out" || input.movementType === "transfer_in"
+              ? "TRANSFER"
+              : input.movementType === "return"
+                ? "RETURN"
+                : "ADJUSTMENT";
+
+    await applyStockChange(existing.id, roundQuantity(input.quantityDelta), {
+      transactionType,
       referenceType: input.referenceType ?? null,
       referenceId: input.referenceId ?? null,
       notes: input.notes ?? null,
-      employeeId: input.employeeId,
-      occurredAt: now,
+      performedByStaffId: scope.userId,
     });
 
-    record.analytics.totalValueCents = record.item.costPerUnitCents * stock.quantityOnHand;
-
-    return structuredClone(record);
+    return this.findById(scope, input.itemId);
   }
 
-  recordWaste(input: RecordWasteInput): InventoryRecord | null {
-    const record = this.findById(input.itemId);
+  async recordWaste(
+    scope: InventoryTenantScope,
+    input: RecordWasteInput | RecordInventoryWasteSchemaInput,
+  ): Promise<InventoryRecord | null> {
+    return this.updateStock(scope, {
+      itemId: input.itemId,
+      locationId: input.locationId,
+      quantityDelta: -Math.abs(input.quantity),
+      movementType: "waste",
+      batchId: input.batchId,
+      notes: input.notes ?? `Waste: ${input.reason}`,
+      employeeId: "recordedByEmployeeId" in input ? input.recordedByEmployeeId : scope.userId,
+    });
+  }
 
-    if (!record) {
+  async createPurchaseOrder(
+    scope: InventoryTenantScope,
+    input: CreatePurchaseOrderInput | CreateInventoryPurchaseOrderSchemaInput,
+  ): Promise<PurchaseOrder> {
+    await prisma.supplier.findFirstOrThrow({
+      where: { id: input.supplierId, businessId: scope.businessId, deletedAt: null },
+    });
+
+    const count = await prisma.purchaseOrder.count({ where: { businessId: scope.businessId } });
+    const poNumber = `PO-${String(count + 1).padStart(6, "0")}`;
+    const lineItems = input.lineItems.map((line) => ({
+      quantity: roundQuantity(line.quantity),
+      unitCost: roundQuantity(line.unitCostCents / 100),
+      totalCost: roundQuantity(line.quantity * (line.unitCostCents / 100)),
+      inventoryItemId: line.itemId,
+    }));
+    const subtotal = lineItems.reduce((sum, line) => sum + line.totalCost, 0);
+    const taxAmount = roundQuantity(subtotal * 0.2);
+
+    const order = await prisma.purchaseOrder.create({
+      data: {
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+        supplierId: input.supplierId,
+        purchaseOrderNumber: poNumber,
+        status: "DRAFT",
+        expectedDeliveryDate: input.expectedDeliveryDate
+          ? new Date(input.expectedDeliveryDate)
+          : null,
+        subtotal,
+        taxAmount,
+        totalAmount: roundQuantity(subtotal + taxAmount),
+        notes: input.notes ?? null,
+        items: {
+          create: lineItems,
+        },
+      },
+      include: purchaseOrderInclude,
+    });
+
+    return mapPurchaseOrder(scope, order as PurchaseOrderWithRelations);
+  }
+
+  async receiveGoods(
+    scope: InventoryTenantScope,
+    input: ReceiveInventoryGoodsSchemaInput,
+  ): Promise<PurchaseOrder> {
+    const order = await prisma.purchaseOrder.findFirst({
+      where: {
+        id: input.purchaseOrderId,
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+      },
+      include: purchaseOrderInclude,
+    });
+
+    if (!order) {
+      throw new Error("Purchase order not found");
+    }
+
+    if (order.status === "CANCELLED") {
+      throw new Error("Cancelled purchase orders cannot be received");
+    }
+
+    if (order.status === "DRAFT") {
+      await prisma.purchaseOrder.update({
+        where: { id: order.id },
+        data: { status: "SENT" },
+      });
+    }
+
+    const branchMeta = await this.loadBranchMeta(scope);
+    const grnLines: Array<{
+      itemId: string;
+      quantityReceived: number;
+      quantityAccepted: number;
+      quantityRejected: number;
+      expiresAt?: string | null;
+    }> = [];
+
+    await runInteractiveTransaction(async (tx) => {
+      for (const line of input.lineItems) {
+        const poItem = order.items.find((item) => item.id === line.purchaseOrderLineId);
+        if (!poItem) {
+          throw new Error("Purchase order line not found");
+        }
+
+        const receivedQty = roundQuantity(line.quantityReceived);
+        if (receivedQty <= 0) {
+          continue;
+        }
+
+        const remaining = roundQuantity(Number(poItem.quantity) - Number(poItem.receivedQuantity));
+        if (receivedQty > remaining) {
+          throw new Error(`Received quantity exceeds remaining for ${poItem.inventoryItem.sku}`);
+        }
+
+        await tx.purchaseOrderItem.update({
+          where: { id: poItem.id },
+          data: { receivedQuantity: { increment: receivedQty } },
+        });
+
+        grnLines.push({
+          itemId: poItem.inventoryItemId,
+          quantityReceived: receivedQty,
+          quantityAccepted: roundQuantity(line.quantityAccepted ?? receivedQty),
+          quantityRejected: roundQuantity(line.quantityRejected ?? 0),
+          expiresAt: line.expiresAt ?? null,
+        });
+      }
+
+      const refreshedItems = await tx.purchaseOrderItem.findMany({
+        where: { purchaseOrderId: order.id },
+      });
+      const allReceived = refreshedItems.every(
+        (item) => Number(item.receivedQuantity) >= Number(item.quantity),
+      );
+      const anyReceived = refreshedItems.some((item) => Number(item.receivedQuantity) > 0);
+
+      await tx.purchaseOrder.update({
+        where: { id: order.id },
+        data: {
+          status: allReceived ? "RECEIVED" : anyReceived ? "PARTIALLY_RECEIVED" : order.status,
+          receivedDate: allReceived ? new Date() : order.receivedDate,
+        },
+      });
+    });
+
+    for (const line of grnLines) {
+      await applyStockChange(line.itemId, line.quantityAccepted, {
+        transactionType: "PURCHASE",
+        referenceType: "PURCHASE_ORDER",
+        referenceId: order.id,
+        notes: `Received from ${order.purchaseOrderNumber}`,
+        performedByStaffId: scope.userId,
+      });
+
+      if (line.expiresAt) {
+        branchMeta.batches = [
+          ...(branchMeta.batches ?? []),
+          {
+            id: `batch-${Date.now()}-${line.itemId}`,
+            itemId: line.itemId,
+            locationId: input.locationId,
+            batchNumber: `B-${order.purchaseOrderNumber}`,
+            quantity: line.quantityAccepted,
+            receivedAt: new Date().toISOString(),
+            expiresAt: line.expiresAt,
+            supplierId: order.supplierId,
+            costPerUnitCents: 0,
+            isExpired: new Date(line.expiresAt).getTime() <= Date.now(),
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      }
+    }
+
+    const mappedOrder = mapPurchaseOrder(scope, order as PurchaseOrderWithRelations);
+    branchMeta.grns = [
+      ...(branchMeta.grns ?? []),
+      synthesizeGrnFromReceive(scope, mappedOrder, input.locationId, grnLines, input.notes),
+    ];
+    await this.saveBranchMeta(scope, branchMeta);
+
+    const refreshed = await prisma.purchaseOrder.findFirstOrThrow({
+      where: { id: order.id },
+      include: purchaseOrderInclude,
+    });
+
+    return mapPurchaseOrder(scope, refreshed as PurchaseOrderWithRelations);
+  }
+
+  async createTransfer(
+    scope: InventoryTenantScope,
+    input: CreateInventoryTransferSchemaInput,
+  ): Promise<InventoryRecord | null> {
+    const existing = await prisma.inventoryItem.findFirst({
+      where: { id: input.itemId, ...scopeItemWhere(scope) },
+    });
+
+    if (!existing) {
       return null;
     }
 
-    const now = new Date().toISOString();
-    const costCents = record.item.costPerUnitCents * input.quantity;
+    const branchMeta = await this.loadBranchMeta(scope);
+    const transferReference = `transfer-${Date.now()}`;
 
-    record.wasteRecords.push({
-      id: createId("waste"),
-      tenantId: record.item.tenantId,
-      businessId: record.item.businessId,
-      branchId: record.item.branchId,
-      itemId: input.itemId,
-      locationId: input.locationId,
-      batchId: input.batchId ?? null,
-      reason: input.reason,
-      quantity: input.quantity,
-      costCents,
-      notes: input.notes ?? null,
-      recordedByEmployeeId: input.recordedByEmployeeId,
-      recordedAt: now,
+    await applyStockChange(existing.id, -roundQuantity(input.quantity), {
+      transactionType: "TRANSFER",
+      referenceType: "TRANSFER",
+      referenceId: transferReference,
+      notes: input.notes ?? `Transfer to ${input.toLocationId}`,
+      performedByStaffId: scope.userId,
     });
 
-    this.updateStock({
-      itemId: input.itemId,
-      locationId: input.locationId,
-      quantityDelta: -input.quantity,
-      movementType: "waste",
-      batchId: input.batchId,
-      notes: input.notes,
-      employeeId: input.recordedByEmployeeId,
-    });
+    branchMeta.transfers = [
+      ...(branchMeta.transfers ?? []),
+      {
+        id: transferReference,
+        tenantId: scope.tenantId,
+        businessId: scope.businessId,
+        fromLocationId: input.fromLocationId,
+        toLocationId: input.toLocationId,
+        fromBranchId: scope.branchId,
+        toBranchId: scope.branchId,
+        status: "completed",
+        lineItems: [
+          {
+            id: `${transferReference}-line`,
+            transferId: transferReference,
+            itemId: input.itemId,
+            batchId: input.batchId ?? null,
+            quantityRequested: input.quantity,
+            quantityTransferred: input.quantity,
+          },
+        ],
+        requestedByEmployeeId: scope.userId,
+        completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    await this.saveBranchMeta(scope, branchMeta);
 
-    return structuredClone(record);
+    return this.findById(scope, input.itemId);
   }
 
-  createPurchaseOrder(input: CreatePurchaseOrderInput): PurchaseOrder {
-    const now = new Date().toISOString();
-    const poId = createId("po");
-    const poNumber = `PO-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-
-    const lineItems = input.lineItems.map((line) => {
-      const itemRecord = this.findById(line.itemId);
-      return {
-        id: createId("po-line"),
-        purchaseOrderId: poId,
-        itemId: line.itemId,
-        itemName: itemRecord?.item.name ?? "Unknown Item",
-        quantityOrdered: line.quantity,
-        quantityReceived: 0,
-        unitCostCents: line.unitCostCents,
-        totalCostCents: line.quantity * line.unitCostCents,
-      };
-    });
-
-    const subtotalCents = lineItems.reduce((sum, l) => sum + l.totalCostCents, 0);
-    const taxCents = Math.round(subtotalCents * 0.2);
-
-    const po: PurchaseOrder = {
-      id: poId,
-      tenantId: DEFAULT_INVENTORY_SCOPE.tenantId,
-      businessId: DEFAULT_INVENTORY_SCOPE.businessId,
-      branchId: input.branchId,
-      supplierId: input.supplierId,
-      poNumber,
-      status: PURCHASE_ORDER_STATUSES.DRAFT,
-      orderDate: now,
-      expectedDeliveryDate: input.expectedDeliveryDate ?? null,
-      subtotalCents,
-      taxCents,
-      totalCents: subtotalCents + taxCents,
-      currency: "GBP",
-      lineItems,
-      notes: input.notes ?? null,
-      createdByEmployeeId: input.createdByEmployeeId,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.purchaseOrders.push(po);
-    return structuredClone(po);
+  async getLowStockRecords(scope: InventoryTenantScope): Promise<InventoryRecord[]> {
+    const records = await this.listRecords(scope);
+    return records.filter((record) => record.lowStockAlerts.length > 0);
   }
 
-  getLowStockRecords(): InventoryRecord[] {
-    return this.records.filter((r) =>
-      r.stocks.some((s) => s.quantityOnHand <= r.item.reorderPoint),
-    );
-  }
-
-  getExpiringRecords(withinDays = 3): InventoryRecord[] {
+  async getExpiringRecords(scope: InventoryTenantScope, withinDays = 3): Promise<InventoryRecord[]> {
+    const records = await this.listRecords(scope);
     const cutoff = Date.now() + withinDays * 86_400_000;
 
-    return this.records.filter((r) =>
-      r.expiryTracking.some((e) => new Date(e.expiresAt).getTime() <= cutoff),
+    return records.filter((record) =>
+      record.expiryTracking.some((entry) => new Date(entry.expiresAt).getTime() <= cutoff),
     );
   }
 }

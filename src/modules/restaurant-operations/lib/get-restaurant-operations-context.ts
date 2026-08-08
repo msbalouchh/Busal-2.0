@@ -7,7 +7,7 @@ import type {
   ReservationOperationsQuery,
 } from "@/modules/restaurant-operations/types/restaurant-operations-types";
 import { getKitchenDisplayContext } from "@/modules/kitchen/lib/get-kitchen-display-context";
-import { getPosModuleContext } from "@/modules/pos/lib/get-pos-context";
+import { getPosTerminalContext } from "@/modules/pos/lib/get-pos-context";
 import { getInventoryOverviewContext } from "@/modules/inventory/lib/get-inventory-context";
 import {
   getMenuOperationsBundle,
@@ -110,12 +110,12 @@ export const getRestaurantKitchenContext = cache(async () => {
 
 export const getRestaurantPosContext = cache(async () => {
   const platform = await protectedPage({ permission: PERMISSION_CODES.POS_USE });
-  const pos = await getPosModuleContext();
+  const terminal = await getPosTerminalContext();
 
   return {
     platform,
     permissions: (await getRestaurantOperationsBundle(platform)).permissions,
-    ...pos,
+    ...terminal,
   };
 });
 

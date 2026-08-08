@@ -44,6 +44,11 @@ export async function persistBusinessContextCookiesForLogin(
     return;
   }
 
+  await setActiveBusinessCookie({
+    userId: user.id,
+    businessId: loginResult.staffSession.businessId,
+  });
+
   const branches = await listBranches(loginResult.staffSession.businessId);
   const branch =
     (loginResult.staffSession.branchId

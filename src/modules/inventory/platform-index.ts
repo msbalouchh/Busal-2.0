@@ -33,16 +33,7 @@ export {
   INVENTORY_PLATFORM_NAV_ITEMS,
 } from "@/modules/inventory/constants/platform-routes";
 
-export {
-  DEFAULT_INVENTORY_SCOPE,
-  MOCK_INVENTORY_CATEGORIES,
-  MOCK_INVENTORY_UNITS,
-  MOCK_INVENTORY_LOCATIONS,
-  MOCK_INVENTORY_SUPPLIERS,
-  MOCK_PURCHASE_ORDERS,
-  MOCK_INVENTORY_RECORDS,
-  MOCK_RECIPE_MAPPINGS,
-} from "@/modules/inventory/constants/mock-data";
+export { INVENTORY_MODULE_PERMISSIONS } from "@/modules/inventory/constants/permissions";
 
 export type * from "@/modules/inventory/types/inventory-platform";
 
@@ -60,7 +51,6 @@ export { InventoryService, inventoryService } from "@/modules/inventory/services
 export {
   buildInventoryPlatformContext,
   buildInventoryPlatformSnapshot,
-  getDefaultInventorySnapshot,
   getCriticalStockItems,
   type InventoryPlatformSnapshot,
   type InventoryPlatformInput,
@@ -76,6 +66,10 @@ export { useInventoryPurchase } from "@/modules/inventory/hooks/use-inventory-pu
 export { InventoryStockStatusBadge } from "@/modules/inventory/components/inventory-stock-status-badge";
 export { PurchaseOrderStatusBadge } from "@/modules/inventory/components/purchase-order-status-badge";
 export { InventoryLocationBadge } from "@/modules/inventory/components/inventory-location-badge";
+export { InventoryManagementLoading } from "@/modules/inventory/components/inventory-management-loading";
+export { InventoryManagementEmpty } from "@/modules/inventory/components/inventory-management-empty";
+export { InventoryManagementError } from "@/modules/inventory/components/inventory-management-error";
+export { InventoryOverview } from "@/modules/inventory/components/inventory-overview";
 
 export {
   registerInventoryAiTools,
@@ -89,4 +83,5 @@ export {
   detectInventoryWaste,
   suggestReorderQuantity,
   optimizeStockLevels,
+  predictExpiryRisk,
 } from "@/modules/inventory/ai";

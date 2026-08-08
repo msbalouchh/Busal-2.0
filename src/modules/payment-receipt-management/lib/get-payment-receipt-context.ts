@@ -21,7 +21,7 @@ import {
   getPaymentDashboardStats,
   listOrderPayments,
   listUnpaidOrders,
-} from "@/services/restaurant-payment.service";
+} from "@/modules/payments/services/payment-platform.service";
 import { getRestaurantFoundationBundle } from "@/services/restaurant-management.service";
 import type { AuthUser } from "@/types/auth";
 import type { AuthorizationContext } from "@/modules/authorization/types/authorization";

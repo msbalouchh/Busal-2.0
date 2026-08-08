@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createFinanceInsight } from "@/services/ai-finance-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getCashFlowSnapshot } from "@/services/ai-finance-cash-flow.service";
 import { getProfitabilitySnapshot } from "@/services/ai-finance-profitability.service";
 import { getRevenueSnapshot } from "@/services/ai-finance-revenue-analysis.service";
@@ -86,21 +87,18 @@ export async function getBusinessHealthSnapshot(ownerId: string): Promise<Busine
 }
 
 export async function generateBusinessHealthInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getBusinessHealthSnapshot(ownerId);
-  let created = 0;
-
-  await createFinanceInsight(businessId, {
-    title: "Business health score",
-    description: `Financial health: ${snapshot.healthScore}% (${snapshot.healthLabel}). ${snapshot.riskCount} risk factors detected.`,
-    category: "health",
-    priority:
-      snapshot.healthScore < 40 ? "CRITICAL" : snapshot.healthScore < 60 ? "HIGH" : "MEDIUM",
-    recommendation:
-      "Review profitability, cash flow, and budget variance to improve financial health.",
-    metadata: { healthScore: snapshot.healthScore, riskCount: snapshot.riskCount },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "finance",
+    task: "business-health-insights",
+    loadContext: getBusinessHealthSnapshot,
+    persistInsight: (businessId, insight) =>
+      createFinanceInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "health",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  return created;
 }

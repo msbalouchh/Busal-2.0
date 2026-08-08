@@ -1,12 +1,15 @@
 /** Analytics dashboard types. */
 export const DASHBOARD_TYPES = {
   EXECUTIVE: "executive",
+  RESTAURANT: "restaurant",
+  SALES: "sales",
   OPERATIONS: "operations",
   KITCHEN: "kitchen",
   FINANCE: "finance",
   MARKETING: "marketing",
   INVENTORY: "inventory",
   STAFF: "staff",
+  CRM: "crm",
   OWNER: "owner",
   CUSTOM: "custom",
 } as const;
@@ -75,6 +78,33 @@ export const KPI_TRENDS = {
 
 export type KpiTrend = (typeof KPI_TRENDS)[keyof typeof KPI_TRENDS];
 
+/** Report output formats. */
+export const REPORT_EXPORT_FORMATS = {
+  CSV: "csv",
+  EXCEL: "excel",
+  PDF: "pdf",
+} as const;
+
+export type ReportExportFormat = (typeof REPORT_EXPORT_FORMATS)[keyof typeof REPORT_EXPORT_FORMATS];
+
+/** Report template categories. */
+export const REPORT_TYPES = {
+  SALES: "sales",
+  REVENUE: "revenue",
+  PROFIT: "profit",
+  EXPENSE: "expense",
+  INVENTORY: "inventory",
+  WASTE: "waste",
+  RESERVATION: "reservation",
+  STAFF_PERFORMANCE: "staff_performance",
+  CUSTOMER: "customer",
+  LOYALTY: "loyalty",
+  FINANCIAL_STATEMENT: "financial_statement",
+  CUSTOM: "custom",
+} as const;
+
+export type ReportType = (typeof REPORT_TYPES)[keyof typeof REPORT_TYPES];
+
 /** Cross-module analytics source keys. */
 export const ANALYTICS_MODULE_SOURCES = {
   BILLING: "billing",
@@ -102,6 +132,12 @@ export const ANALYTICS_AI_TOOL_IDS = {
   RECOMMEND_IMPROVEMENTS: "analytics.recommend-improvements",
   EXECUTIVE_SUMMARY: "analytics.executive-summary",
   COMPARE_BRANCHES: "analytics.compare-branches",
+  CUSTOMER_INSIGHTS: "analytics.customer-insights",
+  CHURN_PREDICTION: "analytics.churn-prediction",
+  INVENTORY_FORECAST: "analytics.inventory-forecast",
+  STAFFING_RECOMMENDATIONS: "analytics.staffing-recommendations",
+  FINANCIAL_FORECAST: "analytics.financial-forecast",
+  BUSINESS_HEALTH_SCORE: "analytics.business-health-score",
 } as const;
 
 export type AnalyticsAiToolId = (typeof ANALYTICS_AI_TOOL_IDS)[keyof typeof ANALYTICS_AI_TOOL_IDS];
@@ -123,12 +159,15 @@ export type AnalyticsPermission =
 
 export const DASHBOARD_TYPE_LABELS: Record<DashboardType, string> = {
   executive: "Executive",
+  restaurant: "Restaurant",
+  sales: "Sales",
   operations: "Operations",
   kitchen: "Kitchen",
   finance: "Finance",
   marketing: "Marketing",
   inventory: "Inventory",
   staff: "Staff",
+  crm: "CRM",
   owner: "Owner",
   custom: "Custom",
 };

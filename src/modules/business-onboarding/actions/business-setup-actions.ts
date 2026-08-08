@@ -14,6 +14,8 @@ import {
   type WorkspaceOnboardingFinalizeInput,
 } from "@/services/business-setup.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
+import { platformProvisioningService } from "@/modules/commercial-foundation/services/platform-provisioning.service";
+import type { SubscriptionPlan } from "@/modules/business-onboarding/types/onboarding.types";
 import { findActiveStaffByEmail } from "@/modules/staff-auth/services/staff-auth.service";
 import {
   businessContactSchema,
@@ -21,6 +23,50 @@ import {
   businessRegionSchema,
 } from "@/modules/business-onboarding/schemas/business-setup.schema";
 import type { BusinessType } from "@prisma/client";
+
+function mapSubscriptionPlanToSlug(plan: SubscriptionPlan): string {
+  if (plan === "trial") {
+    return "starter";
+  }
+
+  return plan;
+}
+
+export async function provisionWorkspaceAction(input: {
+  businessName: string;
+  displayName: string;
+  country: string;
+  timezone: string;
+  defaultBranchName: string;
+  subscriptionPlan: SubscriptionPlan;
+  businessEmail?: string;
+}) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect(ROUTES.login);
+  }
+
+  const business = await getOrCreateBusinessForOwner(user.id);
+
+  const businessName = input.displayName.trim() || input.businessName.trim();
+  if (!businessName) {
+    throw new Error("Business name is required");
+  }
+
+  const result = await platformProvisioningService.provisionExistingBusiness({
+    businessId: business.id,
+    ownerId: user.id,
+    businessName,
+    country: input.country,
+    timezone: input.timezone,
+    branchName: input.defaultBranchName,
+    planSlug: mapSubscriptionPlanToSlug(input.subscriptionPlan),
+    ownerEmail: input.businessEmail ?? user.email,
+  });
+
+  return { success: true as const, result };
+}
 
 export async function ensureBusinessSetupAccess() {
   const user = await getCurrentUser();

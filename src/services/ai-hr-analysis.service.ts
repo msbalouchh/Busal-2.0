@@ -1,5 +1,8 @@
 import "server-only";
 
+/** Orchestrates domain AI inference via delegated services. */
+
+
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import {

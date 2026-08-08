@@ -22,6 +22,8 @@ import {
   routeStepExecution,
 } from "@/services/ai-task-router.service";
 import { getWorkflow, listWorkflowSteps } from "@/services/ai-workflow-manager.service";
+import { getPlatformAgent } from "@/services/ai-agent-platform-manager.service";
+import { runCentralAiChatForOwner } from "@/services/ai-engine-bridge.service";
 import { executeSkill } from "@/services/ai-skill-executor.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
@@ -55,10 +57,31 @@ async function executeWorkflowStep(
   }
 
   if (route === "agent" && step.agentId) {
+    const agentRecord = await getPlatformAgent(ownerId, step.agentId);
+    const userMessage =
+      typeof stepInput.message === "string"
+        ? stepInput.message
+        : JSON.stringify(stepInput ?? {});
+
+    const engineResult = await runCentralAiChatForOwner(ownerId, {
+      message: userMessage,
+      agentSlug: agentRecord.slug,
+      currentModule: "ai-workflow",
+      enableTools: true,
+      metadata: {
+        workflowStepId: step.id,
+        stepOrder: step.order,
+        agentId: step.agentId,
+      },
+    });
+
     return {
       routed: "agent",
       agentId: step.agentId,
-      message: "Agent step routed through orchestrator framework",
+      executionId: engineResult.auditId,
+      output: { content: engineResult.content },
+      status: "COMPLETED",
+      providerId: engineResult.providerId,
       input: stepInput,
     };
   }

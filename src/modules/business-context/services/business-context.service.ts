@@ -139,6 +139,10 @@ async function resolveOwnerActiveBusinessId(
 ): Promise<string> {
   const cookie = await getActiveBusinessCookie();
 
+  if (cookie && cookie.userId !== userId) {
+    await clearBusinessContextCookies();
+  }
+
   if (
     cookie?.userId === userId &&
     businesses.some((business) => business.id === cookie.businessId)
@@ -190,6 +194,37 @@ async function resolveActiveBranch(
   return branches.find((branch) => branch.isMain) ?? branches[0] ?? null;
 }
 
+async function persistResolvedBusinessContextCookies(
+  userId: string,
+  businessId: string,
+  branch: BranchData | null,
+): Promise<void> {
+  const businessCookie = await getActiveBusinessCookie();
+
+  if (businessCookie?.userId !== userId || businessCookie.businessId !== businessId) {
+    await setActiveBusinessCookie({ userId, businessId });
+  }
+
+  if (!branch) {
+    await clearActiveBranchCookie();
+    return;
+  }
+
+  const branchCookie = await getActiveBranchCookie();
+
+  if (
+    branchCookie?.userId !== userId ||
+    branchCookie.businessId !== businessId ||
+    branchCookie.branchId !== branch.id
+  ) {
+    await setActiveBranchCookie({
+      userId,
+      businessId,
+      branchId: branch.id,
+    });
+  }
+}
+
 export async function resolveBusinessContextForUser(user: AuthUser): Promise<BusinessContext> {
   const access = await resolveBusinessAccessForUser(user.id, user.email);
 
@@ -217,7 +252,7 @@ export async function resolveBusinessContextForUser(user: AuthUser): Promise<Bus
 
     const authorization = await resolveAuthorizationContext(user, business);
 
-    return {
+    const resolvedContext: BusinessContext = {
       user,
       business,
       branch,
@@ -230,6 +265,9 @@ export async function resolveBusinessContextForUser(user: AuthUser): Promise<Bus
       accessibleBusinesses: toBusinessOptions(businesses),
       accessibleBranches: toBranchOptions(branches),
     };
+
+    await persistResolvedBusinessContextCookies(user.id, business.id, branch);
+    return resolvedContext;
   }
 
   const business = await loadBusinessProfile(access.businessId);
@@ -248,7 +286,7 @@ export async function resolveBusinessContextForUser(user: AuthUser): Promise<Bus
 
   const authorization = await resolveAuthorizationContext(user, business);
 
-  return {
+  const resolvedContext: BusinessContext = {
     user,
     business,
     branch,
@@ -261,6 +299,9 @@ export async function resolveBusinessContextForUser(user: AuthUser): Promise<Bus
     accessibleBusinesses: toBusinessOptions([business]),
     accessibleBranches: toBranchOptions(branches),
   };
+
+  await persistResolvedBusinessContextCookies(user.id, business.id, branch);
+  return resolvedContext;
 }
 
 export const requireBusinessContext = cache(async (): Promise<BusinessContext> => {

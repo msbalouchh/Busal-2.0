@@ -1,13 +1,21 @@
+import "server-only";
+
 import { BUILTIN_AGENT_SLUGS } from "@/modules/ai/constants/agent-slugs";
 import { PLATFORM_MODULES } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
   analyzeApiUsageForAi,
+  analyzeWebhookFailuresForAi,
   detectFailedWebhooksForAi,
   explainApiErrorsForAi,
   generateApiKeyForAi,
   generateIntegrationMappingForAi,
+  monitorApiHealthForAi,
+  optimizeApiUsageForAi,
   recommendIntegrationForAi,
   recommendRateLimitsForAi,
   suggestRetryForAi,
@@ -17,9 +25,23 @@ import {
   INTEGRATION_CATEGORIES,
   INTEGRATION_PERMISSIONS,
 } from "@/modules/integrations/constants/integration-status";
+import { toIntegrationPlatformContext } from "@/modules/integrations/lib/integration-scope";
 import type { IntegrationCategory } from "@/modules/integrations/constants/integration-status";
+import type { IntegrationPlatformContext } from "@/modules/integrations/types/integration-platform";
 
-const INTEGRATIONS_MODULE = "integrations";
+function toIntegrationContext(context: PlatformExecutionContext): IntegrationPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for Integration tools");
+  }
+
+  return toIntegrationPlatformContext({
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  });
+}
 
 function defineIntegrationTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -66,20 +88,18 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       name: "Recommend Integration",
       description: "Recommend a third-party integration for a category.",
       requiredPermissions: [INTEGRATION_PERMISSIONS.READ],
-      requiredModules: [INTEGRATIONS_MODULE, PLATFORM_MODULES.ANALYTICS],
+      requiredModules: ["integrations", PLATFORM_MODULES.ANALYTICS],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
-      inputSchema: {
-        type: "object",
-        properties: { category: { type: "string" } },
-      },
+      inputSchema: { type: "object", properties: { category: { type: "string" } } },
       outputSchema: { type: "object" },
       supportedAgents: INTEGRATION_AGENT_SLUGS,
       capabilityId: "capability.integrations",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => recommendIntegrationForAi({ category: parseCategory(input.category) }),
+    async (input, context) =>
+      recommendIntegrationForAi(toIntegrationContext(context), { category: parseCategory(input.category) }),
   ),
   defineIntegrationTool(
     {
@@ -87,16 +107,13 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       name: "Generate API Key",
       description: "Generate a new API key with specified scopes.",
       requiredPermissions: [INTEGRATION_PERMISSIONS.API_KEY],
-      requiredModules: [INTEGRATIONS_MODULE],
+      requiredModules: ["integrations"],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
       inputSchema: {
         type: "object",
         required: ["name"],
-        properties: {
-          name: { type: "string" },
-          scopes: { type: "array" },
-        },
+        properties: { name: { type: "string" }, scopes: { type: "array" } },
       },
       outputSchema: { type: "object" },
       supportedAgents: INTEGRATION_AGENT_SLUGS,
@@ -104,11 +121,11 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) =>
-      generateApiKeyForAi({
+    async (input, context) =>
+      generateApiKeyForAi(toIntegrationContext(context), {
         name: typeof input.name === "string" ? input.name : "API Key",
         scopes: Array.isArray(input.scopes)
-          ? input.scopes.filter((s): s is string => typeof s === "string")
+          ? input.scopes.filter((scope): scope is string => typeof scope === "string")
           : undefined,
       }),
   ),
@@ -118,7 +135,7 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       name: "Analyze API Usage",
       description: "Analyze API usage patterns and error rates.",
       requiredPermissions: [INTEGRATION_PERMISSIONS.ANALYTICS_READ],
-      requiredModules: [INTEGRATIONS_MODULE, PLATFORM_MODULES.ANALYTICS],
+      requiredModules: ["integrations", PLATFORM_MODULES.ANALYTICS],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
       inputSchema: { type: "object", properties: {} },
@@ -128,7 +145,7 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => analyzeApiUsageForAi(),
+    async (_input, context) => analyzeApiUsageForAi(toIntegrationContext(context)),
   ),
   defineIntegrationTool(
     {
@@ -136,7 +153,7 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       name: "Detect Failed Webhooks",
       description: "Detect failed and retrying webhook deliveries.",
       requiredPermissions: [INTEGRATION_PERMISSIONS.WEBHOOK],
-      requiredModules: [INTEGRATIONS_MODULE],
+      requiredModules: ["integrations"],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
       inputSchema: { type: "object", properties: {} },
@@ -146,7 +163,7 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true, riskLevel: "medium" },
     },
-    async () => detectFailedWebhooksForAi(),
+    async (_input, context) => detectFailedWebhooksForAi(toIntegrationContext(context)),
   ),
   defineIntegrationTool(
     {
@@ -154,21 +171,18 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       name: "Suggest Retry",
       description: "Suggest retry strategy for failed webhook delivery.",
       requiredPermissions: [INTEGRATION_PERMISSIONS.WEBHOOK],
-      requiredModules: [INTEGRATIONS_MODULE],
+      requiredModules: ["integrations"],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
-      inputSchema: {
-        type: "object",
-        properties: { eventId: { type: "string" } },
-      },
+      inputSchema: { type: "object", properties: { eventId: { type: "string" } } },
       outputSchema: { type: "object" },
       supportedAgents: INTEGRATION_AGENT_SLUGS,
       capabilityId: "capability.integrations",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) =>
-      suggestRetryForAi({
+    async (input, context) =>
+      suggestRetryForAi(toIntegrationContext(context), {
         eventId: typeof input.eventId === "string" ? input.eventId : undefined,
       }),
   ),
@@ -178,21 +192,18 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       name: "Explain API Errors",
       description: "Explain API error responses and suggest fixes.",
       requiredPermissions: [INTEGRATION_PERMISSIONS.READ],
-      requiredModules: [INTEGRATIONS_MODULE],
+      requiredModules: ["integrations"],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
-      inputSchema: {
-        type: "object",
-        properties: { requestId: { type: "string" } },
-      },
+      inputSchema: { type: "object", properties: { requestId: { type: "string" } } },
       outputSchema: { type: "object" },
       supportedAgents: INTEGRATION_AGENT_SLUGS,
       capabilityId: "capability.integrations",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) =>
-      explainApiErrorsForAi({
+    async (input, context) =>
+      explainApiErrorsForAi(toIntegrationContext(context), {
         requestId: typeof input.requestId === "string" ? input.requestId : undefined,
       }),
   ),
@@ -202,7 +213,7 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       name: "Recommend Rate Limits",
       description: "Recommend API rate limits based on usage patterns.",
       requiredPermissions: [INTEGRATION_PERMISSIONS.ANALYTICS_READ],
-      requiredModules: [INTEGRATIONS_MODULE, PLATFORM_MODULES.ANALYTICS],
+      requiredModules: ["integrations", PLATFORM_MODULES.ANALYTICS],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
       inputSchema: { type: "object", properties: {} },
@@ -212,7 +223,7 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => recommendRateLimitsForAi(),
+    async (_input, context) => recommendRateLimitsForAi(toIntegrationContext(context)),
   ),
   defineIntegrationTool(
     {
@@ -220,7 +231,7 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       name: "Generate Integration Mapping",
       description: "Generate field mapping between Busal and external entities.",
       requiredPermissions: [INTEGRATION_PERMISSIONS.MANAGE],
-      requiredModules: [INTEGRATIONS_MODULE],
+      requiredModules: ["integrations"],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
       inputSchema: {
@@ -238,18 +249,72 @@ export const INTEGRATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true },
     },
-    async (input) =>
-      generateIntegrationMappingForAi({
+    async (input, context) =>
+      generateIntegrationMappingForAi(toIntegrationContext(context), {
         integrationId: typeof input.integrationId === "string" ? input.integrationId : "",
         sourceEntity: typeof input.sourceEntity === "string" ? input.sourceEntity : "",
         targetEntity: typeof input.targetEntity === "string" ? input.targetEntity : "",
       }),
   ),
+  defineIntegrationTool(
+    {
+      id: INTEGRATION_AI_TOOL_IDS.OPTIMIZE_API_USAGE,
+      name: "Optimize API Usage",
+      description: "Recommend optimizations for API usage patterns.",
+      requiredPermissions: [INTEGRATION_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: ["integrations", PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: INTEGRATION_AGENT_SLUGS,
+      capabilityId: "capability.integrations",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => optimizeApiUsageForAi(toIntegrationContext(context)),
+  ),
+  defineIntegrationTool(
+    {
+      id: INTEGRATION_AI_TOOL_IDS.API_HEALTH_MONITORING,
+      name: "API Health Monitoring",
+      description: "Monitor integration and API health across the tenant.",
+      requiredPermissions: [INTEGRATION_PERMISSIONS.READ],
+      requiredModules: ["integrations"],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: INTEGRATION_AGENT_SLUGS,
+      capabilityId: "capability.integrations",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => monitorApiHealthForAi(toIntegrationContext(context)),
+  ),
+  defineIntegrationTool(
+    {
+      id: INTEGRATION_AI_TOOL_IDS.WEBHOOK_FAILURE_ANALYSIS,
+      name: "Webhook Failure Analysis",
+      description: "Analyze webhook delivery failures and remediation steps.",
+      requiredPermissions: [INTEGRATION_PERMISSIONS.WEBHOOK],
+      requiredModules: ["integrations"],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: INTEGRATION_AGENT_SLUGS,
+      capabilityId: "capability.integrations",
+      skillIds: [],
+      metadata: { readOnly: true, riskLevel: "medium" },
+    },
+    async (_input, context) => analyzeWebhookFailuresForAi(toIntegrationContext(context)),
+  ),
 ];
 
 let registered = false;
 
-/** Registers Integration platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Integration platform tools with the AI Tool Platform (idempotent). */
 export function registerIntegrationAiTools(): void {
   if (registered) {
     return;

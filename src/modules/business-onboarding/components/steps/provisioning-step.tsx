@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 
 import { PROVISIONING_MESSAGES } from "@/modules/business-onboarding/constants/workspace-steps";
-import { mockProvisionWorkspace } from "@/modules/business-onboarding/lib/onboarding.mock";
+import { provisionWorkspaceAction } from "@/modules/business-onboarding/actions/business-setup-actions";
 import { useWorkspaceWizardStore } from "@/modules/business-onboarding/store/onboarding.store";
 
 export function ProvisioningStep() {
   const setStep = useWorkspaceWizardStore((s) => s.setStep);
   const displayName = useWorkspaceWizardStore((s) => s.displayName);
   const [messageIndex, setMessageIndex] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -22,23 +23,27 @@ export function ProvisioningStep() {
     let cancelled = false;
     async function provision() {
       const state = useWorkspaceWizardStore.getState();
-      const {
-        currentStep: _s,
-        setStep: _set,
-        nextStep: _n,
-        prevStep: _p,
-        patch: _pa,
-        reset: _r,
-        ...payload
-      } = state;
-      /**
-       * `mockProvisionWorkspace` is typed against
-       * `WorkspaceProvisioningProvider["provision"]` (see
-       * lib/workspace-provisioning.types.ts). Swapping in the real
-       * provider implementation requires no change to this call site.
-       */
-      await mockProvisionWorkspace(payload);
-      if (!cancelled) setStep(11);
+      const businessName = state.displayName.trim() || state.businessName.trim();
+
+      try {
+        await provisionWorkspaceAction({
+          businessName: state.businessName,
+          displayName: state.displayName,
+          country: state.country,
+          timezone: state.timezone,
+          defaultBranchName: state.defaultBranchName,
+          subscriptionPlan: state.subscriptionPlan,
+          businessEmail: state.businessEmail,
+        });
+
+        if (!cancelled) {
+          setStep(11);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Provisioning failed. Please refresh and try again.");
+        }
+      }
     }
     void provision();
     return () => {
@@ -51,6 +56,11 @@ export function ProvisioningStep() {
       <div className="onboarding__creating-orb" aria-hidden="true" />
       <p className="onboarding__creating-message">{PROVISIONING_MESSAGES[messageIndex]}</p>
       <p className="text-sm text-white/45">Provisioning {displayName || "your workspace"}…</p>
+      {error ? (
+        <p className="onboarding__field-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

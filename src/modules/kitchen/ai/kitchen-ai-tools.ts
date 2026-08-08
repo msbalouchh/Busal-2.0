@@ -4,17 +4,39 @@ import {
   PLATFORM_TOOL_PERMISSIONS,
 } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
   assignStationForTicket,
   detectKitchenBottlenecks,
   estimatePreparationTime,
+  forecastKitchenLoad,
   optimizeKitchenQueue,
   predictKitchenDelays,
+  recommendStationBalancing,
   recommendWorkflowImprovements,
   routeOrderToStation,
+  suggestStaffAllocation,
 } from "@/modules/kitchen/ai/kitchen-ai-context";
 import { KITCHEN_AI_TOOL_IDS } from "@/modules/kitchen/constants/kitchen-status";
+import { buildKitchenPlatformContext } from "@/modules/kitchen/lib/kitchen-platform-context";
+import type { KitchenPlatformContext } from "@/modules/kitchen/types/kitchen";
+
+function toKitchenContext(context: PlatformExecutionContext): KitchenPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for kitchen tools");
+  }
+
+  return buildKitchenPlatformContext({
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  });
+}
 
 function defineKitchenTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -66,9 +88,10 @@ export const KITCHEN_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, context) => {
       const kitchenOrderId = typeof input.kitchenOrderId === "string" ? input.kitchenOrderId : "";
-      return routeOrderToStation(kitchenOrderId) ?? { error: "Kitchen order not found." };
+      const result = await routeOrderToStation(toKitchenContext(context), kitchenOrderId);
+      return result ?? { error: "Kitchen order not found." };
     },
   ),
   defineKitchenTool(
@@ -94,10 +117,11 @@ export const KITCHEN_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const ticketId = typeof input.ticketId === "string" ? input.ticketId : "";
       const stationId = typeof input.stationId === "string" ? input.stationId : undefined;
-      return assignStationForTicket(ticketId, stationId) ?? { error: "Ticket not found." };
+      const result = await assignStationForTicket(toKitchenContext(context), ticketId, stationId);
+      return result ?? { error: "Ticket not found." };
     },
   ),
   defineKitchenTool(
@@ -119,9 +143,9 @@ export const KITCHEN_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, context) => {
       const limit = typeof input.limit === "number" ? input.limit : 5;
-      return predictKitchenDelays(limit);
+      return predictKitchenDelays(toKitchenContext(context), limit);
     },
   ),
   defineKitchenTool(
@@ -140,7 +164,7 @@ export const KITCHEN_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => optimizeKitchenQueue(),
+    async (_input, context) => optimizeKitchenQueue(toKitchenContext(context)),
   ),
   defineKitchenTool(
     {
@@ -162,9 +186,10 @@ export const KITCHEN_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, context) => {
       const kitchenOrderId = typeof input.kitchenOrderId === "string" ? input.kitchenOrderId : "";
-      return estimatePreparationTime(kitchenOrderId) ?? { error: "Kitchen order not found." };
+      const result = await estimatePreparationTime(toKitchenContext(context), kitchenOrderId);
+      return result ?? { error: "Kitchen order not found." };
     },
   ),
   defineKitchenTool(
@@ -183,7 +208,7 @@ export const KITCHEN_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => recommendWorkflowImprovements(),
+    async (_input, context) => recommendWorkflowImprovements(toKitchenContext(context)),
   ),
   defineKitchenTool(
     {
@@ -201,13 +226,13 @@ export const KITCHEN_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => detectKitchenBottlenecks(),
+    async (_input, context) => detectKitchenBottlenecks(toKitchenContext(context)),
   ),
 ];
 
 let registered = false;
 
-/** Registers Kitchen platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Kitchen platform tools with the AI Tool Platform (idempotent). */
 export function registerKitchenAiTools(): void {
   if (registered) {
     return;

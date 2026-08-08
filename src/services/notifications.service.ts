@@ -19,8 +19,8 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
 } from "@/modules/notifications/constants/routes";
 import {
+  deliverChannelNotification,
   planNotificationDelivery,
-  simulateChannelDelivery,
 } from "@/modules/notifications/engine/notification-engine";
 import { renderTemplate } from "@/modules/notifications/engine/template-engine";
 import { shouldRetryDelivery } from "@/modules/notifications/engine/rule-engine";
@@ -346,10 +346,17 @@ export async function processDelivery(deliveryId: string): Promise<void> {
     return;
   }
 
-  const simulation = simulateChannelDelivery(delivery.channel);
+  const deliveryResult = await deliverChannelNotification({
+    channel: delivery.channel,
+    recipientEmail: delivery.recipientEmail,
+    recipientPhone: delivery.recipientPhone,
+    recipientUserId: delivery.recipientUserId,
+    subject: delivery.renderedSubject,
+    body: delivery.renderedBody ?? "",
+  });
   const now = new Date();
 
-  if (simulation.status === "FAILED") {
+  if (deliveryResult.status === "FAILED") {
     const rule = delivery.deliveryRuleId
       ? await prisma.notificationDeliveryRule.findUnique({ where: { id: delivery.deliveryRuleId } })
       : null;
@@ -382,7 +389,7 @@ export async function processDelivery(deliveryId: string): Promise<void> {
       data: {
         status: "FAILED",
         failedAt: now,
-        errorMessage: simulation.errorMessage,
+        errorMessage: deliveryResult.errorMessage,
       },
     });
 
@@ -401,10 +408,10 @@ export async function processDelivery(deliveryId: string): Promise<void> {
   await prisma.notificationDelivery.update({
     where: { id: deliveryId },
     data: {
-      status: simulation.status,
-      sentAt: simulation.sentAt,
-      deliveredAt: simulation.deliveredAt,
-      deliveryTimeMs: simulation.deliveryTimeMs,
+      status: deliveryResult.status,
+      sentAt: deliveryResult.sentAt,
+      deliveredAt: deliveryResult.deliveredAt,
+      deliveryTimeMs: deliveryResult.deliveryTimeMs,
     },
   });
 
@@ -412,7 +419,7 @@ export async function processDelivery(deliveryId: string): Promise<void> {
     businessId: delivery.businessId,
     notificationId: delivery.notificationId,
     deliveryId: delivery.id,
-    eventType: simulation.status === "QUEUED" ? "QUEUED" : "DELIVERED",
+    eventType: deliveryResult.status === "QUEUED" ? "QUEUED" : "DELIVERED",
     recipientUserId: delivery.recipientUserId,
     channel: delivery.channel,
   });

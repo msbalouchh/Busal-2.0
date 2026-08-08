@@ -1,15 +1,13 @@
 import "server-only";
 
 import { getStaffAnalytics } from "@/services/reporting.service";
-import { getStaffDashboard } from "@/services/restaurant-analytics.service";
 import {
   createOperationInsight,
   createOperationRecommendation,
 } from "@/services/ai-operations-efficiency-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import {
   getOwnedBusinessId,
-  getPrimaryBranchId,
-  weekAnalyticsFilters,
 } from "@/services/ai-operations-context.service";
 import { prisma } from "@/lib/prisma";
 
@@ -53,51 +51,27 @@ export async function getResourceUtilizationSnapshot(
 }
 
 export async function generateResourceOptimizationInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getResourceUtilizationSnapshot(ownerId);
-  let created = 0;
-
-  if (snapshot.utilizationRate < 60 && snapshot.activeStaff > 0) {
-    await createOperationInsight(businessId, {
-      title: "Low staff utilization",
-      description: `Only ${snapshot.utilizationRate}% of active staff processed orders today.`,
-      category: "resource",
-      priority: "HIGH",
-      recommendation: "Reallocate staff to high-demand stations or adjust schedules.",
-      metadata: { utilizationRate: snapshot.utilizationRate },
-    });
-    created += 1;
-  }
-
-  const branchId = await getPrimaryBranchId(businessId);
-  const staffDash = await getStaffDashboard(ownerId, weekAnalyticsFilters(branchId));
-
-  for (const performer of snapshot.underutilized.slice(0, 2)) {
-    await createOperationRecommendation(businessId, {
-      title: `Staff allocation: ${performer.name}`,
-      description: `${performer.name} handled ${performer.ordersHandled} orders — below team average.`,
-      action: "Assign to busier shift or cross-train for kitchen/support roles.",
-      expectedImpact: "Improved team productivity and customer wait times",
-      confidenceScore: 0.75,
-      metadata: { staffName: performer.name, type: "staff_allocation" },
-    });
-    created += 1;
-  }
-
-  if (staffDash.performance.length > 0) {
-    await createOperationInsight(businessId, {
-      title: "Staff productivity overview",
-      description: staffDash.performance
-        .slice(0, 5)
-        .map((row) => row.cells.join(": "))
-        .join(" · "),
-      category: "efficiency",
-      priority: "MEDIUM",
-      recommendation: "Balance workload across top and underutilized staff.",
-      metadata: { performance: staffDash.performance.slice(0, 5) },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "operations",
+    task: "resource-optimization-insights",
+    loadContext: getResourceUtilizationSnapshot,
+    persistInsight: (businessId, insight) =>
+      createOperationInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "resource",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+    persistRecommendation: (businessId, recommendation) =>
+      createOperationRecommendation(businessId, {
+        title: recommendation.title,
+        description: recommendation.description,
+        action: recommendation.action ?? recommendation.recommendation ?? "Review AI recommendation",
+        expectedImpact: recommendation.expectedImpact,
+        confidenceScore: recommendation.confidenceScore,
+        metadata: recommendation.metadata,
+      }),
+  });
 }

@@ -112,7 +112,7 @@ async function buildDashboardWidgets(
     getInventoryDashboard(businessId, branchId),
   ]);
 
-  const activeOrders = await prisma.legacyOrder.count({
+  const activeOrders = await prisma.restaurantOrder.count({
     where: {
       businessId,
       ...branchFilter(branchId),
@@ -132,51 +132,85 @@ async function buildDashboardWidgets(
 }
 
 async function getOrderAmountPaidPence(orderId: string): Promise<number> {
-  const payments = await prisma.payment.findMany({
-    where: { orderId, status: "COMPLETED" },
-    select: { amount: true },
+  const payments = await prisma.orderPayment.findMany({
+    where: { orderId, status: "PAID" },
+    select: { amountPaid: true },
   });
 
-  return payments.reduce((sum, payment) => sum + payment.amount, 0);
+  return payments.reduce((sum, payment) => sum + moneyDecimalToPence(payment.amountPaid), 0);
+}
+
+function mapRestaurantStatusToOrderStatus(
+  status: Prisma.RestaurantOrderGetPayload<{ select: { status: true } }>["status"],
+): SerializedOrderQueueItem["status"] {
+  if (status === "CONFIRMED") {
+    return "ACCEPTED";
+  }
+  return status as SerializedOrderQueueItem["status"];
+}
+
+function mapRestaurantKitchenStatus(
+  status: Prisma.RestaurantOrderGetPayload<{ select: { status: true } }>["status"],
+): string | null {
+  if (status === "PENDING" || status === "CONFIRMED") {
+    return "NEW";
+  }
+  if (status === "PREPARING") {
+    return "PREPARING";
+  }
+  if (status === "READY") {
+    return "READY";
+  }
+  if (status === "SERVED" || status === "COMPLETED") {
+    return "SERVED";
+  }
+  return null;
 }
 
 async function serializeOrderQueueItem(
-  order: Prisma.LegacyOrderGetPayload<{
+  order: Prisma.RestaurantOrderGetPayload<{
     include: {
-      table: { select: { name: true } };
-      kitchenQueue: { select: { status: true } };
+      restaurantTable: { select: { tableName: true } };
+      customer: { select: { name: true; phone: true } };
       items: { select: { id: true } };
     };
   }>,
 ): Promise<SerializedOrderQueueItem> {
-  const orderTotalPence = moneyDecimalToPence(order.total);
+  const orderTotalPence = moneyDecimalToPence(order.totalAmount);
   const amountPaidPence = await getOrderAmountPaidPence(order.id);
   const remainingBalancePence = Math.max(orderTotalPence - amountPaidPence, 0);
 
   let paymentStatus: SerializedOrderQueueItem["paymentStatus"] = "UNPAID";
-  if (remainingBalancePence <= 0) {
+  if (order.paymentStatus === "PAID" || remainingBalancePence <= 0) {
     paymentStatus = "PAID";
-  } else if (amountPaidPence > 0) {
+  } else if (order.paymentStatus === "PARTIALLY_PAID" || amountPaidPence > 0) {
     paymentStatus = "PARTIAL";
   }
 
   return {
     id: order.id,
     orderNumber: order.orderNumber,
-    status: order.status,
-    fulfilmentType: order.fulfilmentType,
-    customerName: order.customerName,
-    customerPhone: order.customerPhone,
-    tableName: order.table?.name ?? null,
-    total: typeof order.total === "number" ? order.total : order.total.toNumber(),
+    status: mapRestaurantStatusToOrderStatus(order.status),
+    fulfilmentType: order.orderType as SerializedOrderQueueItem["fulfilmentType"],
+    customerName: order.customer?.name ?? null,
+    customerPhone: order.customer?.phone ?? null,
+    tableName: order.restaurantTable?.tableName ?? null,
+    total:
+      typeof order.totalAmount === "number" ? order.totalAmount : order.totalAmount.toNumber(),
     paymentStatus,
     amountPaidPence,
     remainingBalancePence,
-    kitchenStatus: order.kitchenQueue?.status ?? null,
+    kitchenStatus: mapRestaurantKitchenStatus(order.status),
     itemCount: order.items.length,
-    createdAt: order.createdAt.toISOString(),
+    createdAt: order.placedAt.toISOString(),
   };
 }
+
+const restaurantOrderQueueInclude = {
+  restaurantTable: { select: { tableName: true } },
+  customer: { select: { name: true, phone: true } },
+  items: { select: { id: true } },
+} satisfies Prisma.RestaurantOrderInclude;
 
 function normalizeDateKey(value: Date | string): string {
   const date = typeof value === "string" ? new Date(value) : value;
@@ -200,17 +234,13 @@ export async function getRestaurantOperationsBundle(
   const permissions = buildPermissions(platform);
   const widgets = await buildDashboardWidgets(platform);
 
-  const orders = await prisma.legacyOrder.findMany({
+  const orders = await prisma.restaurantOrder.findMany({
     where: {
       businessId: platform.business.id,
       ...branchFilter(platform.branchId),
     },
-    include: {
-      table: { select: { name: true } },
-      kitchenQueue: { select: { status: true } },
-      items: { select: { id: true } },
-    },
-    orderBy: [{ createdAt: "desc" }],
+    include: restaurantOrderQueueInclude,
+    orderBy: [{ placedAt: "desc" }],
     take: 5,
   });
 
@@ -236,28 +266,24 @@ export async function queryOrderQueue(
   const page = Math.max(query.page ?? 1, 1);
   const pageSize = query.pageSize ?? ORDER_QUEUE_PAGE_SIZE;
 
-  const orders = await prisma.legacyOrder.findMany({
+  const orders = await prisma.restaurantOrder.findMany({
     where: {
       businessId: platform.business.id,
       ...branchFilter(platform.branchId),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.fulfilmentType ? { fulfilmentType: query.fulfilmentType } : {}),
+      ...(query.status ? { status: query.status === "ACCEPTED" ? "CONFIRMED" : query.status } : {}),
+      ...(query.fulfilmentType ? { orderType: query.fulfilmentType } : {}),
       ...(query.search
         ? {
             OR: [
               { orderNumber: { contains: query.search, mode: "insensitive" } },
-              { customerName: { contains: query.search, mode: "insensitive" } },
-              { customerPhone: { contains: query.search, mode: "insensitive" } },
+              { customer: { name: { contains: query.search, mode: "insensitive" } } },
+              { customer: { phone: { contains: query.search, mode: "insensitive" } } },
             ],
           }
         : {}),
     },
-    include: {
-      table: { select: { name: true } },
-      kitchenQueue: { select: { status: true } },
-      items: { select: { id: true } },
-    },
-    orderBy: [{ createdAt: "desc" }],
+    include: restaurantOrderQueueInclude,
+    orderBy: [{ placedAt: "desc" }],
   });
 
   const serialized = await Promise.all(orders.map(serializeOrderQueueItem));
@@ -527,9 +553,9 @@ export async function cancelRestaurantOrder(
   platform: BusinessContext,
   orderId: string,
 ): Promise<OrderData> {
-  const order = await prisma.legacyOrder.findFirst({
+  const order = await prisma.restaurantOrder.findFirst({
     where: { id: orderId, businessId: platform.business.id },
-    select: { id: true },
+    select: { id: true, branchId: true },
   });
 
   if (!order) {
@@ -537,7 +563,7 @@ export async function cancelRestaurantOrder(
   }
 
   const { cancelOrder } = await import("@/services/order.service");
-  return cancelOrder(orderId);
+  return cancelOrder(orderId, platform.business.id, order.branchId);
 }
 
 export async function listRestaurantOrdersForVerification(

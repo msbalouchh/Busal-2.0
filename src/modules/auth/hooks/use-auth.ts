@@ -10,10 +10,10 @@ import {
   getGoogleSignInUrl,
   loginWithEmail,
   requestPasswordReset,
+  resendVerificationEmail,
   resetPassword,
   signupWithEmail,
 } from "@/modules/auth/lib/auth.client";
-import { mockResendVerificationEmail } from "@/modules/auth/lib/auth.mock";
 import { useAuthStore } from "@/stores/auth.store";
 import type { LoginFormValues } from "@/schemas/auth.schema";
 
@@ -116,7 +116,7 @@ export function useResetPassword() {
 
 export function useResendVerificationEmail() {
   return useMutation({
-    mutationFn: mockResendVerificationEmail,
+    mutationFn: resendVerificationEmail,
     onSuccess: () => {
       toast.success("Verification email sent.");
     },

@@ -46,7 +46,9 @@ export {
   listTools,
 } from "@/modules/ai/registry/tool-registry";
 
+/** @deprecated Use `@/modules/ai-engine` — production memory via aiMemoryManager. */
 export { MemoryEngine, memoryEngine } from "@/modules/ai/memory/memory-engine";
+/** @deprecated Use `@/modules/ai-engine` — production prompts via aiPromptManager. */
 export { PromptEngine, promptEngine } from "@/modules/ai/prompts/prompt-engine";
 
 export {
@@ -58,6 +60,7 @@ export {
   AIResponsePipeline,
   createResponsePipeline,
 } from "@/modules/ai/services/response-pipeline";
+/** @deprecated Dev/test fixtures — production uses ai-engine context injection. */
 export {
   buildAiRuntimeContext,
   buildAiPlatformContext,
@@ -73,6 +76,7 @@ export type {
   OrchestratorRunResult,
 } from "@/modules/ai/orchestrator/ai-orchestrator";
 
+/** @deprecated Use `@/modules/ai-engine` aiProviderManager. */
 export { LocalAiProvider, localAiProvider } from "@/modules/ai/providers/local-ai-provider";
 export { AIContextProvider } from "@/modules/ai/providers/ai-context-provider";
 

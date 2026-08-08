@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { AgentCategory } from "@prisma/client";
 
 import { discoverRegisteredAgents } from "@/modules/ai-agent-platform-management/engine/agent-registry";

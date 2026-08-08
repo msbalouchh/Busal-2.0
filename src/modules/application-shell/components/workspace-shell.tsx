@@ -17,13 +17,26 @@ interface WorkspaceShellFrameProps {
   children: ReactNode;
   userName?: string;
   userEmail?: string;
+  businessName?: string;
+  branchName?: string | null;
 }
 
-function WorkspaceShellFrame({ children, userName, userEmail }: WorkspaceShellFrameProps) {
+function WorkspaceShellFrame({
+  children,
+  userName,
+  userEmail,
+  businessName,
+  branchName,
+}: WorkspaceShellFrameProps) {
   return (
     <div className={cn("bg-background min-h-screen w-full overflow-x-clip")}>
       <SkipToContent />
-      <WorkspaceHeader userName={userName} userEmail={userEmail} />
+      <WorkspaceHeader
+        userName={userName}
+        userEmail={userEmail}
+        businessName={businessName}
+        branchName={branchName}
+      />
       <WorkspaceSidebar />
       <WorkspaceMainContent>{children}</WorkspaceMainContent>
       <NotificationCenter />
@@ -35,6 +48,8 @@ function WorkspaceShellFrame({ children, userName, userEmail }: WorkspaceShellFr
 export function WorkspaceShell({
   children,
   workspaceName,
+  businessName,
+  branchName,
   userName,
   userEmail,
   workspaces,
@@ -47,7 +62,12 @@ export function WorkspaceShell({
       initialNotifications={notifications}
     >
       <NavigationSidebarProvider defaultOpen={false} defaultCollapsed={false}>
-        <WorkspaceShellFrame userName={userName} userEmail={userEmail}>
+        <WorkspaceShellFrame
+          userName={userName}
+          userEmail={userEmail}
+          businessName={businessName}
+          branchName={branchName}
+        >
           {children}
         </WorkspaceShellFrame>
       </NavigationSidebarProvider>

@@ -6,6 +6,7 @@ import {
   createSalesInsight,
   createSalesRecommendation,
 } from "@/services/ai-sales-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 
 export interface QuoteAnalysisItem {
   id: string;
@@ -58,36 +59,27 @@ export async function getLikelyToCloseQuotes(ownerId: string): Promise<QuoteAnal
 }
 
 export async function generateQuoteInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const quotes = await analyzeQuotes(ownerId);
-  let created = 0;
-
-  const likelyClose = quotes.filter((q) => LIKELY_CLOSE_STATUSES.has(q.status));
-  if (likelyClose.length > 0) {
-    await createSalesInsight(businessId, {
-      title: "Quotes likely to close",
-      description: `${likelyClose.length} quotes are in sent or approved status with active opportunities.`,
-      category: "quotes",
-      priority: "HIGH",
-      recommendation: "Follow up on sent quotes within 48 hours to accelerate closure.",
-      metadata: { quoteIds: likelyClose.map((q) => q.id) },
-    });
-    created += 1;
-  }
-
-  const staleCutoff = new Date(Date.now() - STALE_DAYS * 86400000);
-  const staleQuotes = quotes.filter((q) => q.sentAt && new Date(q.sentAt) < staleCutoff);
-  for (const quote of staleQuotes.slice(0, 3)) {
-    await createSalesRecommendation(businessId, {
-      title: `Follow up on quote ${quote.quoteNumber}`,
-      description: `Quote for "${quote.opportunityTitle}" has been pending for over ${STALE_DAYS} days.`,
-      action: "Schedule follow-up call or send reminder email",
-      priority: "HIGH",
-      expectedImpact: "Recover stalled deal",
-      metadata: { quoteId: quote.id },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "sales",
+    task: "quote-insights",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createSalesInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "quotes",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+    persistRecommendation: (businessId, recommendation) =>
+      createSalesRecommendation(businessId, {
+        title: recommendation.title,
+        description: recommendation.description,
+        action: recommendation.action ?? recommendation.recommendation ?? "Review AI recommendation",
+        priority: (recommendation.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        expectedImpact: recommendation.expectedImpact,
+        metadata: recommendation.metadata,
+      }),
+  });
 }

@@ -2,12 +2,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PrismaClient } from "@prisma/client";
-
 import { PERMISSION_CODES } from "../src/modules/authorization/constants/permissions";
 import { formatCrmMoney } from "../src/modules/crm/utils/crm-utils";
 import { CRM_ROUTES } from "../src/modules/crm/constants/routes";
-import { addItem, createCart } from "../src/services/cart.service";
+import { createLegacyPayableOrder, ensureVerificationTenantContext } from "./lib/verify-oms-order";
+import { handleVerificationError } from "./lib/verify-db";
+import { getVerifyPrisma } from "./lib/verify-prisma";
 import {
   createCustomer,
   getCustomer,
@@ -17,10 +17,7 @@ import {
   listCustomerGroups,
   processCrmForCompletedOrder,
 } from "../src/services/crm.service";
-import { createOrderFromSession } from "../src/services/order.service";
-import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
-import { recordPayment } from "../src/services/payment.service";
-import { createQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { recordPaymentForBusiness } from "../src/modules/payments/services/payment-business-bridge.service";
 import {
   adjustLoyaltyPoints,
   calculateEarnPoints,
@@ -30,8 +27,9 @@ import {
   redeemReward,
 } from "../src/services/loyalty.service";
 import { moneyDecimalToPence } from "../src/modules/payments/utils/currency";
+import { ensureLoyaltyAccount } from "../src/services/restaurant-loyalty-account.service";
 
-const prisma = new PrismaClient();
+const prisma = getVerifyPrisma();
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -48,39 +46,20 @@ function assertIntegerPenceValue(value: number, label: string): void {
   assert(Number.isInteger(value), `${label} must be integer pence`);
 }
 
-async function createCrmOrder(businessId: string, ownerId: string, suffix: string) {
-  const qrCode = await createQRCode(ownerId, { slug: `crm-${suffix}` });
-  const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
-    sessionToken: `crm-token-${suffix}`,
+async function createCrmOrder(businessId: string, suffix: string, customerId: string) {
+  const { branchId } = await ensureVerificationTenantContext(prisma, businessId);
+  const { order } = await createLegacyPayableOrder(prisma, businessId, suffix, {
+    price: 25,
+    quantity: 2,
+    branchId,
   });
 
-  const menuItem = await prisma.menuItem.create({
-    data: {
-      businessId,
-      name: `CRM Verify Item ${suffix}`,
-      price: 25,
-      isAvailable: true,
-    },
-    select: { id: true },
+  await prisma.restaurantOrder.update({
+    where: { id: order.id },
+    data: { customerId },
   });
 
-  const cart = await createCart(businessId, visit.session.id);
-  await addItem(businessId, visit.session.id, menuItem.id, 2);
-
-  const orderSession = await createOrderSession(businessId, cart.id, visit.session.id);
-  await markOrderSessionReady(orderSession.id);
-
-  await prisma.orderSession.update({
-    where: { id: orderSession.id },
-    data: {
-      customerName: `CRM Customer ${suffix}`,
-      customerPhone: `07${suffix.slice(-9).padStart(9, "0")}`,
-    },
-  });
-
-  const order = await createOrderFromSession(orderSession.id);
-
-  return { order, menuItemId: menuItem.id };
+  return { order, branchId };
 }
 
 async function main() {
@@ -119,9 +98,9 @@ async function main() {
   const contextSource = readFileSync(join(root, "src/modules/crm/lib/get-crm-context.ts"), "utf8");
   const actionsSource = readFileSync(join(root, "src/modules/crm/actions/crm-actions.ts"), "utf8");
   assert(contextSource.includes("protectedPage"), "crm pages should use protectedPage");
-  assert(contextSource.includes("PERMISSION_CODES.CRM_VIEW"), "crm.view required");
+  assert(contextSource.includes("CRM_PERMISSIONS.CRM_READ"), "crm.view required");
   assert(actionsSource.includes("protectedAction"), "crm actions should use protectedAction");
-  assert(actionsSource.includes("PERMISSION_CODES.CRM_MANAGE"), "crm.manage required");
+  assert(actionsSource.includes("CRM_PERMISSIONS.CRM_MANAGE"), "crm.manage required");
   assert(PERMISSION_CODES.CRM_VIEW === "crm.view", "crm.view code missing");
   assert(PERMISSION_CODES.CRM_MANAGE === "crm.manage", "crm.manage code missing");
   console.log("  PASS");
@@ -176,27 +155,40 @@ async function main() {
   assert(adjustedCustomer.loyaltyPoints === 150, "manual points adjustment failed");
   console.log("  PASS");
 
-  const { order } = await createCrmOrder(business.id, business.ownerId, suffix);
-  const orderRecord = await prisma.legacyOrder.findUnique({
+  await ensureLoyaltyAccount(customer.id, `CRM-${suffix.slice(-8)}`);
+  await prisma.loyaltyAccount.update({
+    where: { customerId: customer.id },
+    data: { pointsBalance: adjustedCustomer.loyaltyPoints, lifetimePoints: adjustedCustomer.loyaltyPoints },
+  });
+
+  const { order, branchId } = await createCrmOrder(business.id, suffix, customer.id);
+  const orderRecord = await prisma.restaurantOrder.findUnique({
     where: { id: order.id },
-    select: { total: true },
+    select: { totalAmount: true },
   });
   assert(orderRecord, "order record missing");
-  const orderTotalPence = moneyDecimalToPence(orderRecord.total);
+  const orderTotalPence = moneyDecimalToPence(orderRecord.totalAmount);
 
   console.log("CRM order completion integration");
-  await recordPayment(business.id, order.id, null, {
+  await recordPaymentForBusiness(business.id, order.id, {
     method: "CARD",
     amountPence: orderTotalPence,
     amountTenderedPence: orderTotalPence,
+  }, branchId);
+
+  const linkedOrder = await prisma.restaurantOrder.findUnique({
+    where: { id: order.id },
+    select: { customerId: true, status: true, paymentStatus: true },
+  });
+  assert(linkedOrder?.paymentStatus === "PAID", "order payment should be completed");
+  assert(linkedOrder?.customerId, "order should link to customer");
+
+  await prisma.restaurantOrder.update({
+    where: { id: order.id },
+    data: { status: "COMPLETED", completedAt: new Date() },
   });
 
-  const linkedOrder = await prisma.legacyOrder.findUnique({
-    where: { id: order.id },
-    select: { customerId: true, status: true },
-  });
-  assert(linkedOrder?.status === "COMPLETED", "order should be completed");
-  assert(linkedOrder?.customerId, "order should link to customer");
+  await processCrmForCompletedOrder(business.id, order.id, null);
 
   const customerAfterOrder = await getCustomer(linkedOrder.customerId!, business.id);
   assert(customerAfterOrder.loyaltyPoints > 150, "loyalty points should be earned on order");
@@ -267,10 +259,7 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
+  .catch(handleVerificationError)
   .finally(async () => {
     await prisma.$disconnect();
   });

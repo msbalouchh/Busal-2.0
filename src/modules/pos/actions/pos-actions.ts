@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
+import { POS_MODULE_PERMISSIONS } from "@/modules/pos/constants/permissions";
 import { KITCHEN_ROUTES } from "@/modules/kitchen/constants/routes";
 import { protectedAction } from "@/modules/platform-guards/guards/action.guards";
 import { POS_ROUTES, type PosOrderType } from "@/modules/pos/constants/routes";
@@ -30,7 +30,7 @@ export async function addPosItemAction(input: {
   menuItemId: string;
   quantity?: number;
 }) {
-  return protectedAction(PERMISSION_CODES.POS_USE, async ({ business }) => {
+  return protectedAction(POS_MODULE_PERMISSIONS.POS_CREATE, async ({ business }) => {
     const currentCart = await prisma.cart.findFirst({
       where: { id: input.cartId, businessId: business.id },
       select: { qrMenuSessionId: true },
@@ -53,7 +53,7 @@ export async function addPosItemAction(input: {
 }
 
 export async function removePosItemAction(input: { cartItemId: string }) {
-  return protectedAction(PERMISSION_CODES.POS_USE, async ({ business }) => {
+  return protectedAction(POS_MODULE_PERMISSIONS.POS_CREATE, async ({ business }) => {
     const item = await prisma.cartItem.findUnique({
       where: { id: input.cartItemId },
       include: { cart: { select: { businessId: true } } },
@@ -70,7 +70,7 @@ export async function removePosItemAction(input: { cartItemId: string }) {
 }
 
 export async function updatePosItemQuantityAction(input: { cartItemId: string; quantity: number }) {
-  return protectedAction(PERMISSION_CODES.POS_USE, async ({ business }) => {
+  return protectedAction(POS_MODULE_PERMISSIONS.POS_CREATE, async ({ business }) => {
     const item = await prisma.cartItem.findUnique({
       where: { id: input.cartItemId },
       include: { cart: { select: { businessId: true } } },
@@ -87,7 +87,7 @@ export async function updatePosItemQuantityAction(input: { cartItemId: string; q
 }
 
 export async function clearPosOrderAction(input: { cartId: string }) {
-  return protectedAction(PERMISSION_CODES.POS_USE, async ({ business }) => {
+  return protectedAction(POS_MODULE_PERMISSIONS.POS_CREATE, async ({ business }) => {
     const cart = await clearPosOrder(input.cartId, business.id);
     revalidatePosPaths();
     return { success: true as const, cart: serializePosCart(cart) };
@@ -103,7 +103,7 @@ export async function holdPosOrderAction(input: {
   customerName?: string | null;
   orderNotes?: string | null;
 }) {
-  return protectedAction(PERMISSION_CODES.POS_USE, async ({ business, platform }) => {
+  return protectedAction(POS_MODULE_PERMISSIONS.POS_CREATE, async ({ business, platform }) => {
     const heldOrder = await holdPosOrder({
       businessId: business.id,
       cartId: input.cartId,
@@ -132,7 +132,7 @@ export async function resumePosOrderAction(input: {
   posSessionId: string;
   orderSessionId: string;
 }) {
-  return protectedAction(PERMISSION_CODES.POS_USE, async ({ business, platform }) => {
+  return protectedAction(POS_MODULE_PERMISSIONS.POS_CREATE, async ({ business, platform }) => {
     const cart = await resumePosOrder({
       businessId: business.id,
       orderSessionId: input.orderSessionId,
@@ -157,7 +157,7 @@ export async function sendPosOrderToKitchenAction(input: {
   orderNotes?: string | null;
 }) {
   return protectedAction(
-    [PERMISSION_CODES.POS_USE, PERMISSION_CODES.ORDER_CREATE],
+    [POS_MODULE_PERMISSIONS.POS_CREATE, POS_MODULE_PERMISSIONS.POS_UPDATE],
     async ({ business, platform }) => {
       const result = await sendPosOrderToKitchen({
         businessId: business.id,
@@ -184,7 +184,7 @@ export async function sendPosOrderToKitchenAction(input: {
 }
 
 export async function createNewPosOrderAction(input: { posSessionId: string }) {
-  return protectedAction(PERMISSION_CODES.POS_USE, async ({ business }) => {
+  return protectedAction(POS_MODULE_PERMISSIONS.POS_CREATE, async ({ business }) => {
     const cart = await getOrCreatePosCart(business.id, input.posSessionId);
     revalidatePosPaths();
     return { success: true as const, cart: serializePosCart(cart) };
@@ -192,7 +192,7 @@ export async function createNewPosOrderAction(input: { posSessionId: string }) {
 }
 
 export async function fetchPosStateAction(input: { posSessionId: string; cartId?: string }) {
-  return protectedAction(PERMISSION_CODES.POS_USE, async ({ business, platform }) => {
+  return protectedAction(POS_MODULE_PERMISSIONS.POS_CREATE, async ({ business, platform }) => {
     const cartRecord = input.cartId
       ? await prisma.cart.findFirst({
           where: { id: input.cartId, businessId: business.id },

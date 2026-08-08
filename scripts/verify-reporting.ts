@@ -7,11 +7,8 @@ import { PrismaClient } from "@prisma/client";
 import { PERMISSION_CODES } from "../src/modules/authorization/constants/permissions";
 import { formatReportingMoney } from "../src/modules/reporting/utils/reporting-utils";
 import { REPORTING_ROUTES } from "../src/modules/reporting/constants/routes";
-import { addItem, createCart } from "../src/services/cart.service";
-import { createOrderFromSession } from "../src/services/order.service";
-import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
-import { recordPayment } from "../src/services/payment.service";
-import { createQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { createOmsOrderFromQrFlow } from "./lib/verify-oms-order";
+import { recordPaymentForBusiness } from "../src/modules/payments/services/payment-business-bridge.service";
 import {
   getCustomerAnalytics,
   getFinancialReport,
@@ -42,26 +39,13 @@ function assertIntegerPenceValue(value: number, label: string): void {
 }
 
 async function createReportingOrder(businessId: string, ownerId: string, suffix: string) {
-  const qrCode = await createQRCode(ownerId, { slug: `report-${suffix}` });
-  const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
-    sessionToken: `report-token-${suffix}`,
-  });
-
-  const menuItem = await prisma.menuItem.create({
-    data: {
-      businessId,
-      name: `Reporting Verify Item ${suffix}`,
-      price: 18.5,
-      isAvailable: true,
-    },
-    select: { id: true },
-  });
-
-  const cart = await createCart(businessId, visit.session.id);
-  await addItem(businessId, visit.session.id, menuItem.id, 1);
-
-  const orderSession = await createOrderSession(businessId, cart.id, visit.session.id);
-  await markOrderSessionReady(orderSession.id);
+  const { order, branchId, menuItem, orderSession } = await createOmsOrderFromQrFlow(
+    prisma,
+    businessId,
+    ownerId,
+    suffix,
+    { slugPrefix: "report", price: 18.5 },
+  );
 
   await prisma.orderSession.update({
     where: { id: orderSession.id },
@@ -71,17 +55,16 @@ async function createReportingOrder(businessId: string, ownerId: string, suffix:
     },
   });
 
-  const order = await createOrderFromSession(orderSession.id);
-  const orderRecord = await prisma.legacyOrder.findUniqueOrThrow({
+  const orderRecord = await prisma.restaurantOrder.findUniqueOrThrow({
     where: { id: order.id },
-    select: { total: true },
+    select: { totalAmount: true },
   });
-  const orderTotalPence = moneyDecimalToPence(orderRecord.total);
-  await recordPayment(businessId, order.id, null, {
+  const orderTotalPence = moneyDecimalToPence(orderRecord.totalAmount);
+  await recordPaymentForBusiness(businessId, order.id, {
     method: "CASH",
     amountPence: orderTotalPence,
     amountTenderedPence: orderTotalPence,
-  });
+  }, branchId);
 
   return { order, menuItemId: menuItem.id };
 }

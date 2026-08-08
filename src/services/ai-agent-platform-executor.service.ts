@@ -19,6 +19,7 @@ import {
 } from "@/services/ai-agent-platform-loader.service";
 import { getPlatformAgent } from "@/services/ai-agent-platform-manager.service";
 import { assertAgentExecutionPermission } from "@/services/ai-agent-platform-permission.service";
+import { runCentralAiChatForOwner } from "@/services/ai-engine-bridge.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 class PlatformAgentExecutor implements IAIExecutor {
@@ -72,19 +73,34 @@ export async function executePlatformAgent(
   });
 
   try {
-    const agent = await loadPlatformAgent(input.agentId, ownerId);
     const context = await loadPlatformAgentContext(input.agentId, ownerId, permissions);
+    const userMessage =
+      typeof input.input?.message === "string"
+        ? input.input.message
+        : JSON.stringify(input.input ?? {});
 
     let response: IAIResponse;
-    if (agent) {
-      response = await executor.execute(agent, context, input.input ?? {});
-    } else {
-      const provider = getPlatformAiProvider();
-      const providerResponse = await provider.complete({
-        systemPrompt: `You are ${record.name}, a Busal AI agent.`,
-        messages: [{ role: "user", content: JSON.stringify(input.input ?? {}) }],
+    try {
+      const engineResult = await runCentralAiChatForOwner(ownerId, {
+        message: userMessage,
+        agentSlug: record.slug,
+        currentModule: "ai-agent-platform",
+        enableTools: true,
+        metadata: { agentContext: context.metadata ?? {} },
       });
-      response = { content: providerResponse.content, metadata: { provider: provider.id } };
+
+      response = {
+        content: engineResult.content,
+        metadata: {
+          provider: engineResult.providerId,
+          model: engineResult.model,
+          auditId: engineResult.auditId,
+        },
+      };
+    } catch (engineError) {
+      const agent = await loadPlatformAgent(input.agentId, ownerId);
+      if (!agent) throw engineError;
+      response = await executor.execute(agent, context, input.input ?? {});
     }
 
     const completedAt = new Date();

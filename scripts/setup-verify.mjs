@@ -47,6 +47,23 @@ loadEnvFile(".env");
 loadEnvFile(".env.local");
 loadEnvFile(".env.development");
 
+process.env.ALLOW_MOCK_AI = process.env.ALLOW_MOCK_AI ?? "true";
+if (process.env.NODE_ENV === "production") {
+  process.env.NODE_ENV = "development";
+}
+
+const { bootstrapVerificationEnvironment, ensureOnboardedBusinessForVerification } = await import(
+  "./lib/verify-bootstrap.ts"
+);
+const { getVerifyPrisma } = await import("./lib/verify-prisma.ts");
+const { connectWithRetry } = await import("./lib/verify-db.ts");
+
+bootstrapVerificationEnvironment();
+
+const verifyPrisma = getVerifyPrisma();
+await connectWithRetry(verifyPrisma);
+await ensureOnboardedBusinessForVerification(verifyPrisma);
+
 const originalLoad = Module._load;
 
 Module._load = function (request, parent, isMain) {

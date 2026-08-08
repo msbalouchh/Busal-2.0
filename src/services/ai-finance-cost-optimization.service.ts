@@ -1,6 +1,10 @@
 import "server-only";
 
-import { createFinanceRecommendation } from "@/services/ai-finance-recommendation.service";
+import {
+  createFinanceInsight,
+  createFinanceRecommendation,
+} from "@/services/ai-finance-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getExpenseSnapshot } from "@/services/ai-finance-expense-analysis.service";
 import { getProfitabilitySnapshot } from "@/services/ai-finance-profitability.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
@@ -55,21 +59,27 @@ export async function identifyCostOptimizations(
 }
 
 export async function generateCostOptimizationRecommendations(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const opportunities = await identifyCostOptimizations(ownerId);
-  let created = 0;
-
-  for (const opp of opportunities.slice(0, 5)) {
-    await createFinanceRecommendation(businessId, {
-      title: `Cost savings: ${opp.area}`,
-      description: opp.description,
-      action: opp.action,
-      expectedImpact: `Estimated savings: £${(opp.estimatedSavingsPence / 100).toFixed(2)}`,
-      confidenceScore: opp.confidence,
-      metadata: { type: "cost_optimization", area: opp.area },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "finance",
+    task: "cost-optimization-recommendations",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createFinanceInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "cost_optimization",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+    persistRecommendation: (businessId, recommendation) =>
+      createFinanceRecommendation(businessId, {
+        title: recommendation.title,
+        description: recommendation.description,
+        action: recommendation.action ?? recommendation.recommendation ?? "Review AI recommendation",
+        expectedImpact: recommendation.expectedImpact,
+        confidenceScore: recommendation.confidenceScore,
+        metadata: recommendation.metadata,
+      }),
+  });
 }

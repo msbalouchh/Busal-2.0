@@ -21,6 +21,7 @@ import { API_ROUTES, ROUTES } from "@/constants/routes";
 import { assignAppPath } from "@/lib/app-navigation";
 import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth.store";
 import { BUSINESS_ROUTES } from "@/modules/business/constants/routes";
 
 interface UserMenuProps {
@@ -64,6 +65,7 @@ export function UserMenu({ userName, userEmail }: UserMenuProps) {
         method: "POST",
         credentials: "include",
       });
+      useAuthStore.getState().reset();
       assignAppPath(ROUTES.login);
     } finally {
       setIsSigningOut(false);

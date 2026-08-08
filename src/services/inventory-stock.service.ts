@@ -4,6 +4,7 @@ import { type Prisma, type StockAdjustmentDirection, type StockMovementType } fr
 import { Decimal } from "@prisma/client/runtime/library";
 
 import { prisma } from "@/lib/prisma";
+import { runInteractiveTransaction } from "@/lib/prisma-transaction";
 import { branchFilter } from "@/modules/business-context/utils/branch-scope";
 import { logInventoryAudit } from "@/modules/inventory/utils/inventory-audit";
 import {
@@ -111,7 +112,7 @@ export async function createStockAdjustment(
 
   const quantityChange = input.direction === "INCREASE" ? quantity : quantity.mul(-1);
 
-  const adjustment = await prisma.$transaction(async (tx) => {
+  const adjustment = await runInteractiveTransaction(async (tx) => {
     const { movementId } = await applyStockChange(tx, {
       businessId,
       branchId,
@@ -195,8 +196,26 @@ export async function deductStockForCompletedOrder(
   paymentId?: string | null,
   branchId: string | null = null,
 ): Promise<void> {
+  const order = await prisma.restaurantOrder.findFirst({
+    where: { id: orderId, businessId, status: "COMPLETED" },
+    include: { items: true },
+  });
+
+  if (!order) {
+    throw new Error("Completed order not found for stock deduction");
+  }
+
+  const legacyOrder = await prisma.legacyOrder.findFirst({
+    where: {
+      businessId,
+      OR: [{ id: orderId }, { orderSessionId: orderId }, { orderNumber: order.orderNumber }],
+    },
+    select: { id: true },
+  });
+  const stockOrderId = legacyOrder?.id ?? orderId;
+
   const existing = await prisma.orderStockDeduction.findUnique({
-    where: { orderId },
+    where: { orderId: stockOrderId },
     select: { id: true },
   });
 
@@ -204,39 +223,31 @@ export async function deductStockForCompletedOrder(
     return;
   }
 
-  const order = await prisma.legacyOrder.findFirst({
-    where: { id: orderId, businessId, status: "COMPLETED" },
-    include: {
-      items: {
-        include: {
-          menuItem: {
-            include: {
-              recipe: {
-                include: {
-                  lines: {
-                    include: {
-                      ingredient: {
-                        select: { id: true, name: true, currentStock: true },
-                      },
-                    },
-                  },
-                },
-              },
+  const deductions = new Map<string, Decimal>();
+
+  for (const orderItem of order.items) {
+    const menuItem = await prisma.menuItem.findFirst({
+      where: { businessId, name: orderItem.productNameSnapshot },
+      select: { id: true },
+    });
+
+    if (!menuItem) {
+      continue;
+    }
+
+    const recipe = await prisma.recipe.findUnique({
+      where: { menuItemId: menuItem.id },
+      include: {
+        lines: {
+          include: {
+            ingredient: {
+              select: { id: true, name: true, currentStock: true },
             },
           },
         },
       },
-    },
-  });
+    });
 
-  if (!order) {
-    throw new Error("Completed order not found for stock deduction");
-  }
-
-  const deductions = new Map<string, Decimal>();
-
-  for (const orderItem of order.items) {
-    const recipe = orderItem.menuItem.recipe;
     if (!recipe) {
       continue;
     }
@@ -254,12 +265,12 @@ export async function deductStockForCompletedOrder(
 
   if (deductions.size === 0) {
     await prisma.orderStockDeduction.create({
-      data: { businessId, orderId },
+      data: { businessId, orderId: stockOrderId },
     });
     return;
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     for (const [ingredientId, requiredQuantity] of deductions.entries()) {
       await applyStockChange(tx, {
         businessId,
@@ -268,14 +279,14 @@ export async function deductStockForCompletedOrder(
         quantityChange: requiredQuantity.mul(-1),
         movementType: "SALE_DEDUCTION",
         staffId,
-        orderId,
+        orderId: stockOrderId,
         paymentId: paymentId ?? null,
         reason: "Order completed",
       });
     }
 
     await tx.orderStockDeduction.create({
-      data: { businessId, orderId },
+      data: { businessId, orderId: stockOrderId },
     });
   });
 

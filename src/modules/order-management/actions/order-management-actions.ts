@@ -27,7 +27,7 @@ import {
   startPreparingManagedOrder,
   transferOrderTable,
   updateManagedOrder,
-} from "@/services/restaurant-order.service";
+} from "@/modules/orders/services/order-management-adapter.service";
 
 function revalidateOrderPages(branchId: string, orderId?: string) {
   revalidatePath(ORDER_MANAGEMENT_ROUTES.listForBranch(branchId));

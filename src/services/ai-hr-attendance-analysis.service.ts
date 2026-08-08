@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { createHrInsight, createHrRecommendation } from "@/services/ai-hr-insight.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -87,44 +88,26 @@ export async function analyzeLeavePatterns(ownerId: string): Promise<LeavePatter
 }
 
 export async function generateAttendanceInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getAttendanceSnapshot(ownerId);
-  let created = 0;
-
-  if (snapshot.inactiveLogin > 0) {
-    await createHrInsight(businessId, {
-      title: "Attendance engagement gap",
-      description: `${snapshot.inactiveLogin} active staff have not logged in for ${INACTIVE_DAYS}+ days.`,
-      category: "attendance",
-      priority: snapshot.inactiveLogin > 3 ? "HIGH" : "MEDIUM",
-      recommendation: "Follow up with inactive staff and verify shift assignments.",
-      metadata: { inactiveCount: snapshot.inactiveLogin },
-    });
-    created += 1;
-  }
-
-  if (snapshot.onLeave > 0) {
-    await createHrInsight(businessId, {
-      title: "Leave pattern summary",
-      description: `${snapshot.onLeave} employees currently on leave (${snapshot.leaveRate}% of workforce).`,
-      category: "leave",
-      priority: snapshot.leaveRate > 20 ? "HIGH" : "MEDIUM",
-      recommendation: "Review coverage plans and ensure adequate staffing during leave periods.",
-      metadata: { onLeave: snapshot.onLeave, leaveRate: snapshot.leaveRate },
-    });
-    created += 1;
-  }
-
-  if (snapshot.lockedAccounts > 0) {
-    await createHrRecommendation(businessId, {
-      title: "Review locked staff accounts",
-      description: `${snapshot.lockedAccounts} accounts are locked or suspended.`,
-      action: "Contact affected employees and resolve account access issues.",
-      confidenceScore: 0.9,
-      metadata: { type: "attendance_account" },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "hr",
+    task: "attendance-insights",
+    loadContext: getAttendanceSnapshot,
+    persistInsight: (businessId, insight) =>
+      createHrInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "attendance",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+    persistRecommendation: (businessId, recommendation) =>
+      createHrRecommendation(businessId, {
+        title: recommendation.title,
+        description: recommendation.description,
+        action: recommendation.action ?? recommendation.recommendation ?? "Review AI recommendation",
+        confidenceScore: recommendation.confidenceScore,
+        metadata: recommendation.metadata,
+      }),
+  });
 }

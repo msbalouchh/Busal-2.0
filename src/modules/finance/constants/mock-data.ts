@@ -230,6 +230,9 @@ function buildInvoice(partial: {
 export const MOCK_FINANCE_RECORD: FinanceRecord = {
   period: MOCK_FINANCIAL_PERIOD,
   chartOfAccounts: MOCK_CHART_OF_ACCOUNTS,
+  costCenters: [],
+  budgets: [],
+  bankReconciliations: [],
   ledgers: [
     {
       id: "ledger-cash",

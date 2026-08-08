@@ -3,20 +3,20 @@
 import type { ReactNode } from "react";
 
 import { TenantFoundationProvider } from "@/modules/tenant/providers/tenant-foundation-provider";
-import type { TenantSelection } from "@/modules/tenant/types/entities";
+import type { TenantSnapshot } from "@/modules/tenant/types/context";
 
 interface TenantProviderProps {
   children: ReactNode;
-  initialSelection?: TenantSelection;
+  initialSnapshot: TenantSnapshot;
 }
 
 /**
  * Root multi-tenant provider.
  * Mounts organization, workspace, business, and branch context slices.
  */
-export function TenantProvider({ children, initialSelection }: TenantProviderProps) {
+export function TenantProvider({ children, initialSnapshot }: TenantProviderProps) {
   return (
-    <TenantFoundationProvider initialSelection={initialSelection}>
+    <TenantFoundationProvider initialSnapshot={initialSnapshot}>
       {children}
     </TenantFoundationProvider>
   );

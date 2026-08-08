@@ -104,7 +104,7 @@ async function main() {
   assert(schemaSource.includes("model CommercialBundle"), "CommercialBundle model missing");
   assert(schemaSource.includes("model PriceBook"), "PriceBook model missing");
   assert(schemaSource.includes("basePricePence           Int"), "base price must be integer pence");
-  assert(schemaSource.includes("bundlePricePence Int"), "bundle price must be integer pence");
+  assert(/bundlePricePence\s+Int/.test(schemaSource), "bundle price must be integer pence");
   console.log("  PASS");
 
   const business = await prisma.business.findFirst({

@@ -13,6 +13,7 @@ import type {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { runInteractiveTransaction } from "@/lib/prisma-transaction";
 import { logContractAudit } from "@/modules/contracts/utils/contract-audit";
 import { createCustomer } from "@/services/crm.service";
 import { provisionImplementationProject } from "@/services/implementation-delivery.service";
@@ -509,7 +510,7 @@ export async function generateContractFromProposal(
     lineItems: quoteVersion.lineItems,
   };
 
-  const contractId = await prisma.$transaction(async (tx) => {
+  const contractId = await runInteractiveTransaction(async (tx) => {
     const created = await tx.contract.create({
       data: {
         businessId,
@@ -640,7 +641,7 @@ export async function createContractRevision(
   const nextVersionNumber = (contract.versions[0]?.versionNumber ?? 0) + 1;
   const source = contract.currentVersion;
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     const version = await tx.contractVersion.create({
       data: {
         contractId,
@@ -770,7 +771,7 @@ export async function requestContractApproval(
     throw new Error("Contract not found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.contract.update({
       where: { id: contractId },
       data: { status: "PENDING_APPROVAL" },
@@ -806,7 +807,7 @@ export async function reviewContractApproval(
     throw new Error("No pending approval found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.contractApproval.update({
       where: { id: approval.id },
       data: {
@@ -856,7 +857,7 @@ export async function recordContractSignature(
     throw new Error("Signature slot not found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.contractSignature.update({
       where: { id: signature.id },
       data: {
@@ -951,7 +952,7 @@ export async function scheduleContractRenewal(
     throw new Error("Contract not found");
   }
 
-  const renewal = await prisma.$transaction(async (tx) => {
+  const renewal = await runInteractiveTransaction(async (tx) => {
     const created = await tx.contractRenewal.create({
       data: {
         contractId,
@@ -1054,7 +1055,7 @@ export async function activateContract(
     status: "ACTIVE",
   });
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     const projectId = await provisionImplementationProject(
       {
         businessId,
@@ -1162,7 +1163,7 @@ export async function archiveContract(
     throw new Error("Contract not found");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runInteractiveTransaction(async (tx) => {
     await tx.contract.update({
       where: { id: contractId },
       data: { status: "ARCHIVED", archivedAt: new Date() },

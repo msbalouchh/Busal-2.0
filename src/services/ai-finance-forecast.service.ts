@@ -2,6 +2,7 @@ import "server-only";
 
 import { generateRevenueForecast } from "@/services/revops.service";
 import { createFinanceInsight } from "@/services/ai-finance-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -46,22 +47,18 @@ export async function getFinancialForecastFramework(
 }
 
 export async function generateForecastInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const framework = await getFinancialForecastFramework(ownerId);
-  let created = 0;
-
-  if (framework.points.length > 0) {
-    const nextMonth = framework.points[0]!;
-    await createFinanceInsight(businessId, {
-      title: "Revenue forecast available",
-      description: `Next month projected revenue: £${(nextMonth.projectedRevenuePence / 100).toFixed(2)} (${nextMonth.source}).`,
-      category: "forecast",
-      priority: "MEDIUM",
-      recommendation: framework.methodology,
-      metadata: { projectedRevenuePence: nextMonth.projectedRevenuePence },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "finance",
+    task: "forecast-insights",
+    loadContext: getFinancialForecastFramework,
+    persistInsight: (businessId, insight) =>
+      createFinanceInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "forecast",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+  });
 }

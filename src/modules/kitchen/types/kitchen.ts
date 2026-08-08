@@ -341,6 +341,8 @@ export interface KitchenContextValue {
   selectOrder: (orderId: string | null) => void;
   searchOrders: (query: KitchenSearchQuery) => KitchenRecord[];
   refresh: () => void;
+  isRefreshing?: boolean;
+  error?: string | null;
 }
 
 export interface KitchenQueueContextValue {

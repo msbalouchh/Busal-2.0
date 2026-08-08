@@ -4,16 +4,39 @@ import {
   PLATFORM_TOOL_PERMISSIONS,
 } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
   buildOrderAiContext,
   buildOrderTrackingSummary,
+  detectDelays,
+  forecastDemand,
   generateUpsellRecommendations,
   predictOrderDelay,
+  suggestOrderOptimizations,
 } from "@/modules/orders/ai/order-ai-context";
-import { ORDER_AI_TOOL_IDS } from "@/modules/orders/constants/order-status";
-import { DEFAULT_OMS_SCOPE } from "@/modules/orders/constants/mock-data";
+import { randomUUID } from "node:crypto";
+
+import { ORDER_AI_TOOL_IDS, ORDER_SOURCES, ORDER_TYPES } from "@/modules/orders/constants/order-status";
+import type { OrderStatus } from "@/modules/orders/constants/order-status";
 import { orderService } from "@/modules/orders/services/order.service";
+import type { OmsPlatformContext } from "@/modules/orders/types/order";
+
+function toOrderContext(context: PlatformExecutionContext): OmsPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for order tools");
+  }
+
+  return {
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  };
+}
 
 function defineOrderTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -55,14 +78,14 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredPermissions: [PLATFORM_TOOL_PERMISSIONS.ORDERS_MANAGE],
       requiredModules: [PLATFORM_MODULES.ORDERS],
       requiredTenantScope: "required",
-      requiredBranchScope: "optional",
+      requiredBranchScope: "required",
       inputSchema: {
         type: "object",
         required: ["orderType", "items"],
         properties: {
           orderType: { type: "string" },
           customerName: { type: "string" },
-          tableNumber: { type: "string" },
+          tableId: { type: "string" },
           items: { type: "array" },
         },
       },
@@ -70,50 +93,37 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
         type: "object",
         properties: { orderId: { type: "string" }, orderNumber: { type: "string" } },
       },
-      supportedAgents: [
-        BUILTIN_AGENT_SLUGS.SALES,
-        BUILTIN_AGENT_SLUGS.CUSTOMER_SUPPORT,
-        BUILTIN_AGENT_SLUGS.OPERATIONS,
-      ],
+      supportedAgents: [BUILTIN_AGENT_SLUGS.SALES, BUILTIN_AGENT_SLUGS.OPERATIONS],
       capabilityId: "capability.orders",
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
-      const orderType = typeof input.orderType === "string" ? input.orderType : "dine_in";
+    async (input, executionContext) => {
+      const context = toOrderContext(executionContext);
+      const orderType = typeof input.orderType === "string" ? input.orderType : ORDER_TYPES.DINE_IN;
       const items = Array.isArray(input.items) ? input.items : [];
-
       const parsedItems = items
-        .filter(
-          (item): item is Record<string, unknown> => typeof item === "object" && item !== null,
-        )
+        .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
         .map((item) => ({
-          productId: typeof item.productId === "string" ? item.productId : "prod-unknown",
+          productId: typeof item.productId === "string" ? item.productId : randomUUID(),
           productName: typeof item.productName === "string" ? item.productName : "Item",
           quantity: typeof item.quantity === "number" ? item.quantity : 1,
           unitPricePence: typeof item.unitPricePence === "number" ? item.unitPricePence : 1000,
         }));
 
-      const record = orderService.create({
-        tenantId: DEFAULT_OMS_SCOPE.tenantId,
-        workspaceId: DEFAULT_OMS_SCOPE.workspaceId,
-        businessId: DEFAULT_OMS_SCOPE.businessId,
-        branchId: DEFAULT_OMS_SCOPE.branchId,
-        orderType: orderType as "dine_in",
-        source: "ai_agent",
+      const record = await orderService.create(context, {
+        tenantId: context.tenantId,
+        workspaceId: context.workspaceId,
+        businessId: context.businessId,
+        branchId: context.branchId,
+        orderType: orderType as typeof ORDER_TYPES.DINE_IN,
+        source: ORDER_SOURCES.AI_AGENT,
         customerName: typeof input.customerName === "string" ? input.customerName : null,
-        tableNumber: typeof input.tableNumber === "string" ? input.tableNumber : null,
+        tableId: typeof input.tableId === "string" ? input.tableId : null,
         items:
           parsedItems.length > 0
             ? parsedItems
-            : [
-                {
-                  productId: "prod-default",
-                  productName: "Default Item",
-                  quantity: 1,
-                  unitPricePence: 1000,
-                },
-              ],
+            : [{ productId: randomUUID(), productName: "Default Item", quantity: 1, unitPricePence: 1000 }],
       });
 
       return { orderId: record.order.id, orderNumber: record.order.orderNumber };
@@ -127,7 +137,7 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredPermissions: [PLATFORM_TOOL_PERMISSIONS.ORDERS_MANAGE],
       requiredModules: [PLATFORM_MODULES.ORDERS],
       requiredTenantScope: "required",
-      requiredBranchScope: "optional",
+      requiredBranchScope: "required",
       inputSchema: {
         type: "object",
         required: ["orderId"],
@@ -146,14 +156,14 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toOrderContext(executionContext);
       const orderId = typeof input.orderId === "string" ? input.orderId : "";
-      const updated = orderService.modify({
+      const updated = await orderService.modify(context, {
         orderId,
-        status: typeof input.status === "string" ? (input.status as "confirmed") : undefined,
+        status: typeof input.status === "string" ? (input.status as OrderStatus) : undefined,
         note: typeof input.note === "string" ? input.note : undefined,
       });
-
       return { updated: Boolean(updated), orderId };
     },
   ),
@@ -165,29 +175,23 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredPermissions: [PLATFORM_TOOL_PERMISSIONS.ORDERS_MANAGE],
       requiredModules: [PLATFORM_MODULES.ORDERS],
       requiredTenantScope: "required",
-      requiredBranchScope: "optional",
+      requiredBranchScope: "required",
       inputSchema: {
         type: "object",
         required: ["orderId"],
-        properties: {
-          orderId: { type: "string" },
-          reason: { type: "string" },
-        },
+        properties: { orderId: { type: "string" }, reason: { type: "string" } },
       },
-      outputSchema: {
-        type: "object",
-        properties: { cancelled: { type: "boolean" }, orderId: { type: "string" } },
-      },
+      outputSchema: { type: "object" },
       supportedAgents: [BUILTIN_AGENT_SLUGS.CUSTOMER_SUPPORT, BUILTIN_AGENT_SLUGS.OPERATIONS],
       capabilityId: "capability.orders",
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "high" },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toOrderContext(executionContext);
       const orderId = typeof input.orderId === "string" ? input.orderId : "";
       const reason = typeof input.reason === "string" ? input.reason : undefined;
-      const cancelled = orderService.cancel(orderId, reason);
-
+      const cancelled = await orderService.cancel(context, orderId, reason);
       return { cancelled: Boolean(cancelled), orderId };
     },
   ),
@@ -199,7 +203,7 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredPermissions: [PLATFORM_TOOL_PERMISSIONS.ORDERS_READ],
       requiredModules: [PLATFORM_MODULES.ORDERS],
       requiredTenantScope: "required",
-      requiredBranchScope: "optional",
+      requiredBranchScope: "required",
       inputSchema: {
         type: "object",
         required: ["orderId"],
@@ -211,9 +215,10 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toOrderContext(executionContext);
       const orderId = typeof input.orderId === "string" ? input.orderId : "";
-      return buildOrderTrackingSummary(orderId) ?? { error: "Order not found." };
+      return (await buildOrderTrackingSummary(context, orderId)) ?? { error: "Order not found." };
     },
   ),
   defineOrderTool(
@@ -230,18 +235,16 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
         required: ["orderId"],
         properties: { orderId: { type: "string" } },
       },
-      outputSchema: {
-        type: "object",
-        properties: { recommendations: { type: "array" } },
-      },
+      outputSchema: { type: "object" },
       supportedAgents: [BUILTIN_AGENT_SLUGS.SALES, BUILTIN_AGENT_SLUGS.MARKETING],
       capabilityId: "capability.orders",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toOrderContext(executionContext);
       const orderId = typeof input.orderId === "string" ? input.orderId : "";
-      return { recommendations: generateUpsellRecommendations(orderId) };
+      return { recommendations: await generateUpsellRecommendations(context, orderId) };
     },
   ),
   defineOrderTool(
@@ -252,38 +255,30 @@ export const ORDER_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredPermissions: [PLATFORM_TOOL_PERMISSIONS.ORDERS_READ],
       requiredModules: [PLATFORM_MODULES.ORDERS, PLATFORM_MODULES.ANALYTICS],
       requiredTenantScope: "required",
-      requiredBranchScope: "optional",
+      requiredBranchScope: "required",
       inputSchema: {
         type: "object",
         required: ["orderId"],
         properties: { orderId: { type: "string" } },
       },
       outputSchema: { type: "object" },
-      supportedAgents: [
-        BUILTIN_AGENT_SLUGS.OPERATIONS,
-        BUILTIN_AGENT_SLUGS.ANALYTICS,
-        BUILTIN_AGENT_SLUGS.CUSTOMER_SUPPORT,
-      ],
+      supportedAgents: [BUILTIN_AGENT_SLUGS.OPERATIONS, BUILTIN_AGENT_SLUGS.ANALYTICS],
       capabilityId: "capability.orders",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toOrderContext(executionContext);
       const orderId = typeof input.orderId === "string" ? input.orderId : "";
-      const context = buildOrderAiContext(orderId);
-      const prediction = predictOrderDelay(orderId);
-
-      return {
-        ...(prediction ?? { error: "Order not found." }),
-        aiContext: context ?? null,
-      } as Record<string, unknown>;
+      const aiContext = await buildOrderAiContext(context, orderId);
+      const prediction = await predictOrderDelay(context, orderId);
+      return { ...(prediction ?? { error: "Order not found." }), aiContext };
     },
   ),
 ];
 
 let registered = false;
 
-/** Registers Order OMS tools with the AI Tool Platform (mock, idempotent). */
 export function registerOrderAiTools(): void {
   if (registered) {
     return;

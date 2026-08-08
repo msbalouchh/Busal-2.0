@@ -59,6 +59,9 @@ export {
   DEFAULT_MOCK_SELECTION,
 } from "@/modules/tenant/constants/mock-tenant-data";
 
+export { getTenantFoundationData } from "@/modules/tenant/lib/get-tenant-foundation-data";
+
+/** @deprecated Dev/test fixtures only — use tenantFoundationService in production. */
 export {
   getMockTenantDataset,
   buildTenantSnapshot,
@@ -73,6 +76,11 @@ export {
   listBusinessesForOrganization,
   listBranchesForBusiness,
 } from "@/modules/tenant/services/mock-tenant.service";
+
+export {
+  TenantFoundationService,
+  tenantFoundationService,
+} from "@/modules/tenant/services/tenant-foundation.service";
 
 export {
   assertSameTenant,

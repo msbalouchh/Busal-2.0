@@ -220,15 +220,24 @@ export interface TableSearchQuery {
   kind?: TableKind;
   minCapacity?: number;
   limit?: number;
+  page?: number;
+  pageSize?: number;
+  sortBy?: "label" | "number" | "capacity" | "status" | "createdAt";
+  sortDirection?: "asc" | "desc";
+  includeArchived?: boolean;
 }
 
 export interface CreateTableInput {
   floorId: string;
-  zoneId: string;
+  zoneId?: string;
   label: string;
   seatCapacity: number;
   minCapacity?: number;
-  position?: DiningTable["position"];
+  position?: {
+    x: number;
+    y: number;
+    rotation?: number;
+  };
   size?: DiningTable["size"];
   isVip?: boolean;
   isOutdoor?: boolean;
@@ -240,7 +249,11 @@ export interface UpdateTableInput {
   label?: string;
   status?: TableStatus;
   seatCapacity?: number;
-  position?: DiningTable["position"];
+  position?: {
+    x: number;
+    y: number;
+    rotation?: number;
+  };
   zoneId?: string;
 }
 
@@ -282,13 +295,30 @@ export interface TablePlatformContext {
   userId: string;
 }
 
+export interface TablePlatformSnapshot {
+  context: TablePlatformContext;
+  floors: FloorRecord[];
+  tableCount: number;
+  availableCount: number;
+  occupiedCount: number;
+  reservedCount: number;
+  cleaningCount: number;
+  blockedCount: number;
+  outOfServiceCount: number;
+  avgUtilizationScore: number;
+  realtimeOccupancyPercent: number;
+}
+
 export interface TableManagementContextValue {
   context: TablePlatformContext;
   floors: FloorRecord[];
+  snapshot: TablePlatformSnapshot | null;
   selectedFloor: FloorRecord | null;
   selectedTable: TableRecord | null;
   selectFloor: (floorId: string | null) => void;
   selectTable: (tableId: string | null) => void;
   searchTables: (query: TableSearchQuery) => TableRecord[];
   refresh: () => void;
+  isRefreshing?: boolean;
+  error?: string | null;
 }

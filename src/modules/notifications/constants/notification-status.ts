@@ -72,6 +72,7 @@ export const NOTIFICATION_EVENT_SOURCES = {
   POS: "pos",
   INVENTORY: "inventory",
   STAFF: "staff",
+  FINANCE: "finance",
   BILLING: "billing",
   ANALYTICS: "analytics",
   SYSTEM: "system",
@@ -111,6 +112,10 @@ export const NOTIFICATION_AI_TOOL_IDS = {
   OPTIMIZE_SEND_TIME: "notifications.optimize-send-time",
   SUMMARIZE: "notifications.summarize",
   GENERATE_TEMPLATES: "notifications.generate-templates",
+  PREDICT_ENGAGEMENT: "notifications.predict-engagement",
+  RECOMMEND_PRIORITY: "notifications.recommend-priority",
+  OPTIMIZE_CAMPAIGN: "notifications.optimize-campaign",
+  ANALYZE_DELIVERY_FAILURES: "notifications.analyze-delivery-failures",
 } as const;
 
 export type NotificationAiToolId =

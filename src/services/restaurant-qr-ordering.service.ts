@@ -21,7 +21,7 @@ import type {
   QrSessionRecord,
   TableQrCodeRecord,
 } from "@/modules/qr-ordering-management/types/qr-ordering-types";
-import { createRestaurantOrderForBusiness } from "@/services/restaurant-order.service";
+import { createRestaurantOrderForBusiness } from "@/modules/orders/services/order-management-adapter.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { mapOrderStatusToKitchen } from "@/modules/kitchen-display-management/lib/kitchen-validation";
 

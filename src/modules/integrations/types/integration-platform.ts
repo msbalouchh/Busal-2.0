@@ -17,6 +17,7 @@ export interface Integration {
   tenantId: string;
   workspaceId: string;
   businessId: string;
+  branchId: string;
   providerId: string;
   name: string;
   category: IntegrationCategory;
@@ -318,8 +319,13 @@ export interface IntegrationSearchQuery {
   query?: string;
   tenantId?: string;
   businessId?: string;
+  branchId?: string;
   category?: IntegrationCategory;
   status?: IntegrationStatus;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
   limit?: number;
 }
 
@@ -340,7 +346,16 @@ export interface IntegrationPlatformContext {
   tenantId: string;
   workspaceId: string;
   businessId: string;
+  branchId: string;
   userId: string;
+}
+
+export interface IntegrationSearchResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export interface IntegrationContextValue {
@@ -350,6 +365,8 @@ export interface IntegrationContextValue {
   selectedIntegration: Integration | null;
   selectIntegration: (integrationId: string | null) => void;
   refresh: () => void;
+  isRefreshing: boolean;
+  error: string | null;
 }
 
 export interface IntegrationWebhooksContextValue {

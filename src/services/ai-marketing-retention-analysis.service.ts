@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCustomerAnalytics } from "@/services/reporting.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { createMarketingInsight } from "@/services/ai-marketing-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 
 export interface RetentionSnapshot {
   retentionRatePercent: number;
@@ -44,54 +45,35 @@ export async function getRetentionSnapshot(ownerId: string): Promise<RetentionSn
 }
 
 export async function generateRetentionInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getRetentionSnapshot(ownerId);
-  let created = 0;
-
-  await createMarketingInsight(businessId, {
-    title: "Retention analysis",
-    description: `${snapshot.retentionRatePercent}% retention rate · ${snapshot.atRiskCount} customers at risk.`,
-    category: "retention",
-    priority: snapshot.retentionRatePercent < 50 ? "CRITICAL" : "MEDIUM",
-    recommendation:
-      snapshot.atRiskCount > 0
-        ? "Deploy a retention campaign targeting inactive customers before they churn."
-        : "Retention is healthy — focus on loyalty program expansion.",
-    metadata: { snapshot },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "marketing",
+    task: "retention-insights",
+    loadContext: getRetentionSnapshot,
+    persistInsight: (businessId, insight) =>
+      createMarketingInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "retention",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  return created;
 }
 
 export async function generatePromotionSuggestions(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  let created = 0;
-  const day = new Date().getDay();
-  const isWeekend = day === 0 || day === 5 || day === 6;
-
-  if (isWeekend) {
-    await createMarketingInsight(businessId, {
-      title: "Weekend promotion suggestion",
-      description:
-        "Weekends typically drive higher footfall — capitalize with a limited-time offer.",
-      category: "promotion",
-      priority: "HIGH",
-      recommendation: "Run a 10–15% discount on best-selling items this weekend.",
-      metadata: { suggestionType: "weekend" },
-    });
-    created += 1;
-  }
-
-  await createMarketingInsight(businessId, {
-    title: "Loyalty campaign suggestion",
-    description: "Reward loyal customers to boost repeat visits and referrals.",
-    category: "promotion",
-    priority: "MEDIUM",
-    recommendation: "Double loyalty points for customers who haven't ordered in 30 days.",
-    metadata: { suggestionType: "loyalty" },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "marketing",
+    task: "promotion-suggestions",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createMarketingInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "promotion",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  return created;
 }

@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { createHrInsight, createHrRecommendation } from "@/services/ai-hr-insight.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -62,33 +63,26 @@ export async function analyzeShiftCoverage(ownerId: string): Promise<ShiftCovera
 }
 
 export async function generateShiftRecommendations(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const coverage = await analyzeShiftCoverage(ownerId);
-  let created = 0;
-
-  const understaffed = coverage.filter((c) => c.staffCount < 2);
-  if (understaffed.length > 0) {
-    await createHrInsight(businessId, {
-      title: "Shift coverage gaps detected",
-      description: `${understaffed.length} department/branch combinations are understaffed.`,
-      category: "shift",
-      priority: "HIGH",
-      recommendation: understaffed.map((c) => `${c.branchName} — ${c.department}`).join(", "),
-      metadata: { understaffedCount: understaffed.length },
-    });
-    created += 1;
-  }
-
-  for (const item of understaffed.slice(0, 3)) {
-    await createHrRecommendation(businessId, {
-      title: `Shift plan: ${item.branchName} / ${item.department}`,
-      description: `Only ${item.staffCount} active staff assigned.`,
-      action: item.recommendation,
-      confidenceScore: 0.8,
-      metadata: { branchId: item.branchId, department: item.department },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "hr",
+    task: "shift-recommendations",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createHrInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "shift",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+    persistRecommendation: (businessId, recommendation) =>
+      createHrRecommendation(businessId, {
+        title: recommendation.title,
+        description: recommendation.description,
+        action: recommendation.action ?? recommendation.recommendation ?? "Review AI recommendation",
+        confidenceScore: recommendation.confidenceScore,
+        metadata: recommendation.metadata,
+      }),
+  });
 }

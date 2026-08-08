@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PrismaClient } from "@prisma/client";
-
+import { getVerifyPrisma } from "./lib/verify-prisma";
+import { connectWithRetry, handleVerificationError } from "./lib/verify-db";
+import { bootstrapVerificationEnvironment } from "./lib/verify-bootstrap";
+import { createLegacyPayableOrder } from "./lib/verify-oms-order";
 import { PERMISSION_CODES } from "../src/modules/authorization/constants/permissions";
 import {
   DEFAULT_PAYMENT_CURRENCY,
@@ -28,19 +30,14 @@ import {
   calculateCashChange,
   formatPaymentMoney,
 } from "../src/modules/payments/utils/payment-utils";
-import { addItem, createCart } from "../src/services/cart.service";
-import { createOrderFromSession } from "../src/services/order.service";
-import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
 import {
-  getOrderPaymentSummary,
-  listPaymentsForOrder,
-  recordPayment,
-  refundPaymentPlaceholder,
-  voidPayment,
-} from "../src/services/payment.service";
-import { createQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+  getOrderPaymentSummaryForBusiness,
+  recordPaymentForBusiness,
+  refundPaymentForBusiness,
+  voidPaymentForBusiness,
+} from "../src/modules/payments/services/payment-business-bridge.service";
 
-const prisma = new PrismaClient();
+const prisma = getVerifyPrisma();
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -57,6 +54,18 @@ function assertIntegerPenceValue(value: number, label: string): void {
   assert(Number.isInteger(value), `${label} must be integer pence`);
 }
 
+/** Payment summaries expose decimal pounds; payment records use integer pence. */
+function summaryPence(pounds: number): number {
+  return Math.round(pounds * 100);
+}
+
+function assertSummaryPence(actualPounds: number, expectedPence: number, label: string): void {
+  assert(
+    summaryPence(actualPounds) === expectedPence,
+    `${label} failed (expected ${expectedPence}p, got ${summaryPence(actualPounds)}p)`,
+  );
+}
+
 function assertNoForbiddenPatterns(filePath: string, forbiddenPatterns: string[]): void {
   const source = readFileSync(join(root, filePath), "utf8");
 
@@ -65,33 +74,19 @@ function assertNoForbiddenPatterns(filePath: string, forbiddenPatterns: string[]
   }
 }
 
-async function createPayableOrder(businessId: string, ownerId: string, suffix: string) {
-  const qrCode = await createQRCode(ownerId, { slug: `payments-${suffix}` });
-  const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
-    sessionToken: `payments-token-${suffix}`,
+async function createPayableOrder(businessId: string, _ownerId: string, suffix: string) {
+  const { order, branchId } = await createLegacyPayableOrder(prisma, businessId, suffix, {
+    quantity: 2,
+    price: 30,
   });
 
-  const menuItem = await prisma.menuItem.create({
-    data: {
-      businessId,
-      name: `Payment Verify Item ${suffix}`,
-      price: 30,
-      isAvailable: true,
-    },
-    select: { id: true },
-  });
-
-  const cart = await createCart(businessId, visit.session.id);
-  await addItem(businessId, visit.session.id, menuItem.id, 2);
-
-  const orderSession = await createOrderSession(businessId, cart.id, visit.session.id);
-  await markOrderSessionReady(orderSession.id);
-  const order = await createOrderFromSession(orderSession.id);
-
-  return { order, qrCodeId: qrCode.id, menuItemId: menuItem.id };
+  return { order, branchId, qrCodeId: "", menuItemId: "" };
 }
 
 async function main() {
+  bootstrapVerificationEnvironment();
+  await connectWithRetry(prisma);
+
   console.log("Module structure");
   const moduleFiles = [
     "src/modules/payments/index.ts",
@@ -206,13 +201,13 @@ async function main() {
   assert(business, "No business found");
 
   const suffix = Date.now().toString();
-  const { order } = await createPayableOrder(business.id, business.ownerId, suffix);
-  const orderRecord = await prisma.legacyOrder.findUnique({
+  const { order, branchId } = await createPayableOrder(business.id, business.ownerId, suffix);
+  const orderRecord = await prisma.restaurantOrder.findUnique({
     where: { id: order.id },
-    select: { total: true },
+    select: { totalAmount: true },
   });
   assert(orderRecord, "order record missing");
-  const orderTotalPence = moneyDecimalToPence(orderRecord.total);
+  const orderTotalPence = moneyDecimalToPence(orderRecord.totalAmount);
   const firstPaymentAmountPence = 2000;
   const secondPaymentAmountPence = 2500;
   const thirdPaymentAmountPence =
@@ -222,7 +217,7 @@ async function main() {
   assert(parseDecimalInputToPence("20.00") === 2000, "decimal input parsing failed");
   assert(moneyDecimalToPence("60.00") === 6000, "decimal string to pence failed");
   assert(
-    moneyDecimalToPence(orderRecord.total) === orderTotalPence,
+    moneyDecimalToPence(orderRecord.totalAmount) === orderTotalPence,
     "prisma decimal must convert to pence without Number()",
   );
 
@@ -247,123 +242,148 @@ async function main() {
   console.log("  PASS");
 
   console.log("Cash payment");
-  const cashPayment = await recordPayment(business.id, order.id, null, {
+  const cashPayment = await recordPaymentForBusiness(business.id, order.id, {
     method: "CASH",
     amountPence: firstPaymentAmountPence,
     amountTenderedPence: 2500,
-  });
+  }, branchId);
+  assert(cashPayment.payment, "cash payment record missing");
   assert(cashPayment.payment.method === "CASH", "cash payment method mismatch");
-  assert(cashPayment.payment.amount === firstPaymentAmountPence, "cash payment amount mismatch");
-  assert(cashPayment.summary.amountPaid === firstPaymentAmountPence, "cash paid total mismatch");
+  const paidPence = Math.round(cashPayment.summary.amountPaid * 100);
+  const remainingPence = Math.round(cashPayment.summary.remainingBalance * 100);
+  assert(paidPence === firstPaymentAmountPence, "cash paid total mismatch");
   assert(
-    cashPayment.summary.remainingBalance === orderTotalPence - firstPaymentAmountPence,
+    remainingPence === orderTotalPence - firstPaymentAmountPence,
     "remaining balance after cash failed",
   );
   console.log("  PASS");
 
   console.log("Change calculation");
   assert(calculateCashChange(firstPaymentAmountPence, 2500) === 500, "change calculation failed");
-  assert(cashPayment.summary.changeDue === 500, "summary change due failed");
+  assertSummaryPence(cashPayment.summary.changeDue, 500, "summary change due");
   console.log("  PASS");
 
   console.log("Partial payment");
-  let summary = await getOrderPaymentSummary(order.id, business.id);
-  assert(
-    summary.remainingBalance === orderTotalPence - firstPaymentAmountPence,
-    "partial remaining balance failed",
+  let summary = await getOrderPaymentSummaryForBusiness(order.id, business.id, branchId);
+  assertSummaryPence(
+    summary.remainingBalance,
+    orderTotalPence - firstPaymentAmountPence,
+    "partial remaining balance",
   );
-  assert(!summary.isFullyPaid, "order should not be fully paid yet");
+  assert(summary.remainingBalance > 0, "order should not be fully paid yet");
   console.log("  PASS");
 
   console.log("Card payment");
-  const cardPayment = await recordPayment(business.id, order.id, null, {
+  const cardPayment = await recordPaymentForBusiness(business.id, order.id, {
     method: "CARD",
     amountPence: secondPaymentAmountPence,
     amountTenderedPence: secondPaymentAmountPence,
-  });
+  }, branchId);
+  assert(cardPayment.payment, "card payment record missing");
   assert(cardPayment.payment.method === "CARD", "card payment method mismatch");
-  assert(
-    cardPayment.summary.amountPaid === firstPaymentAmountPence + secondPaymentAmountPence,
-    "card payment total failed",
+  assertSummaryPence(
+    cardPayment.summary.amountPaid,
+    firstPaymentAmountPence + secondPaymentAmountPence,
+    "card payment total",
   );
-  assert(
-    cardPayment.summary.remainingBalance === thirdPaymentAmountPence,
-    "remaining after card failed",
-  );
+  assertSummaryPence(cardPayment.summary.remainingBalance, thirdPaymentAmountPence, "remaining after card");
   console.log("  PASS");
 
   console.log("Split payment");
-  const splitPayment = await recordPayment(business.id, order.id, null, {
+  const splitPayment = await recordPaymentForBusiness(business.id, order.id, {
     method: "CASH",
     amountPence: thirdPaymentAmountPence,
     amountTenderedPence: thirdPaymentAmountPence + 500,
-  });
-  assertIntegerPenceValue(cashPayment.payment.amount, "cash payment amount");
-  assertIntegerPenceValue(cardPayment.payment.amount, "card payment amount");
-  assertIntegerPenceValue(splitPayment.payment.amount, "split payment amount");
-  assert(splitPayment.summary.isFullyPaid, "split payment should complete order");
+  }, branchId);
+  assert(splitPayment.payment, "split payment record missing");
+  assertIntegerPenceValue(cashPayment.payment!.amount, "cash payment amount");
+  assertIntegerPenceValue(cardPayment.payment!.amount, "card payment amount");
+  assertIntegerPenceValue(splitPayment.payment!.amount, "split payment amount");
+  assert(splitPayment.summary.remainingBalance <= 0, "split payment should complete order");
   assert(splitPayment.summary.remainingBalance === 0, "remaining balance should be zero");
-  const completedOrder = await prisma.legacyOrder.findUnique({
+  const completedOrder = await prisma.restaurantOrder.findUnique({
     where: { id: order.id },
-    select: { status: true },
+    select: { paymentStatus: true },
   });
-  assert(completedOrder?.status === "COMPLETED", "order should be marked completed");
+  assert(completedOrder?.paymentStatus === "PAID", "order should be marked paid");
   console.log("  PASS");
 
   console.log("Payment history");
-  const history = await listPaymentsForOrder(order.id);
-  assert(history.length === 3, "payment history count failed");
+  summary = await getOrderPaymentSummaryForBusiness(order.id, business.id, branchId);
+  assert(summary.payments.length === 3, "payment history count failed");
   assert(
-    history.every((payment) => payment.status === "COMPLETED"),
+    summary.payments.every((payment) => payment.status === "PAID"),
     "history status failed",
   );
   console.log("  PASS");
 
   console.log("Remaining balance");
-  summary = await getOrderPaymentSummary(order.id, business.id);
+  summary = await getOrderPaymentSummaryForBusiness(order.id, business.id, branchId);
   assert(summary.remainingBalance === 0, "final remaining balance failed");
-  assert(summary.isFullyPaid, "final paid state failed");
+  assert(summary.remainingBalance <= 0, "final paid state failed");
   console.log("  PASS");
 
   console.log("Void payment before completion");
   const suffixVoid = `${suffix}-void`;
-  const { order: voidOrder } = await createPayableOrder(business.id, business.ownerId, suffixVoid);
-  const voidOrderRecord = await prisma.legacyOrder.findUnique({
+  const { order: voidOrder, branchId: voidBranchId } = await createPayableOrder(
+    business.id,
+    business.ownerId,
+    suffixVoid,
+  );
+  const voidOrderRecord = await prisma.restaurantOrder.findUnique({
     where: { id: voidOrder.id },
-    select: { total: true },
+    select: { totalAmount: true },
   });
   assert(voidOrderRecord, "void order record missing");
-  const voidable = await recordPayment(business.id, voidOrder.id, null, {
+  const voidable = await recordPaymentForBusiness(business.id, voidOrder.id, {
     method: "CASH",
     amountPence: 2000,
     amountTenderedPence: 2000,
-  });
-  const voidSummary = await voidPayment(voidable.payment.id, business.id);
+  }, voidBranchId);
+  assert(voidable.payment, "voidable payment missing");
+  const voidSummary = await voidPaymentForBusiness(voidable.payment.id, business.id, voidBranchId);
   assert(voidSummary.amountPaid === 0, "void should remove paid amount");
-  assert(
-    voidSummary.remainingBalance === moneyDecimalToPence(voidOrderRecord.total),
-    "void should restore remaining balance",
+  assertSummaryPence(
+    voidSummary.remainingBalance,
+    moneyDecimalToPence(voidOrderRecord.totalAmount),
+    "void remaining balance",
   );
   console.log("  PASS");
 
-  console.log("Refund placeholder");
-  let refundFailed = false;
-  try {
-    await refundPaymentPlaceholder(voidable.payment.id, business.id);
-  } catch (error) {
-    refundFailed = error instanceof Error && error.message.includes("not available");
-  }
-  assert(refundFailed, "refund placeholder should throw");
+  console.log("Refund");
+  const refundOrder = await createPayableOrder(business.id, business.ownerId, `${suffix}-refund`);
+  const refundTotalPence = Math.round(refundOrder.order.total * 100);
+  const paid = await recordPaymentForBusiness(
+    business.id,
+    refundOrder.order.id,
+    {
+      method: "CASH",
+      amountPence: refundTotalPence,
+      amountTenderedPence: refundTotalPence,
+    },
+    refundOrder.branchId,
+  );
+  assert(paid.payment?.id, "refund setup payment missing");
+  const refundedPayment = await refundPaymentForBusiness(
+    paid.payment.id,
+    business.id,
+    refundOrder.branchId,
+    refundTotalPence / 100,
+  );
+  assert(refundedPayment.status === "REFUNDED", "payment should be refunded");
+  const refundSummary = await getOrderPaymentSummaryForBusiness(
+    refundOrder.order.id,
+    business.id,
+    refundOrder.branchId,
+  );
+  assert(refundSummary.amountPaid === 0, "refund should zero paid balance");
   console.log("  PASS");
 
   console.log("\nPayment verification passed.");
 }
 
 main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
+  .catch(handleVerificationError)
   .finally(async () => {
     await prisma.$disconnect();
   });

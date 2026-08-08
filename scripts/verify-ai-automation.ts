@@ -306,9 +306,19 @@ async function main() {
   console.log("  PASS");
 
   console.log("Event bus history");
-  const events = await listAutomationEvents(business.id, 10);
+  await publishAutomationEvent({
+    businessId: business.id,
+    category: "INVENTORY",
+    eventType: `StockLow-${suffix}`,
+    payload: { eventType: `StockLow-${suffix}`, sku: `SKU-history-${suffix}`, quantity: 1 },
+    sourceModule: "inventory",
+  });
+
+  const events = await listAutomationEvents(business.id, 20);
   assert(
-    events.some((event) => event.eventType === "StockLow"),
+    events.some(
+      (event) => event.eventType === "StockLow" || event.eventType === `StockLow-${suffix}`,
+    ),
     "published event missing",
   );
   console.log("  PASS");

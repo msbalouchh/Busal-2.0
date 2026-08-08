@@ -3,11 +3,6 @@ import {
   BILLING_PAYMENT_STATUSES,
   SUBSCRIPTION_STATUSES,
 } from "@/modules/billing/constants/billing-status";
-import {
-  DEFAULT_BILLING_SCOPE,
-  MOCK_BILLING_RECORD,
-  MOCK_SUBSCRIPTION_PLANS,
-} from "@/modules/billing/constants/mock-data";
 import type {
   ApplyCouponInput,
   BillingInvoice,
@@ -17,34 +12,40 @@ import type {
   SubscriptionPlan,
   UpgradeSubscriptionInput,
 } from "@/modules/billing/types/billing-platform";
+import {
+  findCatalogPlanById,
+  listCatalogPlans,
+} from "@/modules/commercial-foundation/lib/plan-catalog";
 
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-/** In-memory billing repository (mock only, no backend). */
+/** Billing repository — loads production records from commercial foundation. */
 export class BillingRepository {
-  private record: BillingRecord = structuredClone(MOCK_BILLING_RECORD);
-  private plans: SubscriptionPlan[] = structuredClone(MOCK_SUBSCRIPTION_PLANS);
+  private clientRecord: BillingRecord | null = null;
 
   getRecord(): BillingRecord {
-    return structuredClone(this.record);
+    if (!this.clientRecord) {
+      throw new Error("Billing record is not loaded. Call loadRecord(businessId) first.");
+    }
+    return structuredClone(this.clientRecord);
+  }
+
+  setClientRecord(record: BillingRecord): void {
+    this.clientRecord = structuredClone(record);
   }
 
   getPlans(): SubscriptionPlan[] {
-    return structuredClone(this.plans);
+    return listCatalogPlans();
   }
 
   findPlanById(planId: string): SubscriptionPlan | undefined {
-    return this.plans.find((plan) => plan.id === planId);
+    return findCatalogPlanById(planId);
   }
 
   findPlanByType(planType: SubscriptionPlan["planType"]): SubscriptionPlan | undefined {
-    return this.plans.find((plan) => plan.planType === planType);
+    return this.getPlans().find((plan) => plan.planType === planType);
   }
 
   searchPlans(query: BillingSearchQuery = {}): SubscriptionPlan[] {
-    let results = structuredClone(this.plans);
+    let results = this.getPlans();
 
     if (query.planType) {
       results = results.filter((plan) => plan.planType === query.planType);
@@ -65,8 +66,15 @@ export class BillingRepository {
     return results;
   }
 
+  private requireRecord(): BillingRecord {
+    if (!this.clientRecord) {
+      throw new Error("Billing record is not loaded. Call loadRecord(businessId) first.");
+    }
+    return this.clientRecord;
+  }
+
   getOpenInvoices(): BillingInvoice[] {
-    return this.record.invoices.filter(
+    return this.requireRecord().invoices.filter(
       (inv) =>
         inv.status === BILLING_INVOICE_STATUSES.OPEN ||
         inv.status === BILLING_INVOICE_STATUSES.DRAFT,
@@ -74,164 +82,141 @@ export class BillingRepository {
   }
 
   getFailedPayments(): BillingRecord["payments"] {
-    return this.record.payments.filter(
+    return this.requireRecord().payments.filter(
       (payment) => payment.status === BILLING_PAYMENT_STATUSES.FAILED,
     );
   }
 
-  upgradeSubscription(input: UpgradeSubscriptionInput): BillingRecord {
+  async loadRecord(businessId: string): Promise<BillingRecord> {
+    const { buildBillingRecordForBusiness } = await import(
+      "@/modules/commercial-foundation/services/billing-record.service"
+    );
+    const record = await buildBillingRecordForBusiness(businessId);
+    this.clientRecord = record;
+    return structuredClone(record);
+  }
+
+  async upgradeSubscription(businessId: string, input: UpgradeSubscriptionInput): Promise<BillingRecord> {
+    const { subscriptionLifecycleService } = await import(
+      "@/modules/commercial-foundation/services/subscription-lifecycle.service"
+    );
+    const record = await subscriptionLifecycleService.upgradeSubscription(businessId, input);
+    this.clientRecord = record;
+    return structuredClone(record);
+  }
+
+  async downgradeSubscription(
+    businessId: string,
+    input: DowngradeSubscriptionInput,
+  ): Promise<BillingRecord> {
+    const { subscriptionLifecycleService } = await import(
+      "@/modules/commercial-foundation/services/subscription-lifecycle.service"
+    );
+    const record = await subscriptionLifecycleService.downgradeSubscription(businessId, input);
+    this.clientRecord = record;
+    return structuredClone(record);
+  }
+
+  async pauseSubscription(businessId: string): Promise<BillingRecord> {
+    const { subscriptionLifecycleService } = await import(
+      "@/modules/commercial-foundation/services/subscription-lifecycle.service"
+    );
+    const record = await subscriptionLifecycleService.pauseSubscription(businessId);
+    this.clientRecord = record;
+    return structuredClone(record);
+  }
+
+  async resumeSubscription(businessId: string): Promise<BillingRecord> {
+    const { subscriptionLifecycleService } = await import(
+      "@/modules/commercial-foundation/services/subscription-lifecycle.service"
+    );
+    const record = await subscriptionLifecycleService.resumeSubscription(businessId);
+    this.clientRecord = record;
+    return structuredClone(record);
+  }
+
+  async cancelSubscription(businessId: string, atPeriodEnd = true): Promise<BillingRecord> {
+    const { subscriptionLifecycleService } = await import(
+      "@/modules/commercial-foundation/services/subscription-lifecycle.service"
+    );
+    const record = await subscriptionLifecycleService.cancelSubscription(businessId, atPeriodEnd);
+    this.clientRecord = record;
+    return structuredClone(record);
+  }
+
+  async applyCoupon(businessId: string, input: ApplyCouponInput): Promise<BillingRecord> {
+    const { subscriptionLifecycleService } = await import(
+      "@/modules/commercial-foundation/services/subscription-lifecycle.service"
+    );
+    const record = await subscriptionLifecycleService.applyCoupon(businessId, input);
+    this.clientRecord = record;
+    return structuredClone(record);
+  }
+
+  upgradeSubscriptionSync(input: UpgradeSubscriptionInput): BillingRecord {
+    const record = this.requireRecord();
     const targetPlan = this.findPlanById(input.targetPlanId);
-
     if (!targetPlan) {
-      return structuredClone(this.record);
+      return this.getRecord();
     }
 
-    const now = new Date().toISOString();
-
-    this.record.plan = structuredClone(targetPlan);
-    this.record.subscription.planId = targetPlan.id;
-    this.record.subscription.mrrCents = targetPlan.monthlyPriceCents;
-    this.record.subscription.updatedAt = now;
-    this.record.workspaceSubscription.planId = targetPlan.id;
-    this.record.workspaceSubscription.featureAccess = structuredClone(targetPlan.featureAccess);
-    this.record.analytics.upgradeCount += 1;
-    this.record.analytics.mrrCents = targetPlan.monthlyPriceCents;
-    this.record.analytics.arrCents = targetPlan.monthlyPriceCents * 12;
-
-    return structuredClone(this.record);
+    record.plan = structuredClone(targetPlan);
+    record.subscription.planId = targetPlan.id;
+    record.subscription.status = SUBSCRIPTION_STATUSES.ACTIVE;
+    this.clientRecord = record;
+    return this.getRecord();
   }
 
-  downgradeSubscription(input: DowngradeSubscriptionInput): BillingRecord {
+  downgradeSubscriptionSync(input: DowngradeSubscriptionInput): BillingRecord {
+    const record = this.requireRecord();
     const targetPlan = this.findPlanById(input.targetPlanId);
-
     if (!targetPlan) {
-      return structuredClone(this.record);
+      return this.getRecord();
     }
 
-    const now = new Date().toISOString();
-
-    this.record.plan = structuredClone(targetPlan);
-    this.record.subscription.planId = targetPlan.id;
-    this.record.subscription.mrrCents = targetPlan.monthlyPriceCents;
-    this.record.subscription.updatedAt = now;
-    this.record.workspaceSubscription.planId = targetPlan.id;
-    this.record.workspaceSubscription.featureAccess = structuredClone(targetPlan.featureAccess);
-    this.record.analytics.downgradeCount += 1;
-    this.record.analytics.mrrCents = targetPlan.monthlyPriceCents;
-    this.record.analytics.arrCents = targetPlan.monthlyPriceCents * 12;
-
-    if (input.effectiveAt === "period_end") {
-      this.record.subscription.cancelAtPeriodEnd = false;
-    }
-
-    return structuredClone(this.record);
+    record.plan = structuredClone(targetPlan);
+    record.subscription.planId = targetPlan.id;
+    this.clientRecord = record;
+    return this.getRecord();
   }
 
-  pauseSubscription(): BillingRecord {
-    const now = new Date().toISOString();
-    this.record.subscription.status = SUBSCRIPTION_STATUSES.PAUSED;
-    this.record.subscription.pausedAt = now;
-    this.record.subscription.updatedAt = now;
-    this.record.workspaceSubscription.status = SUBSCRIPTION_STATUSES.PAUSED;
-    return structuredClone(this.record);
+  pauseSubscriptionSync(): BillingRecord {
+    const record = this.requireRecord();
+    record.subscription.status = SUBSCRIPTION_STATUSES.PAUSED;
+    this.clientRecord = record;
+    return this.getRecord();
   }
 
-  resumeSubscription(): BillingRecord {
-    const now = new Date().toISOString();
-    this.record.subscription.status = SUBSCRIPTION_STATUSES.ACTIVE;
-    this.record.subscription.pausedAt = null;
-    this.record.subscription.updatedAt = now;
-    this.record.workspaceSubscription.status = SUBSCRIPTION_STATUSES.ACTIVE;
-    return structuredClone(this.record);
+  resumeSubscriptionSync(): BillingRecord {
+    const record = this.requireRecord();
+    record.subscription.status = SUBSCRIPTION_STATUSES.ACTIVE;
+    this.clientRecord = record;
+    return this.getRecord();
   }
 
-  cancelSubscription(atPeriodEnd = true): BillingRecord {
-    const now = new Date().toISOString();
-    this.record.subscription.cancelAtPeriodEnd = atPeriodEnd;
-    this.record.subscription.cancelledAt = atPeriodEnd ? null : now;
-    this.record.subscription.updatedAt = now;
-
+  cancelSubscriptionSync(atPeriodEnd = true): BillingRecord {
+    const record = this.requireRecord();
+    record.subscription.cancelAtPeriodEnd = atPeriodEnd;
     if (!atPeriodEnd) {
-      this.record.subscription.status = SUBSCRIPTION_STATUSES.CANCELLED;
-      this.record.workspaceSubscription.status = SUBSCRIPTION_STATUSES.CANCELLED;
+      record.subscription.status = SUBSCRIPTION_STATUSES.CANCELLED;
     }
-
-    return structuredClone(this.record);
+    this.clientRecord = record;
+    return this.getRecord();
   }
 
-  applyCoupon(input: ApplyCouponInput): BillingRecord {
-    const coupon = this.record.coupons.find(
-      (c) => c.code.toLowerCase() === input.couponCode.toLowerCase() && c.isActive,
+  applyCouponSync(input: ApplyCouponInput): BillingRecord {
+    const record = this.requireRecord();
+    const coupon = record.coupons.find(
+      (entry) => entry.code.toLowerCase() === input.couponCode.toLowerCase() && entry.isActive,
     );
 
     if (!coupon) {
-      return structuredClone(this.record);
+      return this.getRecord();
     }
 
-    const now = new Date().toISOString();
-    const discountCents =
-      coupon.discountType === "percentage" && coupon.valueBps !== null
-        ? Math.round((this.record.subscription.mrrCents * coupon.valueBps) / 10000)
-        : (coupon.amountCents ?? 0);
-
-    this.record.discounts.push({
-      id: createId("disc"),
-      subscriptionId: input.subscriptionId,
-      couponId: coupon.id,
-      couponCode: coupon.code,
-      amountCents: discountCents,
-      appliedAt: now,
-      expiresAt: coupon.validTo,
-    });
-
     coupon.redemptionCount += 1;
-    this.record.analytics.couponRedemptionCount += 1;
-
-    return structuredClone(this.record);
-  }
-
-  generateInvoice(): BillingInvoice {
-    const now = new Date().toISOString();
-    const invoiceId = createId("binv");
-    const subtotalCents = this.record.subscription.mrrCents;
-    const taxCents = Math.round(subtotalCents * 0.2);
-    const totalCents = subtotalCents + taxCents;
-
-    const invoice: BillingInvoice = {
-      id: invoiceId,
-      tenantId: DEFAULT_BILLING_SCOPE.tenantId,
-      workspaceId: DEFAULT_BILLING_SCOPE.workspaceId,
-      subscriptionId: this.record.subscription.id,
-      invoiceNumber: `BUSAL-INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-      status: BILLING_INVOICE_STATUSES.OPEN,
-      subtotalCents,
-      discountCents: 0,
-      taxCents,
-      totalCents,
-      amountPaidCents: 0,
-      amountDueCents: totalCents,
-      currency: this.record.subscription.currency,
-      periodStart: this.record.subscription.currentPeriodStart,
-      periodEnd: this.record.subscription.currentPeriodEnd,
-      dueDate: now.slice(0, 10),
-      paidAt: null,
-      lineItems: [
-        {
-          id: createId("bline"),
-          invoiceId,
-          description: `${this.record.plan.name} Plan — ${this.record.subscription.billingCycle}`,
-          quantity: 1,
-          unitAmountCents: subtotalCents,
-          amountCents: subtotalCents,
-          periodStart: this.record.subscription.currentPeriodStart,
-          periodEnd: this.record.subscription.currentPeriodEnd,
-        },
-      ],
-      createdAt: now,
-    };
-
-    this.record.invoices.push(invoice);
-    return structuredClone(invoice);
+    this.clientRecord = record;
+    return this.getRecord();
   }
 }
 

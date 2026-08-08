@@ -524,6 +524,11 @@ export async function assignSubscription(
 ): Promise<void> {
   assertPermission(platform, PERMISSION_CODES.TENANT_PLATFORM_MANAGE);
 
+  const previous = await prisma.tenantRecord.findUnique({
+    where: { businessId: platform.business.id },
+    select: { subscriptionPlan: true },
+  });
+
   await prisma.tenantRecord.update({
     where: { businessId: platform.business.id },
     data: {
@@ -532,12 +537,51 @@ export async function assignSubscription(
     },
   });
 
+  const { updateTenantPlanLimits, assignFeaturesForPlan } = await import(
+    "@/modules/commercial-foundation/services/stripe-billing.service"
+  );
+  await updateTenantPlanLimits(platform.business.id, input.subscriptionPlan);
+  await assignFeaturesForPlan(platform.business.id, input.subscriptionPlan);
+
   await logTenantAudit({
     businessId: platform.business.id,
     userId: platform.user.id,
     eventType: "SUBSCRIPTION_ASSIGNED",
     metadata: { plan: input.subscriptionPlan },
   });
+
+  const { publishModuleDomainEvent } = await import(
+    "@/modules/platform-orchestration/lib/publish-module-event"
+  );
+  const { DOMAIN_EVENT_TYPES } = await import(
+    "@/modules/platform-orchestration/constants/domain-events"
+  );
+
+  const businessId = platform.business.id;
+  const scope = {
+    tenantId: businessId,
+    workspaceId: `${businessId}-ws`,
+    businessId,
+    branchId: platform.branchId,
+    userId: platform.user.id,
+  };
+
+  await publishModuleDomainEvent(scope, {
+    eventType: DOMAIN_EVENT_TYPES.SUBSCRIPTION_UPDATED,
+    aggregateId: businessId,
+    payload: { plan: input.subscriptionPlan, status: input.subscriptionStatus ?? "ACTIVE" },
+  });
+
+  if (previous?.subscriptionPlan !== input.subscriptionPlan) {
+    await publishModuleDomainEvent(scope, {
+      eventType: DOMAIN_EVENT_TYPES.PLAN_CHANGED,
+      aggregateId: businessId,
+      payload: {
+        previousPlan: previous?.subscriptionPlan,
+        plan: input.subscriptionPlan,
+      },
+    });
+  }
 }
 
 export async function assignFeatures(

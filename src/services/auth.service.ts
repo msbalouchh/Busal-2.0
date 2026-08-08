@@ -241,3 +241,24 @@ export async function refreshSession(): Promise<Session | null> {
 
   return mapSupabaseUserToSession(session.user, session.access_token);
 }
+
+export function isSupabaseEmailVerified(user: User): boolean {
+  return Boolean(user.email_confirmed_at);
+}
+
+export async function resendVerificationEmail(email: string): Promise<{ message: string }> {
+  const supabase = await getSupabaseClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: getAuthCallbackUrl(),
+    },
+  });
+
+  if (error) {
+    throwAuthError(error);
+  }
+
+  return { message: "Verification email sent." };
+}

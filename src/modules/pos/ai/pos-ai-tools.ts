@@ -4,18 +4,40 @@ import {
   PLATFORM_TOOL_PERMISSIONS,
 } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
+  analyzePeakHours,
   applyDiscountForAi,
   createSaleForAi,
+  detectFraud,
   detectSuspiciousRefunds,
   forecastRevenue,
   predictBusyHours,
+  predictSales,
   recommendUpsells,
   splitBillForAi,
   suggestPromotions,
 } from "@/modules/pos/ai/pos-ai-context";
 import { POS_AI_TOOL_IDS } from "@/modules/pos/constants/pos-status";
+import { buildPosPlatformContext } from "@/modules/pos/lib/pos-platform-context";
+import type { PosPlatformContext } from "@/modules/pos/types/pos-platform";
+
+function toPosContext(context: PlatformExecutionContext): PosPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for POS tools");
+  }
+
+  return buildPosPlatformContext({
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  });
+}
 
 function definePosTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -81,7 +103,7 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const rawItems = Array.isArray(input.items) ? input.items : [];
       const items = rawItems
         .filter(
@@ -94,7 +116,7 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
           unitPriceCents: typeof item.unitPriceCents === "number" ? item.unitPriceCents : 0,
         }));
 
-      return createSaleForAi(items);
+      return createSaleForAi(toPosContext(context), items);
     },
   ),
   definePosTool(
@@ -121,11 +143,12 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const orderId = typeof input.orderId === "string" ? input.orderId : "";
       const valueBps = typeof input.valueBps === "number" ? input.valueBps : 0;
       const label = typeof input.label === "string" ? input.label : "AI Discount";
-      return applyDiscountForAi(orderId, valueBps, label) ?? { error: "Order not found." };
+      const result = await applyDiscountForAi(toPosContext(context), orderId, valueBps, label);
+      return result ?? { error: "Order not found." };
     },
   ),
   definePosTool(
@@ -151,10 +174,11 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "low" },
     },
-    async (input) => {
+    async (input, context) => {
       const orderId = typeof input.orderId === "string" ? input.orderId : "";
       const splitCount = typeof input.splitCount === "number" ? input.splitCount : 2;
-      return splitBillForAi(orderId, splitCount) ?? { error: "Order not found." };
+      const result = await splitBillForAi(toPosContext(context), orderId, splitCount);
+      return result ?? { error: "Order not found." };
     },
   ),
   definePosTool(
@@ -177,9 +201,10 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, context) => {
       const orderId = typeof input.orderId === "string" ? input.orderId : "";
-      return recommendUpsells(orderId) ?? { error: "Order not found." };
+      const result = await recommendUpsells(toPosContext(context), orderId);
+      return result ?? { error: "Order not found." };
     },
   ),
   definePosTool(
@@ -198,7 +223,7 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => predictBusyHours(),
+    async (_input, context) => analyzePeakHours(toPosContext(context)),
   ),
   definePosTool(
     {
@@ -219,9 +244,9 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const limit = typeof input.limit === "number" ? input.limit : 5;
-      return detectSuspiciousRefunds(limit);
+      return detectSuspiciousRefunds(toPosContext(context), limit);
     },
   ),
   definePosTool(
@@ -240,7 +265,7 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => suggestPromotions(),
+    async (_input, context) => suggestPromotions(toPosContext(context)),
   ),
   definePosTool(
     {
@@ -258,13 +283,13 @@ export const POS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => forecastRevenue(),
+    async (_input, context) => predictSales(toPosContext(context)),
   ),
 ];
 
 let registered = false;
 
-/** Registers POS platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers POS platform tools with the AI Tool Platform (idempotent). */
 export function registerPosAiTools(): void {
   if (registered) {
     return;

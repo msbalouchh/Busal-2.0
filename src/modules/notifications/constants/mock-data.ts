@@ -499,6 +499,7 @@ export const MOCK_NOTIFICATION_RECORD: NotificationRecord = {
       branchId: DEFAULT_NOTIFICATION_SCOPE.branchId,
     },
   ],
+  campaigns: [],
   analytics: {
     tenantId: DEFAULT_NOTIFICATION_SCOPE.tenantId,
     totalSent: 156,

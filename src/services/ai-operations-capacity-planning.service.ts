@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getReservationsDashboard } from "@/services/restaurant-analytics.service";
 import { createOperationInsight } from "@/services/ai-operations-efficiency-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import {
   defaultAnalyticsFilters,
   getOwnedBusinessId,
@@ -61,19 +62,18 @@ export async function getCapacitySnapshot(ownerId: string): Promise<CapacitySnap
 }
 
 export async function generateCapacityInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getCapacitySnapshot(ownerId);
-  let created = 0;
-
-  await createOperationInsight(businessId, {
-    title: "Capacity planning summary",
-    description: `${snapshot.capacityUtilization}% table utilization · ${snapshot.activeStaff} staff · ${snapshot.activeTables} tables.`,
-    category: "capacity",
-    priority: snapshot.capacityUtilization > 90 ? "HIGH" : "MEDIUM",
-    recommendation: snapshot.recommendation,
-    metadata: { capacityUtilization: snapshot.capacityUtilization },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "operations",
+    task: "capacity-insights",
+    loadContext: getCapacitySnapshot,
+    persistInsight: (businessId, insight) =>
+      createOperationInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "capacity",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  return created;
 }

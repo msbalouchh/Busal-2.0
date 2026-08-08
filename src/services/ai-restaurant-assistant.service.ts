@@ -3,10 +3,6 @@ import "server-only";
 import type { Prisma, RecommendationPriority, RecommendationStatus } from "@prisma/client";
 
 import {
-  ensureAiRestaurantAssistantProviders,
-  getRestaurantAssistantProvider,
-} from "@/modules/ai-restaurant-assistant-management/engine/bootstrap-ai-providers";
-import {
   buildBusinessHealthSummary,
   composeRestaurantAssistantReply,
 } from "@/modules/ai-restaurant-assistant-management/engine/restaurant-assistant-engine";
@@ -188,8 +184,7 @@ export async function sendAssistantMessage(
   input: SendMessageInput,
 ): Promise<AssistantResponse> {
   validateSendMessageInput(input);
-  ensureAiRestaurantAssistantProviders();
-
+  
   const businessId = await getOwnedBusinessId(ownerId);
   const staffId = await resolveStaffId(ownerId, businessId);
 
@@ -222,12 +217,6 @@ export async function sendAssistantMessage(
 
   const composed = await composeRestaurantAssistantReply(ownerId, input.message, input.branchId);
 
-  const provider = getRestaurantAssistantProvider();
-  await provider.complete({
-    systemPrompt: `You are the Busal Restaurant Assistant. ownerId:${ownerId}${input.branchId ? ` branchId:${input.branchId}` : ""}`,
-    messages: [{ role: "user", content: input.message }],
-  });
-
   const assistantMessage = await prisma.aIMessage.create({
     data: {
       conversationId,
@@ -235,7 +224,7 @@ export async function sendAssistantMessage(
       content: composed.content,
       metadata: {
         intent: composed.intent,
-        provider: provider.id,
+        provider: "ai-engine",
       } as Prisma.InputJsonValue,
     },
   });

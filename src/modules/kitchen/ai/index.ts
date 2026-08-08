@@ -9,4 +9,7 @@ export {
   estimatePreparationTime,
   recommendWorkflowImprovements,
   detectKitchenBottlenecks,
+  forecastKitchenLoad,
+  suggestStaffAllocation,
+  recommendStationBalancing,
 } from "@/modules/kitchen/ai/kitchen-ai-context";

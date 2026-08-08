@@ -60,16 +60,16 @@ async function main() {
   console.log("POS route");
   assert(POS_ROUTES.overview === "/dashboard/pos", "POS route mismatch");
   const pageSource = readFileSync(join(root, "src/app/dashboard/pos/page.tsx"), "utf8");
-  assert(pageSource.includes("getPosModuleContext"), "POS page should load module context");
+  assert(pageSource.includes("getPosTerminalContext"), "POS page should load module context");
   console.log("  PASS");
 
   console.log("Permission protected");
   const contextSource = readFileSync(join(root, "src/modules/pos/lib/get-pos-context.ts"), "utf8");
   const actionsSource = readFileSync(join(root, "src/modules/pos/actions/pos-actions.ts"), "utf8");
   assert(contextSource.includes("protectedPage"), "POS page should use protectedPage");
-  assert(contextSource.includes("PERMISSION_CODES.POS_USE"), "POS page should require pos.use");
+  assert(contextSource.includes("POS_MODULE_PERMISSIONS.POS_READ"), "POS page should require pos.use");
   assert(actionsSource.includes("protectedAction"), "POS actions should use protectedAction");
-  assert(actionsSource.includes("PERMISSION_CODES.POS_USE"), "POS actions should require pos.use");
+  assert(actionsSource.includes("POS_MODULE_PERMISSIONS.POS_READ"), "POS actions should require pos.use");
   assert(PERMISSION_CODES.POS_USE === "pos.use", "pos.use permission code missing");
   console.log("  PASS");
 

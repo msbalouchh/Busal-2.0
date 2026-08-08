@@ -27,7 +27,7 @@ import {
   listBranchStaffForOrderSelect,
   listBranchTablesForOrderSelect,
   listManagedOrders,
-} from "@/services/restaurant-order.service";
+} from "@/modules/orders/services/order-management-adapter.service";
 import { getRestaurantFoundationBundle } from "@/services/restaurant-management.service";
 import type { AuthUser } from "@/types/auth";
 import type { AuthorizationContext } from "@/modules/authorization/types/authorization";
@@ -238,6 +238,10 @@ export const getOrderDetailsContext = cache(async (branchId: string, orderId: st
       pageSize: 50,
     }),
   ]);
+
+  if (!order) {
+    redirect(ORDER_MANAGEMENT_ROUTES.listForBranch(context.selectedBranchId));
+  }
 
   const mergeCandidates = mergeResult.items.filter(
     (candidate) =>

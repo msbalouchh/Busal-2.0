@@ -110,7 +110,7 @@ async function main() {
     schemaSource.includes("model SalesOpportunityCatalogueLink"),
     "catalogue link model missing",
   );
-  assert(schemaSource.includes("valuePence        Int"), "opportunity value must be integer pence");
+  assert(/valuePence\s+Int/.test(schemaSource), "opportunity value must be integer pence");
   console.log("  PASS");
 
   const business = await prisma.business.findFirst({

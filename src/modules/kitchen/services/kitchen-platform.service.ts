@@ -1,5 +1,7 @@
+import "server-only";
+
 import { KITCHEN_STATUSES } from "@/modules/kitchen/constants/kitchen-status";
-import { DEFAULT_KITCHEN_SCOPE } from "@/modules/kitchen/constants/mock-data";
+import { buildKitchenPlatformContext } from "@/modules/kitchen/lib/kitchen-platform-context";
 import { kitchenRepository } from "@/modules/kitchen/repository/kitchen-repository";
 import type {
   KitchenPlatformContext,
@@ -29,81 +31,75 @@ export interface KitchenPlatformSnapshot {
 export interface KitchenPlatformInput {
   tenantId?: string;
   workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
+  businessId: string;
+  branchId: string;
   userId?: string;
   kitchenId?: string;
 }
 
-export function buildKitchenPlatformContext(
-  input: KitchenPlatformInput = {},
-): KitchenPlatformContext {
-  return {
-    tenantId: input.tenantId ?? DEFAULT_KITCHEN_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_KITCHEN_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_KITCHEN_SCOPE.businessId,
-    branchId: input.branchId ?? DEFAULT_KITCHEN_SCOPE.branchId,
-    userId: input.userId ?? DEFAULT_KITCHEN_SCOPE.userId,
-    kitchenId: input.kitchenId ?? DEFAULT_KITCHEN_SCOPE.kitchenId,
-  };
+function countByStatus(records: KitchenRecord[], status: string): number {
+  return records.filter((record) => record.order.status === status).length;
 }
 
-export function buildKitchenPlatformSnapshot(
-  input: KitchenPlatformInput = {},
-): KitchenPlatformSnapshot {
+export async function buildKitchenPlatformSnapshot(
+  input: KitchenPlatformInput,
+): Promise<KitchenPlatformSnapshot> {
   const context = buildKitchenPlatformContext(input);
-  const records = kitchenRepository
-    .listRecords()
-    .filter(
-      (record) =>
-        record.order.tenantId === context.tenantId &&
-        record.order.businessId === context.businessId &&
-        record.order.kitchenId === context.kitchenId,
-    );
+  const scope = {
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+    kitchenId: context.kitchenId,
+  };
 
-  const countByStatus = (status: string) =>
-    records.filter((record) => record.order.status === status).length;
+  const [records, stations, screens, queues] = await Promise.all([
+    kitchenRepository.listRecords(scope),
+    kitchenRepository.listStations(scope),
+    kitchenRepository.listScreens(scope),
+    kitchenRepository.listQueues(scope),
+  ]);
 
-  const prepSum = records.reduce((sum, r) => sum + r.analytics.totalPrepMinutes, 0);
-  const onTimeSum = records.reduce((sum, r) => sum + r.analytics.onTimePercentage, 0);
+  const prepSum = records.reduce((sum, record) => sum + record.analytics.totalPrepMinutes, 0);
+  const onTimeSum = records.reduce((sum, record) => sum + record.analytics.onTimePercentage, 0);
 
   return {
     context,
     records,
-    stations: kitchenRepository.listStations(),
-    screens: kitchenRepository.listScreens(),
-    queues: kitchenRepository.listQueues(),
+    stations,
+    screens,
+    queues,
     orderCount: records.length,
-    queuedCount: countByStatus(KITCHEN_STATUSES.QUEUED),
-    acceptedCount: countByStatus(KITCHEN_STATUSES.ACCEPTED),
-    preparingCount: countByStatus(KITCHEN_STATUSES.PREPARING),
-    readyCount: countByStatus(KITCHEN_STATUSES.READY),
-    delayedCount: countByStatus(KITCHEN_STATUSES.DELAYED),
-    recalledCount: records.filter((r) => r.order.isRecalled).length,
+    queuedCount: countByStatus(records, KITCHEN_STATUSES.QUEUED),
+    acceptedCount: countByStatus(records, KITCHEN_STATUSES.ACCEPTED),
+    preparingCount: countByStatus(records, KITCHEN_STATUSES.PREPARING),
+    readyCount: countByStatus(records, KITCHEN_STATUSES.READY),
+    delayedCount: countByStatus(records, KITCHEN_STATUSES.DELAYED),
+    recalledCount: records.filter((record) => record.order.isRecalled).length,
     avgPrepMinutes: records.length > 0 ? prepSum / records.length : 0,
     onTimePercentage: records.length > 0 ? onTimeSum / records.length : 100,
   };
 }
 
-export function getDefaultKitchenSnapshot(): KitchenPlatformSnapshot {
-  return buildKitchenPlatformSnapshot();
-}
-
-export function getActiveKitchenOrders(limit = 10): KitchenRecord[] {
-  return kitchenRepository
-    .search({
-      status: KITCHEN_STATUSES.PREPARING,
-      limit,
-    })
-    .concat(
-      kitchenRepository.search({
-        status: KITCHEN_STATUSES.QUEUED,
-        limit,
-      }),
+export async function getActiveKitchenOrders(
+  input: KitchenPlatformInput,
+  limit = 10,
+): Promise<KitchenRecord[]> {
+  const snapshot = await buildKitchenPlatformSnapshot(input);
+  return snapshot.records
+    .filter(
+      (record) =>
+        record.order.status !== KITCHEN_STATUSES.SERVED &&
+        record.order.status !== KITCHEN_STATUSES.COMPLETED &&
+        record.order.status !== KITCHEN_STATUSES.CANCELLED,
     )
     .slice(0, limit);
 }
 
-export function getDelayedKitchenOrders(): KitchenRecord[] {
-  return kitchenRepository.search({ status: KITCHEN_STATUSES.DELAYED });
+export async function getDelayedKitchenOrders(input: KitchenPlatformInput): Promise<KitchenRecord[]> {
+  const snapshot = await buildKitchenPlatformSnapshot(input);
+  return snapshot.records.filter((record) => record.order.status === KITCHEN_STATUSES.DELAYED);
 }
+
+export { buildKitchenPlatformContext };

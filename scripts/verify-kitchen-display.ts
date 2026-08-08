@@ -2,9 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PrismaClient } from "@prisma/client";
-
-import { addItem, createCart } from "../src/services/cart.service";
 import {
   acknowledgeOrder,
   getQueue,
@@ -12,6 +9,7 @@ import {
   markServed,
   startPreparation,
 } from "../src/services/kitchen-queue.service";
+import { addItem, createCart } from "../src/services/cart.service";
 import { createOrderFromSession } from "../src/services/order.service";
 import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
 import {
@@ -21,8 +19,11 @@ import {
 } from "../src/modules/kitchen/lib/kitchen-display-utils";
 import { KITCHEN_REFRESH_INTERVAL_MS } from "../src/modules/kitchen/constants/routes";
 import { createQRCode, deleteQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { handleVerificationError } from "./lib/verify-db";
+import { cleanupRestaurantOrder, ensureVerificationTenantContext } from "./lib/verify-oms-order";
+import { getVerifyPrisma } from "./lib/verify-prisma";
 
-const prisma = new PrismaClient();
+const prisma = getVerifyPrisma();
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -37,17 +38,18 @@ async function main() {
   });
   assert(business, "No business found");
 
+  const { branchId } = await ensureVerificationTenantContext(prisma, business.id);
   const ownerId = business.ownerId;
   const suffix = Date.now();
   const slug = `kitchen-display-${suffix}`;
 
-  const qrCode = await createQRCode(ownerId, { slug });
+  const qrCode = await createQRCode(ownerId, { slug, branchId });
   const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
     sessionToken: `kitchen-display-token-${suffix}`,
   });
 
   let menuItem = await prisma.menuItem.findFirst({
-    where: { businessId: business.id, isAvailable: true },
+    where: { businessId: business.id, branchId, isAvailable: true },
     select: { id: true, name: true },
   });
 
@@ -55,6 +57,7 @@ async function main() {
     menuItem = await prisma.menuItem.create({
       data: {
         businessId: business.id,
+        branchId,
         name: `Kitchen Display Item ${suffix}`,
         price: 12,
         isAvailable: true,
@@ -63,14 +66,22 @@ async function main() {
     });
   }
 
-  const cart = await createCart(business.id, visit.session.id);
-  await addItem(business.id, visit.session.id, menuItem.id, 2);
-  const orderSession = await createOrderSession(business.id, cart.id, visit.session.id);
+  const cart = await createCart(business.id, visit.session.id, branchId);
+  await addItem(business.id, visit.session.id, menuItem.id, 2, branchId);
+  const orderSession = await createOrderSession(business.id, cart.id, visit.session.id, {
+    branchId,
+  });
   await markOrderSessionReady(orderSession.id);
-  const order = await createOrderFromSession(orderSession.id);
+  const order = await createOrderFromSession(orderSession.id, branchId);
+
+  const legacyOrder = await prisma.legacyOrder.findUnique({
+    where: { orderSessionId: orderSession.id },
+    select: { id: true },
+  });
+  assert(legacyOrder, "legacy kitchen order missing");
 
   const queueItem = await prisma.kitchenQueue.findUnique({
-    where: { orderId: order.id },
+    where: { orderId: legacyOrder.id },
     include: {
       order: {
         include: {
@@ -90,9 +101,9 @@ async function main() {
   assert(queueItem, "queue item missing");
 
   console.log("Queue loads");
-  const queue = await getQueue(business.id);
+  const queue = await getQueue(business.id, { branchId });
   assert(
-    queue.some((entry) => entry.orderId === order.id),
+    queue.some((entry) => entry.orderId === legacyOrder.id),
     "queue load failed",
   );
   console.log("  PASS");
@@ -170,8 +181,9 @@ async function main() {
 
   console.log("Cleanup");
   await prisma.kitchenQueue.delete({ where: { id: queueItem.id } });
-  await prisma.legacyOrderItem.deleteMany({ where: { orderId: order.id } });
-  await prisma.legacyOrder.delete({ where: { id: order.id } });
+  await prisma.legacyOrderItem.deleteMany({ where: { orderId: legacyOrder.id } });
+  await prisma.legacyOrder.delete({ where: { id: legacyOrder.id } });
+  await cleanupRestaurantOrder(prisma, order.id);
   await prisma.orderSession.delete({ where: { id: orderSession.id } });
   await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
   await prisma.cart.delete({ where: { id: cart.id } });
@@ -183,10 +195,7 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error("\nFIRST ERROR:", error instanceof Error ? error.message : error);
-    process.exit(1);
-  })
+  .catch(handleVerificationError)
   .finally(async () => {
     await prisma.$disconnect();
   });

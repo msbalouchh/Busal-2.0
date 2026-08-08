@@ -394,16 +394,39 @@ export interface StaffPlatformContext {
   userId: string;
 }
 
+export interface StaffPlatformSnapshot {
+  context: StaffPlatformContext;
+  records: StaffRecord[];
+  staffCount: number;
+  activeCount: number;
+  onLeaveCount: number;
+  inactiveCount: number;
+  pendingLeaveCount: number;
+  upcomingShiftCount: number;
+  avgAttendanceRateBps: number;
+  avgPerformanceScoreBps: number;
+}
+
 export interface StaffContextValue {
   context: StaffPlatformContext;
   records: StaffRecord[];
   departments: Department[];
   designations: Designation[];
+  staffCount: number;
+  activeCount: number;
+  onLeaveCount: number;
+  inactiveCount: number;
+  pendingLeaveCount: number;
+  upcomingShiftCount: number;
+  avgAttendanceRateBps: number;
+  avgPerformanceScoreBps: number;
   selectedStaffId: string | null;
   selectedStaff: StaffRecord | null;
   selectStaff: (staffId: string | null) => void;
   searchStaff: (query: StaffSearchQuery) => StaffRecord[];
   refresh: () => void;
+  isRefreshing: boolean;
+  error: string | null;
 }
 
 export interface StaffScheduleContextValue {

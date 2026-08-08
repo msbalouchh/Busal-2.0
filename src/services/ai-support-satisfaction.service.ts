@@ -3,6 +3,10 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { createSupportInsight } from "@/services/ai-support-response-recommendation.service";
+import {
+  runOwnerDomainDetectionTask,
+  runOwnerDomainInsightTask,
+} from "@/services/ai-engine-bridge.service";
 
 export interface SatisfactionSnapshot {
   satisfactionScore: number;
@@ -13,9 +17,46 @@ export interface SatisfactionSnapshot {
   complaintRatePercent: number;
 }
 
+interface ComplaintFlag {
+  messageIndex: number;
+}
+
+interface DissatisfiedCustomerItem {
+  ticketId: string;
+  customerId: string | null;
+  customerName: string | null;
+  subject: string;
+  preview: string;
+}
+
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
   const business = await getOrCreateBusinessForOwner(ownerId);
   return business.id;
+}
+
+async function detectComplaintMessageIndexes(
+  ownerId: string,
+  messages: Array<{ body: string }>,
+): Promise<number[]> {
+  if (messages.length === 0) return [];
+
+  const flagged = await runOwnerDomainDetectionTask<ComplaintFlag>(ownerId, {
+    module: "support",
+    task: "complaint-message-detection",
+    responseKey: "complaints",
+    instructions:
+      'Return JSON only: { "complaints": [{ "messageIndex": number }] } listing indexes of inbound messages expressing dissatisfaction, complaints, refund requests, or clearly negative sentiment.',
+    loadContext: async () => ({
+      messages: messages.map((message, index) => ({
+        messageIndex: index,
+        body: message.body.slice(0, 500),
+      })),
+    }),
+  });
+
+  return flagged
+    .map((entry) => entry.messageIndex)
+    .filter((index) => Number.isInteger(index) && index >= 0 && index < messages.length);
 }
 
 export async function getSatisfactionSnapshot(ownerId: string): Promise<SatisfactionSnapshot> {
@@ -43,11 +84,11 @@ export async function getSatisfactionSnapshot(ownerId: string): Promise<Satisfac
     }),
   ]);
 
-  const complaintCount = recentMessages.filter((m) =>
-    /unhappy|complaint|refund|terrible|awful|disappointed|bad/i.test(m.body),
-  ).length;
+  const complaintIndexes = await detectComplaintMessageIndexes(ownerId, recentMessages);
   const complaintRatePercent =
-    recentMessages.length === 0 ? 0 : Math.round((complaintCount / recentMessages.length) * 100);
+    recentMessages.length === 0
+      ? 0
+      : Math.round((complaintIndexes.length / recentMessages.length) * 100);
 
   const responseTimes: number[] = [];
   const conversationIds = [...new Set(recentMessages.map((m) => m.conversationId))].slice(0, 20);
@@ -101,55 +142,59 @@ export async function getSatisfactionSnapshot(ownerId: string): Promise<Satisfac
 }
 
 export async function generateSatisfactionInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getSatisfactionSnapshot(ownerId);
-  let created = 0;
-
-  await createSupportInsight(businessId, {
-    title: "Customer satisfaction score",
-    description: `Score: ${snapshot.satisfactionScore}/100 (${snapshot.satisfactionLabel}) · Avg response: ${snapshot.avgResponseTimeHours}h · Complaint rate: ${snapshot.complaintRatePercent}%.`,
-    priority: snapshot.satisfactionScore < 60 ? "HIGH" : "MEDIUM",
-    recommendation:
-      snapshot.complaintRatePercent > 10
-        ? "Review complaint patterns and update support scripts."
-        : "Maintain current response quality and monitor open ticket volume.",
-    metadata: { snapshot },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "support",
+    task: "satisfaction-insights",
+    loadContext: getSatisfactionSnapshot,
+    persistInsight: (businessId, insight) =>
+      createSupportInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  return created;
 }
 
 export async function identifyDissatisfiedCustomers(ownerId: string) {
-  const businessId = await getOwnedBusinessId(ownerId);
+  return runOwnerDomainDetectionTask<DissatisfiedCustomerItem>(ownerId, {
+    module: "support",
+    task: "dissatisfied-customer-detection",
+    responseKey: "customers",
+    instructions:
+      'Return JSON only: { "customers": [{ "ticketId": string, "customerId": string|null, "customerName": string|null, "subject": string, "preview": string }] } for up to 10 dissatisfied customers grounded in the supplied messages.',
+    loadContext: async (id) => {
+      const businessId = await getOwnedBusinessId(id);
 
-  const messages = await prisma.communicationMessage.findMany({
-    where: {
-      businessId,
-      messageType: "INBOUND",
-      createdAt: { gte: new Date(Date.now() - 14 * 86400000) },
-    },
-    include: {
-      conversation: {
-        select: {
-          id: true,
-          subject: true,
-          customer: { select: { id: true, name: true } },
+      const messages = await prisma.communicationMessage.findMany({
+        where: {
+          businessId,
+          messageType: "INBOUND",
+          createdAt: { gte: new Date(Date.now() - 14 * 86400000) },
         },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
+        include: {
+          conversation: {
+            select: {
+              id: true,
+              subject: true,
+              customer: { select: { id: true, name: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
 
-  return messages
-    .filter((m) => /unhappy|complaint|refund|terrible|awful|disappointed|bad/i.test(m.body))
-    .map((m) => ({
-      ticketId: m.conversation.id,
-      customerId: m.conversation.customer?.id ?? null,
-      customerName: m.conversation.customer?.name ?? null,
-      subject: m.conversation.subject,
-      preview: m.body.slice(0, 120),
-    }))
-    .slice(0, 10);
+      return {
+        messages: messages.map((message) => ({
+          ticketId: message.conversation.id,
+          customerId: message.conversation.customer?.id ?? null,
+          customerName: message.conversation.customer?.name ?? null,
+          subject: message.conversation.subject,
+          body: message.body.slice(0, 500),
+        })),
+      };
+    },
+  });
 }

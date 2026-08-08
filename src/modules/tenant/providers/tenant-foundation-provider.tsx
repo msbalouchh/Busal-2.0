@@ -8,52 +8,82 @@ import { OrganizationContext } from "@/modules/tenant/contexts/organization-cont
 import { TenantContext } from "@/modules/tenant/contexts/tenant-context";
 import { TenantFoundationContext } from "@/modules/tenant/contexts/tenant-foundation-context";
 import { WorkspaceContext } from "@/modules/tenant/contexts/workspace-context";
-import {
-  buildTenantSnapshot,
-  getDefaultTenantSnapshot,
-  selectBranch,
-  selectBusiness,
-  selectOrganization,
-  selectTenant,
-  selectWorkspace,
-} from "@/modules/tenant/services/mock-tenant.service";
 import type { TenantSelection } from "@/modules/tenant/types/entities";
-import type { TenantFoundationContextValue } from "@/modules/tenant/types/context";
+import type { TenantFoundationContextValue, TenantSnapshot } from "@/modules/tenant/types/context";
 import { hasPermissionKey } from "@/modules/tenant/utils/tenant-selectors";
 
 interface TenantFoundationProviderProps {
   children: ReactNode;
-  initialSelection?: TenantSelection;
+  initialSnapshot: TenantSnapshot;
+}
+
+function buildSelectionFromSnapshot(
+  snapshot: TenantSnapshot,
+  branchId?: string,
+): TenantSelection {
+  return {
+    tenantId: snapshot.tenant.id,
+    organizationId: snapshot.organization.id,
+    workspaceId: snapshot.workspace.id,
+    businessId: snapshot.business.id,
+    branchId: branchId ?? snapshot.branch.id,
+  };
 }
 
 export function TenantFoundationProvider({
   children,
-  initialSelection,
+  initialSnapshot,
 }: TenantFoundationProviderProps) {
-  const [selection, setSelection] = useState<TenantSelection>(
-    () => initialSelection ?? getDefaultTenantSnapshot().selection,
+  const [snapshot, setSnapshot] = useState<TenantSnapshot>(initialSnapshot);
+  const [selection, setSelection] = useState<TenantSelection>(() =>
+    buildSelectionFromSnapshot(initialSnapshot),
   );
 
-  const snapshot = useMemo(() => buildTenantSnapshot(selection), [selection]);
+  const refreshSnapshot = useCallback(async () => {
+    const response = await fetch("/api/tenant/snapshot");
+    if (!response.ok) {
+      return;
+    }
 
-  const switchTenant = useCallback((tenantId: string) => {
-    setSelection(selectTenant(tenantId));
+    const nextSnapshot = (await response.json()) as TenantSnapshot;
+    setSnapshot(nextSnapshot);
+    setSelection(buildSelectionFromSnapshot(nextSnapshot));
   }, []);
 
+  const switchTenant = useCallback(
+    (tenantId: string) => {
+      if (snapshot.tenant.id !== tenantId) {
+        void refreshSnapshot();
+        return;
+      }
+
+      setSelection((current) => ({ ...current, tenantId }));
+    },
+    [refreshSnapshot, snapshot.tenant.id],
+  );
+
   const switchOrganization = useCallback((organizationId: string) => {
-    setSelection(selectOrganization(organizationId));
+    setSelection((current) => ({ ...current, organizationId }));
   }, []);
 
   const switchWorkspace = useCallback((workspaceId: string) => {
-    setSelection(selectWorkspace(workspaceId));
+    setSelection((current) => ({ ...current, workspaceId }));
   }, []);
 
-  const switchBusiness = useCallback((businessId: string) => {
-    setSelection(selectBusiness(businessId));
-  }, []);
+  const switchBusiness = useCallback(
+    (businessId: string) => {
+      void refreshSnapshot();
+      setSelection((current) => ({ ...current, businessId }));
+    },
+    [refreshSnapshot],
+  );
 
   const switchBranch = useCallback((branchId: string) => {
-    setSelection((current) => selectBranch(branchId, current));
+    setSelection((current) => ({ ...current, branchId }));
+    setSnapshot((current) => {
+      const branch = current.branches.find((entry) => entry.id === branchId) ?? current.branch;
+      return { ...current, branch };
+    });
   }, []);
 
   const hasPermission = useCallback(
@@ -82,7 +112,7 @@ export function TenantFoundationProvider({
       staff: snapshot.staff,
       roles: snapshot.roles,
       permissions: snapshot.permissions,
-      selection: snapshot.selection,
+      selection,
       switchTenant,
       switchOrganization,
       switchWorkspace,
@@ -93,6 +123,7 @@ export function TenantFoundationProvider({
     }),
     [
       snapshot,
+      selection,
       switchTenant,
       switchOrganization,
       switchWorkspace,

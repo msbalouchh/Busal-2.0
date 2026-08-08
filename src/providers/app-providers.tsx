@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { ErrorBoundary } from "@/components/common/error-boundary";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthSessionProvider } from "@/modules/auth/providers/auth-session-provider";
 import { NotificationProvider } from "@/providers/notification-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
@@ -21,12 +22,14 @@ export function AppProviders({ children }: AppProvidersProps) {
       disableTransitionOnChange
     >
       <QueryProvider>
-        <TooltipProvider delayDuration={0}>
-          <ErrorBoundary>
-            {children}
-            <NotificationProvider />
-          </ErrorBoundary>
-        </TooltipProvider>
+        <AuthSessionProvider>
+          <TooltipProvider delayDuration={0}>
+            <ErrorBoundary>
+              {children}
+              <NotificationProvider />
+            </ErrorBoundary>
+          </TooltipProvider>
+        </AuthSessionProvider>
       </QueryProvider>
     </ThemeProvider>
   );

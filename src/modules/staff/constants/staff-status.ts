@@ -124,6 +124,8 @@ export const STAFF_AI_TOOL_IDS = {
   RECOMMEND_STAFFING: "staff.recommend-staffing",
   PREDICT_LABOUR_DEMAND: "staff.predict-labour-demand",
   DETECT_ATTENDANCE_ISSUES: "staff.detect-attendance-issues",
+  SUGGEST_TRAINING: "staff.suggest-training",
+  OPTIMIZE_WORKFORCE: "staff.optimize-workforce",
 } as const;
 
 export type StaffAiToolId = (typeof STAFF_AI_TOOL_IDS)[keyof typeof STAFF_AI_TOOL_IDS];

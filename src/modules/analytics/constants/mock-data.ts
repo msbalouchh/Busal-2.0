@@ -38,6 +38,7 @@ export const MOCK_EXECUTIVE_DASHBOARD: Dashboard = {
   createdByUserId: DEFAULT_ANALYTICS_SCOPE.userId,
   createdAt: NOW,
   updatedAt: NOW,
+  deletedAt: null,
 };
 
 export const MOCK_OPERATIONS_DASHBOARD: Dashboard = {
@@ -55,6 +56,7 @@ export const MOCK_OPERATIONS_DASHBOARD: Dashboard = {
   createdByUserId: DEFAULT_ANALYTICS_SCOPE.userId,
   createdAt: NOW,
   updatedAt: NOW,
+  deletedAt: null,
 };
 
 export const MOCK_ANALYTICS_RECORD: AnalyticsRecord = {
@@ -314,8 +316,13 @@ export const MOCK_ANALYTICS_RECORD: AnalyticsRecord = {
       createdByUserId: DEFAULT_ANALYTICS_SCOPE.userId,
       createdAt: NOW,
       updatedAt: NOW,
+      deletedAt: null,
     },
   ],
+  reportTemplates: [],
+  dataSources: [],
+  dashboardLayouts: [],
+  savedViews: [],
   savedReports: [
     {
       id: "saved-report-001",

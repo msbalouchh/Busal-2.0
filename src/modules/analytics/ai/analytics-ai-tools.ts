@@ -1,16 +1,28 @@
+import "server-only";
+
 import { BUILTIN_AGENT_SLUGS } from "@/modules/ai/constants/agent-slugs";
 import { PLATFORM_MODULES } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
+  buildAnalyticsAiContext,
+  businessHealthScoreForAi,
+  churnPredictionForAi,
   compareBranchesForAi,
+  customerInsightsForAi,
   detectBusinessAnomaliesForAi,
   explainKpiForAi,
+  financialForecastForAi,
   forecastDemandForAi,
   forecastRevenueForAi,
   generateExecutiveSummaryForAi,
   generateReportForAi,
+  inventoryForecastForAi,
   recommendImprovementsForAi,
+  staffingRecommendationsForAi,
 } from "@/modules/analytics/ai/analytics-ai-context";
 import {
   ANALYTICS_AI_TOOL_IDS,
@@ -18,6 +30,22 @@ import {
   ANALYTICS_PERMISSIONS,
 } from "@/modules/analytics/constants/analytics-status";
 import type { AnalyticsModuleSource } from "@/modules/analytics/constants/analytics-status";
+import { buildAnalyticsPlatformContext } from "@/modules/analytics/lib/analytics-platform-context";
+import type { AnalyticsPlatformContext } from "@/modules/analytics/types/analytics-platform";
+
+function toAnalyticsContext(context: PlatformExecutionContext): AnalyticsPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for Analytics tools");
+  }
+
+  return buildAnalyticsPlatformContext({
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  });
+}
 
 function defineAnalyticsTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -71,28 +99,17 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredModules: [PLATFORM_MODULES.ANALYTICS],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
-      inputSchema: {
-        type: "object",
-        required: ["name"],
-        properties: {
-          name: { type: "string" },
-          moduleSources: { type: "array" },
-          periodStart: { type: "string" },
-          periodEnd: { type: "string" },
-        },
-      },
+      inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" }, moduleSources: { type: "array" } } },
       outputSchema: { type: "object" },
       supportedAgents: ANALYTICS_AGENT_SLUGS,
       capabilityId: "capability.analytics",
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) =>
-      generateReportForAi({
+    async (input, context) =>
+      generateReportForAi(toAnalyticsContext(context), {
         name: typeof input.name === "string" ? input.name : "Analytics Report",
         moduleSources: parseModuleSources(input.moduleSources),
-        periodStart: typeof input.periodStart === "string" ? input.periodStart : undefined,
-        periodEnd: typeof input.periodEnd === "string" ? input.periodEnd : undefined,
       }),
   ),
   defineAnalyticsTool(
@@ -104,18 +121,15 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredModules: [PLATFORM_MODULES.ANALYTICS],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
-      inputSchema: {
-        type: "object",
-        properties: { kpiKey: { type: "string" } },
-      },
+      inputSchema: { type: "object", properties: { kpiKey: { type: "string" } } },
       outputSchema: { type: "object" },
       supportedAgents: ANALYTICS_AGENT_SLUGS,
       capabilityId: "capability.analytics",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) =>
-      explainKpiForAi({
+    async (input, context) =>
+      explainKpiForAi(toAnalyticsContext(context), {
         kpiKey: typeof input.kpiKey === "string" ? input.kpiKey : undefined,
       }),
   ),
@@ -128,18 +142,15 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredModules: [PLATFORM_MODULES.ANALYTICS, PLATFORM_MODULES.FINANCE],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
-      inputSchema: {
-        type: "object",
-        properties: { periodsAhead: { type: "number" } },
-      },
+      inputSchema: { type: "object", properties: { periodsAhead: { type: "number" } } },
       outputSchema: { type: "object" },
-      supportedAgents: [BUILTIN_AGENT_SLUGS.ANALYTICS, BUILTIN_AGENT_SLUGS.OPERATIONS],
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
       capabilityId: "capability.analytics",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) =>
-      forecastRevenueForAi({
+    async (input, context) =>
+      forecastRevenueForAi(toAnalyticsContext(context), {
         periodsAhead: typeof input.periodsAhead === "number" ? input.periodsAhead : 4,
       }),
   ),
@@ -152,18 +163,15 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredModules: [PLATFORM_MODULES.ANALYTICS, PLATFORM_MODULES.ORDERS],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
-      inputSchema: {
-        type: "object",
-        properties: { periodsAhead: { type: "number" } },
-      },
+      inputSchema: { type: "object", properties: { periodsAhead: { type: "number" } } },
       outputSchema: { type: "object" },
-      supportedAgents: [BUILTIN_AGENT_SLUGS.ANALYTICS, BUILTIN_AGENT_SLUGS.OPERATIONS],
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
       capabilityId: "capability.analytics",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) =>
-      forecastDemandForAi({
+    async (input, context) =>
+      forecastDemandForAi(toAnalyticsContext(context), {
         periodsAhead: typeof input.periodsAhead === "number" ? input.periodsAhead : 7,
       }),
   ),
@@ -178,12 +186,12 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredBranchScope: "optional",
       inputSchema: { type: "object", properties: {} },
       outputSchema: { type: "object" },
-      supportedAgents: [BUILTIN_AGENT_SLUGS.ANALYTICS, BUILTIN_AGENT_SLUGS.OPERATIONS],
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
       capabilityId: "capability.analytics",
       skillIds: [],
       metadata: { readOnly: true, riskLevel: "medium" },
     },
-    async () => detectBusinessAnomaliesForAi(),
+    async (_input, context) => detectBusinessAnomaliesForAi(toAnalyticsContext(context)),
   ),
   defineAnalyticsTool(
     {
@@ -201,7 +209,7 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => recommendImprovementsForAi(),
+    async (_input, context) => recommendImprovementsForAi(toAnalyticsContext(context)),
   ),
   defineAnalyticsTool(
     {
@@ -214,12 +222,12 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredBranchScope: "optional",
       inputSchema: { type: "object", properties: {} },
       outputSchema: { type: "object" },
-      supportedAgents: [BUILTIN_AGENT_SLUGS.BUSINESS_ASSISTANT, BUILTIN_AGENT_SLUGS.ANALYTICS],
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
       capabilityId: "capability.analytics",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => generateExecutiveSummaryForAi(),
+    async (_input, context) => generateExecutiveSummaryForAi(toAnalyticsContext(context)),
   ),
   defineAnalyticsTool(
     {
@@ -230,21 +238,15 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredModules: [PLATFORM_MODULES.ANALYTICS],
       requiredTenantScope: "required",
       requiredBranchScope: "required",
-      inputSchema: {
-        type: "object",
-        properties: {
-          branchIds: { type: "array" },
-          metricKeys: { type: "array" },
-        },
-      },
+      inputSchema: { type: "object", properties: { branchIds: { type: "array" }, metricKeys: { type: "array" } } },
       outputSchema: { type: "object" },
-      supportedAgents: [BUILTIN_AGENT_SLUGS.ANALYTICS, BUILTIN_AGENT_SLUGS.OPERATIONS],
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
       capabilityId: "capability.analytics",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) =>
-      compareBranchesForAi({
+    async (input, context) =>
+      compareBranchesForAi(toAnalyticsContext(context), {
         branchIds: Array.isArray(input.branchIds)
           ? input.branchIds.filter((id): id is string => typeof id === "string")
           : undefined,
@@ -253,11 +255,119 @@ export const ANALYTICS_AI_TOOLS: RegisteredPlatformTool[] = [
           : undefined,
       }),
   ),
+  defineAnalyticsTool(
+    {
+      id: ANALYTICS_AI_TOOL_IDS.CUSTOMER_INSIGHTS,
+      name: "Customer Insights",
+      description: "Analyze customer segments, retention, and lifetime value.",
+      requiredPermissions: [ANALYTICS_PERMISSIONS.READ],
+      requiredModules: [PLATFORM_MODULES.ANALYTICS, PLATFORM_MODULES.CRM],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
+      capabilityId: "capability.analytics",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => customerInsightsForAi(toAnalyticsContext(context)),
+  ),
+  defineAnalyticsTool(
+    {
+      id: ANALYTICS_AI_TOOL_IDS.CHURN_PREDICTION,
+      name: "Churn Prediction",
+      description: "Predict customer churn risk from retention signals.",
+      requiredPermissions: [ANALYTICS_PERMISSIONS.READ],
+      requiredModules: [PLATFORM_MODULES.ANALYTICS, PLATFORM_MODULES.CRM],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
+      capabilityId: "capability.analytics",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => churnPredictionForAi(toAnalyticsContext(context)),
+  ),
+  defineAnalyticsTool(
+    {
+      id: ANALYTICS_AI_TOOL_IDS.INVENTORY_FORECAST,
+      name: "Inventory Forecast",
+      description: "Forecast inventory demand and low-stock risk.",
+      requiredPermissions: [ANALYTICS_PERMISSIONS.READ],
+      requiredModules: [PLATFORM_MODULES.ANALYTICS, PLATFORM_MODULES.INVENTORY],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
+      capabilityId: "capability.analytics",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => inventoryForecastForAi(toAnalyticsContext(context)),
+  ),
+  defineAnalyticsTool(
+    {
+      id: ANALYTICS_AI_TOOL_IDS.STAFFING_RECOMMENDATIONS,
+      name: "Staffing Recommendations",
+      description: "Recommend staffing levels based on demand and labour cost.",
+      requiredPermissions: [ANALYTICS_PERMISSIONS.READ],
+      requiredModules: [PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
+      capabilityId: "capability.analytics",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => staffingRecommendationsForAi(toAnalyticsContext(context)),
+  ),
+  defineAnalyticsTool(
+    {
+      id: ANALYTICS_AI_TOOL_IDS.FINANCIAL_FORECAST,
+      name: "Financial Forecast",
+      description: "Forecast revenue, expenses, and net profit.",
+      requiredPermissions: [ANALYTICS_PERMISSIONS.READ],
+      requiredModules: [PLATFORM_MODULES.ANALYTICS, PLATFORM_MODULES.FINANCE],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
+      capabilityId: "capability.analytics",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => financialForecastForAi(toAnalyticsContext(context)),
+  ),
+  defineAnalyticsTool(
+    {
+      id: ANALYTICS_AI_TOOL_IDS.BUSINESS_HEALTH_SCORE,
+      name: "Business Health Score",
+      description: "Calculate an overall business health score.",
+      requiredPermissions: [ANALYTICS_PERMISSIONS.READ],
+      requiredModules: [PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: ANALYTICS_AGENT_SLUGS,
+      capabilityId: "capability.analytics",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => businessHealthScoreForAi(toAnalyticsContext(context)),
+  ),
 ];
 
 let registered = false;
 
-/** Registers Analytics platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Analytics platform tools with the AI Tool Platform (idempotent). */
 export function registerAnalyticsAiTools(): void {
   if (registered) {
     return;
@@ -269,3 +379,5 @@ export function registerAnalyticsAiTools(): void {
 
   registered = true;
 }
+
+export { buildAnalyticsAiContext };

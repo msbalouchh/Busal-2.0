@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { SkillExecutionContext } from "@/modules/ai-skills-management/interfaces/skill-handler.interface";
 import { getSkill, getSkillBySlug } from "@/services/ai-skill-manager.service";
 

@@ -24,6 +24,8 @@ export {
   type PosPermission,
 } from "@/modules/pos/constants/pos-status";
 
+export { POS_MODULE_PERMISSIONS } from "@/modules/pos/constants/permissions";
+
 export {
   POS_INTEGRATION_POINTS,
   type PosIntegrationPoint,
@@ -34,38 +36,11 @@ export {
   POS_PLATFORM_NAV_ITEMS,
 } from "@/modules/pos/constants/platform-routes";
 
-export {
-  DEFAULT_POS_SCOPE,
-  MOCK_POS_REGISTER,
-  MOCK_POS_TERMINALS,
-  MOCK_POS_SHIFT,
-  MOCK_POS_EMPLOYEES,
-  MOCK_POS_CASH_DRAWER,
-  MOCK_POS_SESSION,
-  MOCK_POS_RECORDS,
-  MOCK_POS_REGISTERS,
-  MOCK_POS_SHIFTS,
-} from "@/modules/pos/constants/mock-data";
-
 export type * from "@/modules/pos/types/pos-platform";
 
 export * from "@/modules/pos/utils/pos-selectors";
 export * from "@/modules/pos/utils/pos-discount-utils";
 export * from "@/modules/pos/utils/pos-tax-utils";
-
-export { PosRepository, posRepository } from "@/modules/pos/repository/pos-repository";
-
-export { PosService, posService } from "@/modules/pos/services/pos.service";
-
-export {
-  buildPosPlatformContext,
-  buildPosPlatformSnapshot,
-  getDefaultPosSnapshot,
-  getOpenPosOrders,
-  getHeldPosOrders,
-  type PosPlatformSnapshot,
-  type PosPlatformInput,
-} from "@/modules/pos/services/pos-platform.service";
 
 export { PosProvider } from "@/modules/pos/providers/pos-provider";
 export { PosContext } from "@/modules/pos/contexts/pos-context";
@@ -77,6 +52,10 @@ export { usePosShift } from "@/modules/pos/hooks/use-pos-shift";
 export { PosOrderStatusBadge } from "@/modules/pos/components/pos-order-status-badge";
 export { PosPaymentBadge } from "@/modules/pos/components/pos-payment-badge";
 export { PosShiftBadge } from "@/modules/pos/components/pos-shift-badge";
+export { PosOverview } from "@/modules/pos/components/pos-overview";
+export { PosManagementLoading } from "@/modules/pos/components/pos-management-loading";
+export { PosManagementEmpty } from "@/modules/pos/components/pos-management-empty";
+export { PosManagementError } from "@/modules/pos/components/pos-management-error";
 
 export {
   registerPosAiTools,
@@ -90,4 +69,10 @@ export {
   detectSuspiciousRefunds,
   suggestPromotions,
   forecastRevenue,
+  predictSales,
+  detectFraud,
+  analyzePeakHours,
 } from "@/modules/pos/ai";
+
+export { getPosModuleContext } from "@/modules/pos/lib/get-pos-module-context";
+export { buildPosPlatformContext } from "@/modules/pos/lib/pos-platform-context";

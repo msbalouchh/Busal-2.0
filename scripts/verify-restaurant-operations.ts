@@ -2,8 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PrismaClient } from "@prisma/client";
-
 import { resolveAuthorizationContext } from "../src/modules/authorization/services/authorization.service";
 import type { BusinessContext } from "../src/modules/business-context/types/business-context";
 import { RESTAURANT_OPERATIONS_ROUTES } from "../src/modules/restaurant-operations/constants/restaurant-operations";
@@ -15,8 +13,10 @@ import {
 } from "../src/services/restaurant-operations-module.service";
 import { getOwnedBusinessById } from "../src/services/business-profile.service";
 import { mapProfileToAuthUser } from "../src/services/user.service";
+import { ensureVerificationTenantContext } from "./lib/verify-oms-order";
+import { getVerifyPrisma } from "./lib/verify-prisma";
 
-const prisma = new PrismaClient();
+const prisma = getVerifyPrisma();
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -47,12 +47,13 @@ async function buildPlatformContext(businessId: string): Promise<BusinessContext
     {},
   );
   const authorization = await resolveAuthorizationContext(user, business);
+  const { branchId } = await ensureVerificationTenantContext(prisma, businessId);
 
   return {
     user,
     business,
     branch: null,
-    branchId: null,
+    branchId,
     roleSlug: authorization.roleSlug,
     permissions: Array.from(authorization.permissions),
     authorization,

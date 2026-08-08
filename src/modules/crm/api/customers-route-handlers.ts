@@ -9,6 +9,7 @@ import {
 import { CRM_PERMISSIONS } from "@/modules/crm/constants/permissions";
 import { resolveCrmScope, toCrmPlatformContext } from "@/modules/crm/lib/crm-scope";
 import { customerService } from "@/modules/crm/services/customer.service";
+import type { CustomerAiInsights } from "@/modules/crm/services/crm-ai.service";
 import {
   createCustomerSchema,
   customerSearchSchema,
@@ -231,11 +232,37 @@ export async function handleCustomerAiInsights(_request: Request, customerId: st
     const platform = await protectedRoute({ permission: CRM_PERMISSIONS.CRM_READ });
     const context = toCrmPlatformContext(resolveCrmScope(platform));
     const { generateCustomerAiInsights } = await import("@/modules/crm/services/crm-ai.service");
-    const insights = await generateCustomerAiInsights(customerId, context);
+    const baseInsights = await generateCustomerAiInsights(customerId, context);
 
-    if (!insights) {
+    if (!baseInsights) {
       return NextResponse.json({ success: false, error: "Customer not found" }, { status: 404 });
     }
+
+    const { aiEngine } = await import("@/modules/ai-engine/engine/ai-engine");
+    const aiInsight = await aiEngine.generateInsight(platform, {
+      currentModule: "crm",
+      prompt: `Analyze this CRM customer and return JSON with keys: summary, insights (array), upsellSuggestions (array), recommendedActions (array), sentiment (positive|neutral|negative). Customer data: ${JSON.stringify(baseInsights)}`,
+      contextData: { customerId, baseInsights },
+      responseFormat: "json",
+    }).catch(() => null);
+
+    const insights = aiInsight?.parsed
+      ? {
+          ...baseInsights,
+          summary: String(aiInsight.parsed.summary ?? baseInsights.summary),
+          insights: Array.isArray(aiInsight.parsed.insights)
+            ? (aiInsight.parsed.insights as string[])
+            : baseInsights.insights,
+          upsellSuggestions: Array.isArray(aiInsight.parsed.upsellSuggestions)
+            ? (aiInsight.parsed.upsellSuggestions as string[])
+            : baseInsights.upsellSuggestions,
+          recommendedActions: Array.isArray(aiInsight.parsed.recommendedActions)
+            ? (aiInsight.parsed.recommendedActions as string[])
+            : baseInsights.recommendedActions,
+          sentiment:
+            (aiInsight.parsed.sentiment as CustomerAiInsights["sentiment"]) ?? baseInsights.sentiment,
+        }
+      : baseInsights;
 
     return jsonSuccess(insights);
   } catch (error) {

@@ -11,6 +11,7 @@ import {
   PLATFORM_PUBLIC_API_ROUTES,
   PROTECTED_ROUTES,
 } from "@/modules/platform-guards/constants/routes";
+import { EMAIL_VERIFICATION_PENDING_ROUTES } from "@/constants/routes";
 
 export function isPlatformDashboardRoute(pathname: string): boolean {
   return (
@@ -107,6 +108,35 @@ export function unauthenticatedApiResponse(): NextResponse {
       code: "UNAUTHENTICATED",
     },
     { status: 401 },
+  );
+}
+
+export function isEmailVerificationPendingRoute(pathname: string): boolean {
+  return EMAIL_VERIFICATION_PENDING_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
+export function isEmailVerificationPendingApiRoute(pathname: string): boolean {
+  return (
+    pathname === "/api/auth/session" ||
+    pathname === "/api/auth/logout" ||
+    pathname === "/api/auth/resend-verification"
+  );
+}
+
+export function redirectUnverifiedToVerifyEmail(_request: NextRequest): NextResponse {
+  return NextResponse.redirect(buildAppUrl(ROUTES.verifyEmail));
+}
+
+export function unverifiedApiResponse(): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Email verification required",
+      code: "EMAIL_VERIFICATION_REQUIRED",
+    },
+    { status: 403 },
   );
 }
 

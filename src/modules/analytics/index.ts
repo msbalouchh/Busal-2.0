@@ -3,6 +3,8 @@ export {
   WIDGET_TYPES,
   CHART_TYPES,
   REPORT_STATUSES,
+  REPORT_EXPORT_FORMATS,
+  REPORT_TYPES,
   SCHEDULE_FREQUENCIES,
   ALERT_SEVERITIES,
   KPI_TRENDS,
@@ -16,6 +18,8 @@ export {
   type WidgetType,
   type ChartType,
   type ReportStatus,
+  type ReportExportFormat,
+  type ReportType,
   type ScheduleFrequency,
   type AlertSeverity,
   type KpiTrend,
@@ -34,12 +38,7 @@ export {
   ANALYTICS_PLATFORM_NAV_ITEMS,
 } from "@/modules/analytics/constants/platform-routes";
 
-export {
-  DEFAULT_ANALYTICS_SCOPE,
-  MOCK_EXECUTIVE_DASHBOARD,
-  MOCK_OPERATIONS_DASHBOARD,
-  MOCK_ANALYTICS_RECORD,
-} from "@/modules/analytics/constants/mock-data";
+export { ANALYTICS_MODULE_PERMISSIONS } from "@/modules/analytics/constants/permissions";
 
 export type * from "@/modules/analytics/types/analytics-platform";
 
@@ -57,11 +56,12 @@ export { AnalyticsService, analyticsService } from "@/modules/analytics/services
 export {
   buildAnalyticsPlatformContext,
   buildAnalyticsPlatformSnapshot,
-  getDefaultAnalyticsSnapshot,
   getAnalyticsPlatformSummary,
   type AnalyticsPlatformSnapshot,
   type AnalyticsPlatformInput,
 } from "@/modules/analytics/services/analytics-platform.service";
+
+export { getAnalyticsPlatformModuleContext } from "@/modules/analytics/lib/get-analytics-module-context";
 
 export { AnalyticsProvider } from "@/modules/analytics/providers/analytics-provider";
 export { AnalyticsContext } from "@/modules/analytics/contexts/analytics-context";
@@ -73,6 +73,10 @@ export { useAnalyticsReports } from "@/modules/analytics/hooks/use-analytics-rep
 export { DashboardTypeBadge } from "@/modules/analytics/components/dashboard-type-badge";
 export { AlertSeverityBadge } from "@/modules/analytics/components/alert-severity-badge";
 export { KpiTrendBadge } from "@/modules/analytics/components/kpi-trend-badge";
+export { AnalyticsManagementLoading } from "@/modules/analytics/components/analytics-management-loading";
+export { AnalyticsManagementEmpty } from "@/modules/analytics/components/analytics-management-empty";
+export { AnalyticsManagementError } from "@/modules/analytics/components/analytics-management-error";
+export { AnalyticsPlatformOverview } from "@/modules/analytics/components/analytics-platform-overview";
 
 export {
   registerAnalyticsAiTools,
@@ -86,4 +90,10 @@ export {
   recommendImprovementsForAi,
   generateExecutiveSummaryForAi,
   compareBranchesForAi,
+  customerInsightsForAi,
+  churnPredictionForAi,
+  inventoryForecastForAi,
+  staffingRecommendationsForAi,
+  financialForecastForAi,
+  businessHealthScoreForAi,
 } from "@/modules/analytics/ai";

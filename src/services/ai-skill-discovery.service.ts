@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { SkillDiscoveryEntry } from "@/modules/ai-skills-management/types/ai-skills-types";
 import { listSkills } from "@/services/ai-skill-manager.service";
 import { getBuiltInSkillTemplates } from "@/services/ai-skill-registry.service";

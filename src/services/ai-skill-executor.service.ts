@@ -19,6 +19,7 @@ import {
   assertValidSkillOutput,
 } from "@/services/ai-skill-validator.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
+import { runCentralAiChatForOwner, runCentralAiInsightForOwner } from "@/services/ai-engine-bridge.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
   const business = await getOrCreateBusinessForOwner(ownerId);
@@ -26,15 +27,28 @@ async function getOwnedBusinessId(ownerId: string): Promise<string> {
 }
 
 async function runTemplateSkill(
+  ownerId: string,
   slug: string,
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
+  const result = await runCentralAiInsightForOwner(ownerId, {
+    currentModule: "ai-skills",
+    prompt: `Execute skill "${slug}" with supplied input and return JSON output.`,
+    contextData: { slug, input },
+    responseFormat: "json",
+  });
+
+  if (result.parsed) {
+    return result.parsed;
+  }
+
   return {
-    template: true,
     slug,
-    message: `Template execution completed for ${slug}`,
+    message: result.content.trim() || `Skill ${slug} completed.`,
     receivedInput: input,
     executedAt: new Date().toISOString(),
+    providerId: result.providerId,
+    auditId: result.auditId,
   };
 }
 
@@ -65,7 +79,7 @@ export async function executeSkill(
   });
 
   try {
-    const output = await runTemplateSkill(skill.slug, input);
+    const output = await runTemplateSkill(ownerId, skill.slug, input);
     assertValidSkillOutput(skill, output);
     const completedAt = new Date();
 

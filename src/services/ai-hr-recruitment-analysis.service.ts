@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { createHrInsight } from "@/services/ai-hr-insight.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -45,45 +46,18 @@ export async function getRecruitmentSnapshot(ownerId: string): Promise<Recruitme
 }
 
 export async function generateRecruitmentInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getRecruitmentSnapshot(ownerId);
-  let created = 0;
-
-  if (snapshot.pendingInvitations > 0) {
-    await createHrInsight(businessId, {
-      title: "Pending staff invitations",
-      description: `${snapshot.pendingInvitations} invitations awaiting acceptance.`,
-      category: "recruitment",
-      priority: snapshot.pendingInvitations > 5 ? "HIGH" : "MEDIUM",
-      recommendation: "Follow up on pending invitations and resend if needed.",
-      metadata: { pending: snapshot.pendingInvitations },
-    });
-    created += 1;
-  }
-
-  if (snapshot.expiredInvitations > 0) {
-    await createHrInsight(businessId, {
-      title: "Expired invitations need attention",
-      description: `${snapshot.expiredInvitations} staff invitations have expired.`,
-      category: "recruitment",
-      priority: "HIGH",
-      recommendation: "Re-issue invitations or remove stale entries from the pipeline.",
-      metadata: { expired: snapshot.expiredInvitations },
-    });
-    created += 1;
-  }
-
-  if (snapshot.openHeadcountGap > 0) {
-    await createHrInsight(businessId, {
-      title: "Headcount gap identified",
-      description: `Estimated ${snapshot.openHeadcountGap} additional staff needed for branch coverage.`,
-      category: "recruitment",
-      priority: snapshot.openHeadcountGap > 5 ? "CRITICAL" : "HIGH",
-      recommendation: "Prioritize hiring for understaffed branches and departments.",
-      metadata: { gap: snapshot.openHeadcountGap },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "hr",
+    task: "recruitment-insights",
+    loadContext: getRecruitmentSnapshot,
+    persistInsight: (businessId, insight) =>
+      createHrInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "recruitment",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+  });
 }

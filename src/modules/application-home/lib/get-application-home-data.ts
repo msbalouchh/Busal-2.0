@@ -106,25 +106,26 @@ async function getWeeklyTrends(
   ordersTrend: ApplicationHomeChartPoint[];
 }> {
   const range = getDateRangeForPeriod("week");
-  const orders = await prisma.legacyOrder.findMany({
+  const orders = await prisma.restaurantOrder.findMany({
     where: {
       businessId,
       ...branchFilter(branchId),
       status: "COMPLETED",
-      createdAt: { gte: range.from, lte: range.to },
+      completedAt: { gte: range.from, lte: range.to },
     },
-    select: { total: true, createdAt: true },
+    select: { totalAmount: true, completedAt: true, placedAt: true },
   });
 
   const revenueTrend = DAY_LABELS.map((day) => ({ day, amount: 0 }));
   const ordersTrend = DAY_LABELS.map((day) => ({ day, count: 0 }));
 
   for (const order of orders) {
-    const jsDay = order.createdAt.getDay();
+    const orderDate = order.completedAt ?? order.placedAt;
+    const jsDay = orderDate.getDay();
     const index = jsDay === 0 ? 6 : jsDay - 1;
     ordersTrend[index]!.count = (ordersTrend[index]!.count ?? 0) + 1;
     revenueTrend[index]!.amount =
-      (revenueTrend[index]!.amount ?? 0) + moneyDecimalToPence(order.total) / 100;
+      (revenueTrend[index]!.amount ?? 0) + moneyDecimalToPence(order.totalAmount) / 100;
   }
 
   return { revenueTrend, ordersTrend };

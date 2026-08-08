@@ -46,6 +46,12 @@ import {
   updateNotificationUserPreferences,
 } from "../src/services/notifications.service";
 import { mapProfileToAuthUser } from "../src/services/user.service";
+import { bootstrapVerificationEnvironment } from "./lib/verify-bootstrap";
+import { connectWithRetry, handleVerificationError } from "./lib/verify-db";
+import {
+  logProviderVerificationResults,
+  verifyCommunicationProviders,
+} from "./lib/verify-providers";
 
 const prisma = new PrismaClient();
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
@@ -93,6 +99,9 @@ async function buildPlatformContext(businessId: string): Promise<BusinessContext
 }
 
 async function main() {
+  bootstrapVerificationEnvironment();
+  await connectWithRetry(prisma);
+
   console.log("Module structure");
   const moduleFiles = [
     "src/modules/notifications/index.ts",
@@ -365,14 +374,20 @@ async function main() {
   );
   console.log("  PASS");
 
+  console.log("Communication providers");
+  const providerResults = await verifyCommunicationProviders();
+  logProviderVerificationResults(providerResults);
+  assert(
+    providerResults.every((result) => result.status === "PASS" || result.status === "SKIP"),
+    "provider verification returned unexpected failure",
+  );
+  console.log("  PASS");
+
   console.log("\nUnified Notification Hub verification passed.");
 }
 
 main()
-  .catch((error: unknown) => {
-    console.error(error);
-    process.exit(1);
-  })
+  .catch(handleVerificationError)
   .finally(async () => {
     await prisma.$disconnect();
   });

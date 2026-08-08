@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { TakePaymentPageClient } from "@/modules/payment-receipt-management/components/take-payment-page-client";
 import { PAYMENT_RECEIPT_ROUTES } from "@/modules/payment-receipt-management/constants/routes";
 import { getPaymentReceiptContext } from "@/modules/payment-receipt-management/lib/get-payment-receipt-context";
-import { getOrderPaymentSummary } from "@/services/restaurant-payment.service";
+import { getOrderPaymentSummary } from "@/modules/payments/services/payment-platform.service";
 
 interface TakePaymentPageProps {
   searchParams: Promise<{ branchId?: string; orderId?: string }>;

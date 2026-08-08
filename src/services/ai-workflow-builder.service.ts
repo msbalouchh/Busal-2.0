@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import { WORKFLOW_TEMPLATES } from "@/modules/ai-orchestrator-management/lib/ai-orchestrator-validation";
 import type {
   WorkflowInput,

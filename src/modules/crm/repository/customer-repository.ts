@@ -3,6 +3,7 @@ import "server-only";
 import { type Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { runInteractiveTransaction } from "@/lib/prisma-transaction";
 import { DEFAULT_CUSTOMER_GROUPS } from "@/modules/crm/constants/routes";
 import type { CrmTenantScope } from "@/modules/crm/lib/crm-scope";
 import {
@@ -406,8 +407,8 @@ export class CustomerRepository {
       return null;
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.legacyOrder.updateMany({
+    await runInteractiveTransaction(async (tx) => {
+      await tx.restaurantOrder.updateMany({
         where: { customerId: secondaryCustomerId, businessId: scope.businessId },
         data: { customerId: primaryCustomerId },
       });
@@ -663,9 +664,9 @@ export class CustomerRepository {
         loyaltyPoints: true,
         createdAt: true,
         group: { select: { slug: true, name: true } },
-        legacyOrders: {
+        restaurantOrders: {
           where: { status: "COMPLETED", ...branchFilter },
-          select: { total: true },
+          select: { totalAmount: true },
         },
       },
     });
@@ -675,7 +676,7 @@ export class CustomerRepository {
 
     const newCustomers = customers.filter((customer) => customer.createdAt >= thirtyDaysAgo).length;
     const returningCustomers = customers.filter(
-      (customer) => customer.legacyOrders.length > 1,
+      (customer) => customer.restaurantOrders.length > 1,
     ).length;
     const vipCustomers = customers.filter((customer) => customer.group?.slug === "vip").length;
 
@@ -683,8 +684,8 @@ export class CustomerRepository {
       .map((customer) => ({
         id: customer.id,
         name: customer.name,
-        totalSpentPence: customer.legacyOrders.reduce(
-          (sum, order) => sum + Math.round(Number(order.total) * 100),
+        totalSpentPence: customer.restaurantOrders.reduce(
+          (sum, order) => sum + Math.round(Number(order.totalAmount) * 100),
           0,
         ),
         loyaltyPoints: customer.loyaltyPoints,

@@ -26,6 +26,7 @@ export function useKitchenStation(stationId?: string): KitchenStationContextValu
       (record) =>
         record.tickets.some((ticket) => ticket.stationId === station.id) &&
         record.order.status !== KITCHEN_STATUSES.SERVED &&
+        record.order.status !== KITCHEN_STATUSES.COMPLETED &&
         record.order.status !== KITCHEN_STATUSES.CANCELLED,
     );
 

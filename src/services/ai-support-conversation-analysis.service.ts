@@ -3,6 +3,10 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { createSupportInsight } from "@/services/ai-support-response-recommendation.service";
+import {
+  runOwnerDomainDetectionTask,
+  runOwnerDomainInsightTask,
+} from "@/services/ai-domain-insight-runner.service";
 
 export interface ConversationSummary {
   ticketId: string;
@@ -14,31 +18,24 @@ export interface ConversationSummary {
   intents: string[];
 }
 
-const INTENT_KEYWORDS: Record<string, string[]> = {
-  order: ["order", "delivery", "refund", "cancel"],
-  billing: ["payment", "charge", "invoice", "bill"],
-  account: ["account", "login", "password", "profile"],
-  complaint: ["complaint", "unhappy", "disappointed", "terrible", "awful"],
-  inquiry: ["question", "how", "what", "when", "where"],
-  loyalty: ["points", "reward", "loyalty", "discount"],
-};
-
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
   const business = await getOrCreateBusinessForOwner(ownerId);
   return business.id;
 }
 
-export function detectIntentsFromText(text: string): string[] {
-  const lower = text.toLowerCase();
-  const intents: string[] = [];
+/** Routes intent detection through the centralized AI engine. */
+export async function detectIntentsFromText(ownerId: string, text: string): Promise<string[]> {
+  const intents = await runOwnerDomainDetectionTask<{ intent: string }>(ownerId, {
+    module: "support",
+    task: "conversation-intent-classification",
+    responseKey: "intents",
+    loadContext: async () => ({ text: text.slice(0, 2000) }),
+    instructions:
+      'Classify customer message intents. Return JSON: { "intents": [{ "intent": string }] }',
+  });
 
-  for (const [intent, keywords] of Object.entries(INTENT_KEYWORDS)) {
-    if (keywords.some((keyword) => lower.includes(keyword))) {
-      intents.push(intent);
-    }
-  }
-
-  return intents.length > 0 ? intents : ["general"];
+  const values = intents.map((entry) => entry.intent).filter(Boolean);
+  return values.length > 0 ? values : ["general"];
 }
 
 export async function summarizeConversation(
@@ -59,7 +56,7 @@ export async function summarizeConversation(
 
   const inboundMessages = conversation.messages.filter((m) => m.messageType === "INBOUND");
   const allText = inboundMessages.map((m) => m.body).join(" ");
-  const intents = detectIntentsFromText(allText);
+  const intents = allText.trim() ? await detectIntentsFromText(ownerId, allText) : ["general"];
   const lastInbound = inboundMessages[inboundMessages.length - 1];
 
   const summaryParts = [
@@ -99,23 +96,19 @@ export async function analyzeOpenConversations(ownerId: string): Promise<Convers
 }
 
 export async function generateConversationInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const summaries = await analyzeOpenConversations(ownerId);
-  let created = 0;
-
-  for (const summary of summaries.slice(0, 5)) {
-    await createSupportInsight(businessId, {
-      ticketId: summary.ticketId,
-      title: `Conversation summary: ${summary.subject ?? "Support request"}`,
-      description: summary.summary,
-      priority: summary.intents.includes("complaint") ? "HIGH" : "MEDIUM",
-      recommendation: `Latest: "${summary.lastMessagePreview.slice(0, 100)}..."`,
-      metadata: { intents: summary.intents },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "support",
+    task: "conversation-insights",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createSupportInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+  });
 }
 
 export async function getConversationMessages(ownerId: string, ticketId: string) {

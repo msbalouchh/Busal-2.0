@@ -14,6 +14,7 @@ export const DEFAULT_INTEGRATION_SCOPE = {
   tenantId: "tenant-harbour",
   workspaceId: "ws-harbour-kitchen",
   businessId: "biz-harbour-kitchen",
+  branchId: "branch-harbour-main",
   userId: "user-harbour-owner",
 } as const;
 
@@ -90,6 +91,7 @@ export const MOCK_INTEGRATION_RECORD: IntegrationRecord = {
       tenantId: DEFAULT_INTEGRATION_SCOPE.tenantId,
       workspaceId: DEFAULT_INTEGRATION_SCOPE.workspaceId,
       businessId: DEFAULT_INTEGRATION_SCOPE.businessId,
+      branchId: DEFAULT_INTEGRATION_SCOPE.branchId,
       providerId: "prov-stripe",
       name: "Stripe Payments",
       category: INTEGRATION_CATEGORIES.PAYMENT,
@@ -106,6 +108,7 @@ export const MOCK_INTEGRATION_RECORD: IntegrationRecord = {
       tenantId: DEFAULT_INTEGRATION_SCOPE.tenantId,
       workspaceId: DEFAULT_INTEGRATION_SCOPE.workspaceId,
       businessId: DEFAULT_INTEGRATION_SCOPE.businessId,
+      branchId: DEFAULT_INTEGRATION_SCOPE.branchId,
       providerId: "prov-twilio",
       name: "Twilio SMS",
       category: INTEGRATION_CATEGORIES.SMS,
@@ -122,6 +125,7 @@ export const MOCK_INTEGRATION_RECORD: IntegrationRecord = {
       tenantId: DEFAULT_INTEGRATION_SCOPE.tenantId,
       workspaceId: DEFAULT_INTEGRATION_SCOPE.workspaceId,
       businessId: DEFAULT_INTEGRATION_SCOPE.businessId,
+      branchId: DEFAULT_INTEGRATION_SCOPE.branchId,
       providerId: "prov-xero",
       name: "Xero Accounting",
       category: INTEGRATION_CATEGORIES.ACCOUNTING,

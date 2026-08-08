@@ -49,12 +49,12 @@ export async function getCentralBranchDashboard(
         prisma.staff.count({
           where: { businessId, branchId: branch.id, isActive: true },
         }),
-        prisma.legacyOrder.count({
+        prisma.restaurantOrder.count({
           where: {
             businessId,
             ...branchFilter(branch.id),
             status: "COMPLETED",
-            createdAt: { gte: todayStart },
+            completedAt: { gte: todayStart },
           },
         }),
         prisma.payment.findMany({
@@ -109,12 +109,12 @@ export async function getBranchDashboard(
       prisma.legacyTable.count({
         where: { businessId, ...scope, isActive: true, status: "OCCUPIED" },
       }),
-      prisma.legacyOrder.count({
+      prisma.restaurantOrder.count({
         where: {
           businessId,
           ...scope,
           status: "COMPLETED",
-          createdAt: { gte: todayStart },
+          completedAt: { gte: todayStart },
         },
       }),
       prisma.payment.findMany({
@@ -162,10 +162,10 @@ export async function getBranchOrderRevenuePence(
   businessId: string,
   branchId: string,
 ): Promise<number> {
-  const orders = await prisma.legacyOrder.findMany({
+  const orders = await prisma.restaurantOrder.findMany({
     where: { businessId, ...branchFilter(branchId), status: "COMPLETED" },
-    select: { total: true },
+    select: { totalAmount: true },
   });
 
-  return orders.reduce((sum, order) => sum + moneyDecimalToPence(order.total), 0);
+  return orders.reduce((sum, order) => sum + moneyDecimalToPence(order.totalAmount), 0);
 }

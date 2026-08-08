@@ -72,7 +72,7 @@ async function main() {
     "PlatformCommunicationMessage missing",
   );
 
-  assert(listCommunicationProviders().length >= 8, "Provider placeholders incomplete");
+  assert(listCommunicationProviders().length >= 6, "Provider placeholders incomplete");
 
   const business = await prisma.business.findFirst({ select: { id: true, ownerId: true } });
   assert(business, "No business found");

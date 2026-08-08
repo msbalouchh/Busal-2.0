@@ -1,20 +1,39 @@
 import { BUILTIN_AGENT_SLUGS } from "@/modules/ai/constants/agent-slugs";
 import { PLATFORM_MODULES } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
   analyzePerformance,
   approveLeaveForAi,
   assignRoleForAi,
   createEmployeeForAi,
   detectAttendanceIssues,
+  optimizeWorkforceAllocation,
   predictLabourDemand,
   recommendStaffing,
   scheduleShiftForAi,
+  suggestTraining,
 } from "@/modules/staff/ai/staff-ai-context";
+import { buildStaffPlatformContext } from "@/modules/staff/lib/staff-platform-context";
 import { STAFF_AI_TOOL_IDS, STAFF_PERMISSIONS } from "@/modules/staff/constants/staff-status";
+import type { StaffPlatformContext } from "@/modules/staff/types/staff-platform";
 
-const STAFF_MODULE = "staff";
+function toStaffContext(context: PlatformExecutionContext): StaffPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for Staff tools");
+  }
+
+  return buildStaffPlatformContext({
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  });
+}
 
 function defineStaffTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -38,6 +57,8 @@ function defineStaffTool(
     handler,
   };
 }
+
+const STAFF_MODULE = "staff";
 
 const STAFF_AGENT_SLUGS = [
   BUILTIN_AGENT_SLUGS.BUSINESS_ASSISTANT,
@@ -73,8 +94,8 @@ export const STAFF_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) =>
-      createEmployeeForAi({
+    async (input, context) =>
+      createEmployeeForAi(toStaffContext(context), {
         firstName: typeof input.firstName === "string" ? input.firstName : "New",
         lastName: typeof input.lastName === "string" ? input.lastName : "Employee",
         email: typeof input.email === "string" ? input.email : "employee@example.com",
@@ -109,11 +130,15 @@ export const STAFF_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const staffId = typeof input.staffId === "string" ? input.staffId : "";
       const roleId = typeof input.roleId === "string" ? input.roleId : "";
       const roleName = typeof input.roleName === "string" ? input.roleName : "Staff";
-      return assignRoleForAi(staffId, roleId, roleName) ?? { error: "Staff member not found." };
+      return (
+        (await assignRoleForAi(toStaffContext(context), staffId, roleId, roleName)) ?? {
+          error: "Staff member not found.",
+        }
+      );
     },
   ),
   defineStaffTool(
@@ -141,13 +166,19 @@ export const STAFF_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "low" },
     },
-    async (input) => {
+    async (input, context) => {
       const staffId = typeof input.staffId === "string" ? input.staffId : "";
       const shiftDate = typeof input.shiftDate === "string" ? input.shiftDate : "2026-02-16";
       const startTime = typeof input.startTime === "string" ? input.startTime : "10:00";
       const endTime = typeof input.endTime === "string" ? input.endTime : "18:00";
       return (
-        scheduleShiftForAi(staffId, shiftDate, startTime, endTime) ?? { error: "Staff not found." }
+        (await scheduleShiftForAi(
+          toStaffContext(context),
+          staffId,
+          shiftDate,
+          startTime,
+          endTime,
+        )) ?? { error: "Staff not found." }
       );
     },
   ),
@@ -171,9 +202,13 @@ export const STAFF_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const leaveRequestId = typeof input.leaveRequestId === "string" ? input.leaveRequestId : "";
-      return approveLeaveForAi(leaveRequestId) ?? { error: "Leave request not found." };
+      return (
+        (await approveLeaveForAi(toStaffContext(context), leaveRequestId)) ?? {
+          error: "Leave request not found.",
+        }
+      );
     },
   ),
   defineStaffTool(
@@ -195,9 +230,9 @@ export const STAFF_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, context) => {
       const staffId = typeof input.staffId === "string" ? input.staffId : undefined;
-      return analyzePerformance(staffId);
+      return analyzePerformance(toStaffContext(context), staffId);
     },
   ),
   defineStaffTool(
@@ -219,9 +254,9 @@ export const STAFF_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
-      const shiftDate = typeof input.shiftDate === "string" ? input.shiftDate : "2026-02-15";
-      return recommendStaffing(shiftDate);
+    async (input, context) => {
+      const shiftDate = typeof input.shiftDate === "string" ? input.shiftDate : undefined;
+      return recommendStaffing(toStaffContext(context), shiftDate);
     },
   ),
   defineStaffTool(
@@ -240,7 +275,7 @@ export const STAFF_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => predictLabourDemand(),
+    async (_input, context) => predictLabourDemand(toStaffContext(context)),
   ),
   defineStaffTool(
     {
@@ -258,13 +293,49 @@ export const STAFF_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => detectAttendanceIssues(),
+    async (_input, context) => detectAttendanceIssues(toStaffContext(context)),
+  ),
+  defineStaffTool(
+    {
+      id: STAFF_AI_TOOL_IDS.SUGGEST_TRAINING,
+      name: "Suggest Training",
+      description: "Identify staff who need training and recommend courses.",
+      requiredPermissions: [STAFF_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [STAFF_MODULE, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: STAFF_AGENT_SLUGS,
+      capabilityId: "capability.staff",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => suggestTraining(toStaffContext(context)),
+  ),
+  defineStaffTool(
+    {
+      id: STAFF_AI_TOOL_IDS.OPTIMIZE_WORKFORCE,
+      name: "Optimize Workforce Allocation",
+      description: "Analyze shift coverage gaps and recommend workforce allocation.",
+      requiredPermissions: [STAFF_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [STAFF_MODULE, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "required",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: STAFF_AGENT_SLUGS,
+      capabilityId: "capability.staff",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => optimizeWorkforceAllocation(toStaffContext(context)),
   ),
 ];
 
 let registered = false;
 
-/** Registers Staff platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Staff platform tools with the AI Tool Platform (idempotent). */
 export function registerStaffAiTools(): void {
   if (registered) {
     return;

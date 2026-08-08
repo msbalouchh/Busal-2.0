@@ -2,8 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PrismaClient } from "@prisma/client";
-
 import {
   addItem,
   calculateSubtotal,
@@ -15,8 +13,11 @@ import {
   updateQuantity,
 } from "../src/services/cart.service";
 import { createQRCode, deleteQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { connectWithRetry, handleVerificationError } from "./lib/verify-db";
+import { ensureVerificationTenantContext } from "./lib/verify-oms-order";
+import { getVerifyPrisma } from "./lib/verify-prisma";
 
-const prisma = new PrismaClient();
+const prisma = getVerifyPrisma();
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -26,16 +27,19 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 async function main() {
+  await connectWithRetry(prisma);
+
   const business = await prisma.business.findFirst({
     select: { ownerId: true, id: true },
   });
   assert(business, "No business found");
 
+  const { branchId } = await ensureVerificationTenantContext(prisma, business.id);
   const ownerId = business.ownerId;
   const suffix = Date.now();
   const slug = `cart-verify-${suffix}`;
 
-  const qrCode = await createQRCode(ownerId, { slug });
+  const qrCode = await createQRCode(ownerId, { slug, branchId });
   const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
     sessionToken: `cart-session-${suffix}`,
   });
@@ -49,6 +53,7 @@ async function main() {
     menuItem = await prisma.menuItem.create({
       data: {
         businessId: business.id,
+        branchId,
         name: `Cart Verify Item ${suffix}`,
         price: 12.5,
         isAvailable: true,
@@ -57,8 +62,10 @@ async function main() {
     });
   }
 
+  const itemPrice = Number(menuItem.price);
+
   console.log("Create cart");
-  const cart = await createCart(business.id, visit.session.id);
+  const cart = await createCart(business.id, visit.session.id, branchId);
   assert(cart.status === "ACTIVE", "cart should be active");
   assert(cart.subtotal === 0, "initial subtotal should be 0");
   console.log("  PASS");
@@ -74,9 +81,9 @@ async function main() {
   console.log("  PASS");
 
   console.log("Add item");
-  const withItem = await addItem(business.id, visit.session.id, menuItem.id);
+  const withItem = await addItem(business.id, visit.session.id, menuItem.id, 1, branchId);
   assert(withItem.items.length === 1, "cart should have one item");
-  assert(withItem.subtotal === 12.5, "subtotal should match item price");
+  assert(withItem.subtotal === itemPrice, "subtotal should match item price");
   console.log("  PASS");
 
   console.log("Increase quantity");
@@ -84,13 +91,13 @@ async function main() {
   assert(cartItemId, "cart item id missing");
   const increased = await updateQuantity(cartItemId, 2);
   assert(increased.items[0]?.quantity === 2, "quantity should be 2");
-  assert(increased.subtotal === 25, "subtotal should reflect quantity");
+  assert(increased.subtotal === itemPrice * 2, "subtotal should reflect quantity");
   console.log("  PASS");
 
   console.log("Decrease quantity");
   const decreased = await updateQuantity(cartItemId, 1);
   assert(decreased.items[0]?.quantity === 1, "quantity should be 1");
-  assert(decreased.subtotal === 12.5, "subtotal should decrease");
+  assert(decreased.subtotal === itemPrice, "subtotal should decrease");
   console.log("  PASS");
 
   console.log("Remove item");
@@ -100,7 +107,7 @@ async function main() {
   console.log("  PASS");
 
   console.log("Clear cart");
-  const refilled = await addItem(business.id, visit.session.id, menuItem.id);
+  const refilled = await addItem(business.id, visit.session.id, menuItem.id, 1, branchId);
   const cleared = await clearCart(refilled.id);
   assert(cleared.items.length === 0, "clear cart should remove items");
   assert(cleared.subtotal === 0, "clear cart subtotal should be 0");
@@ -112,7 +119,7 @@ async function main() {
   console.log("  PASS");
 
   console.log("Get active cart");
-  await addItem(business.id, visit.session.id, menuItem.id);
+  await addItem(business.id, visit.session.id, menuItem.id, 1, branchId);
   const active = await getActiveCart(visit.session.id);
   assert(active?.id === cart.id, "getActiveCart failed");
   console.log("  PASS");
@@ -146,10 +153,7 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error("\nFIRST ERROR:", error instanceof Error ? error.message : error);
-    process.exit(1);
-  })
+  .catch(handleVerificationError)
   .finally(async () => {
     await prisma.$disconnect();
   });

@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import { BUILT_IN_SKILL_TEMPLATES } from "@/modules/ai-skills-management/lib/ai-skills-validation";
 import type { BuiltInSkillTemplate } from "@/modules/ai-skills-management/types/ai-skills-types";
 

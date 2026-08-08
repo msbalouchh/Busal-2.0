@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
+import { DASHBOARD_MODULE_DESCRIPTIONS } from "@/modules/dashboard/constants/module-descriptions";
 
 interface TablesLayoutProps {
   children: ReactNode;
@@ -8,7 +9,7 @@ interface TablesLayoutProps {
 
 export default function TablesLayout({ children }: TablesLayoutProps) {
   return (
-    <DashboardSectionLayout description="Manage table layouts, sections, and seating capacity.">
+    <DashboardSectionLayout description={DASHBOARD_MODULE_DESCRIPTIONS.tables}>
       {children}
     </DashboardSectionLayout>
   );

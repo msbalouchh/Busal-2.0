@@ -13,6 +13,9 @@ export const INTEGRATION_CATEGORIES = {
   AI: "ai",
   ERP: "erp",
   CUSTOM: "custom",
+  PRODUCTIVITY: "productivity",
+  ANALYTICS: "analytics",
+  AUTOMATION: "automation",
 } as const;
 
 export type IntegrationCategory =
@@ -121,6 +124,9 @@ export const INTEGRATION_AI_TOOL_IDS = {
   EXPLAIN_API_ERRORS: "integrations.explain-api-errors",
   RECOMMEND_RATE_LIMITS: "integrations.recommend-rate-limits",
   GENERATE_MAPPING: "integrations.generate-mapping",
+  OPTIMIZE_API_USAGE: "integrations.optimize-api-usage",
+  API_HEALTH_MONITORING: "integrations.api-health-monitoring",
+  WEBHOOK_FAILURE_ANALYSIS: "integrations.webhook-failure-analysis",
 } as const;
 
 export type IntegrationAiToolId =
@@ -155,6 +161,9 @@ export const INTEGRATION_CATEGORY_LABELS: Record<IntegrationCategory, string> = 
   ai: "AI",
   erp: "ERP",
   custom: "Custom",
+  productivity: "Productivity",
+  analytics: "Analytics",
+  automation: "Automation",
 };
 
 export const INTEGRATION_STATUS_LABELS: Record<IntegrationStatus, string> = {

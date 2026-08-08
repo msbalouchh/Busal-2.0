@@ -4,18 +4,38 @@ import {
   PLATFORM_TOOL_PERMISSIONS,
 } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
   createInventoryItemForAi,
   detectInventoryWaste,
   forecastDemand,
   optimizeStockLevels,
+  predictExpiryRisk,
   predictLowStock,
   recommendPurchaseOrders,
   suggestReorderQuantity,
   updateStockForAi,
 } from "@/modules/inventory/ai/inventory-ai-context";
 import { INVENTORY_AI_TOOL_IDS } from "@/modules/inventory/constants/inventory-status";
+import { buildInventoryPlatformContext } from "@/modules/inventory/lib/inventory-platform-context";
+import type { InventoryPlatformContext } from "@/modules/inventory/types/inventory-platform";
+
+function toInventoryContext(context: PlatformExecutionContext): InventoryPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for inventory tools");
+  }
+
+  return buildInventoryPlatformContext({
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  });
+}
 
 function defineInventoryTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -85,8 +105,8 @@ export const INVENTORY_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) =>
-      createInventoryItemForAi({
+    async (input, context) =>
+      createInventoryItemForAi(toInventoryContext(context), {
         sku: typeof input.sku === "string" ? input.sku : "SKU-NEW",
         name: typeof input.name === "string" ? input.name : "New Item",
         categoryId: typeof input.categoryId === "string" ? input.categoryId : "cat-dry-goods",
@@ -121,11 +141,15 @@ export const INVENTORY_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const itemId = typeof input.itemId === "string" ? input.itemId : "";
       const quantityDelta = typeof input.quantityDelta === "number" ? input.quantityDelta : 0;
       const notes = typeof input.notes === "string" ? input.notes : undefined;
-      return updateStockForAi(itemId, quantityDelta, notes) ?? { error: "Item not found." };
+      return (
+        (await updateStockForAi(toInventoryContext(context), itemId, quantityDelta, notes)) ?? {
+          error: "Item not found.",
+        }
+      );
     },
   ),
   defineInventoryTool(
@@ -147,9 +171,9 @@ export const INVENTORY_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, context) => {
       const limit = typeof input.limit === "number" ? input.limit : 10;
-      return predictLowStock(limit);
+      return predictLowStock(toInventoryContext(context), limit);
     },
   ),
   defineInventoryTool(
@@ -168,7 +192,7 @@ export const INVENTORY_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => forecastDemand(),
+    async (_input, context) => forecastDemand(toInventoryContext(context)),
   ),
   defineInventoryTool(
     {
@@ -186,7 +210,7 @@ export const INVENTORY_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => recommendPurchaseOrders(),
+    async (_input, context) => recommendPurchaseOrders(toInventoryContext(context)),
   ),
   defineInventoryTool(
     {
@@ -204,7 +228,7 @@ export const INVENTORY_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => detectInventoryWaste(),
+    async (_input, context) => detectInventoryWaste(toInventoryContext(context)),
   ),
   defineInventoryTool(
     {
@@ -226,9 +250,13 @@ export const INVENTORY_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, context) => {
       const itemId = typeof input.itemId === "string" ? input.itemId : "";
-      return suggestReorderQuantity(itemId) ?? { error: "Item not found." };
+      return (
+        (await suggestReorderQuantity(toInventoryContext(context), itemId)) ?? {
+          error: "Item not found.",
+        }
+      );
     },
   ),
   defineInventoryTool(
@@ -247,13 +275,13 @@ export const INVENTORY_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => optimizeStockLevels(),
+    async (_input, context) => optimizeStockLevels(toInventoryContext(context)),
   ),
 ];
 
 let registered = false;
 
-/** Registers Inventory platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Inventory platform tools with the AI Tool Platform (idempotent). */
 export function registerInventoryAiTools(): void {
   if (registered) {
     return;
@@ -265,3 +293,5 @@ export function registerInventoryAiTools(): void {
 
   registered = true;
 }
+
+export { predictExpiryRisk };

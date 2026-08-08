@@ -21,10 +21,18 @@ import { resolveActiveWorkspaceNavLabel } from "@/modules/application-shell/util
 interface WorkspaceHeaderProps {
   userName?: string;
   userEmail?: string;
+  businessName?: string;
+  branchName?: string | null;
   className?: string;
 }
 
-export function WorkspaceHeader({ userName, userEmail, className }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({
+  userName,
+  userEmail,
+  businessName,
+  branchName,
+  className,
+}: WorkspaceHeaderProps) {
   const pathname = usePathname();
   const { isCollapsed, isMobile } = useNavigationSidebar();
 
@@ -47,7 +55,12 @@ export function WorkspaceHeader({ userName, userEmail, className }: WorkspaceHea
       }
       title={
         <div className="min-w-0">
-          <p className="text-muted-foreground hidden text-xs md:block">Workspace</p>
+          {businessName ? (
+            <p className="text-muted-foreground hidden truncate text-xs md:block">
+              {businessName}
+              {branchName ? ` · ${branchName}` : ""}
+            </p>
+          ) : null}
           <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
             {pageTitle}
           </h1>

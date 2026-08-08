@@ -48,19 +48,19 @@ export async function getDashboardHomeData(platform: BusinessContext): Promise<D
         ...branchFilter(branchId),
       },
     }),
-    prisma.legacyOrder.findMany({
+    prisma.restaurantOrder.findMany({
       where: {
         businessId,
         ...branchFilter(branchId),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { placedAt: "desc" },
       take: 5,
       select: {
         id: true,
         orderNumber: true,
         status: true,
-        total: true,
-        createdAt: true,
+        totalAmount: true,
+        placedAt: true,
       },
     }),
     prisma.notificationInboxItem.findMany({
@@ -95,8 +95,8 @@ export async function getDashboardHomeData(platform: BusinessContext): Promise<D
   const recentActivity: DashboardActivityItem[] = recentOrders.map((order) => ({
     id: order.id,
     title: `Order #${order.orderNumber}`,
-    description: `${order.status} · ${formatPence(moneyDecimalToPence(order.total))}`,
-    timestamp: order.createdAt.toISOString(),
+    description: `${order.status} · ${formatPence(moneyDecimalToPence(order.totalAmount))}`,
+    timestamp: order.placedAt.toISOString(),
     href: `/dashboard/reporting/orders`,
   }));
 

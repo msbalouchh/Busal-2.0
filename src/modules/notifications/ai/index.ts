@@ -8,6 +8,10 @@ export {
   optimizeSendTimeForAi,
   summarizeNotificationsForAi,
   generateTemplatesForAi,
+  predictCustomerEngagementForAi,
+  recommendNotificationPriorityForAi,
+  optimizeCampaignForAi,
+  analyzeDeliveryFailuresForAi,
 } from "@/modules/notifications/ai/notification-ai-context";
 
 export {

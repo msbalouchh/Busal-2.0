@@ -20,6 +20,8 @@ export {
   type KitchenPermission,
 } from "@/modules/kitchen/constants/kitchen-status";
 
+export { KITCHEN_MODULE_PERMISSIONS } from "@/modules/kitchen/constants/permissions";
+
 export {
   KITCHEN_INTEGRATION_POINTS,
   type KitchenIntegrationPoint,
@@ -30,37 +32,11 @@ export {
   KITCHEN_PLATFORM_NAV_ITEMS,
 } from "@/modules/kitchen/constants/platform-routes";
 
-export {
-  DEFAULT_KITCHEN_SCOPE,
-  MOCK_KITCHEN,
-  MOCK_KITCHEN_STATIONS,
-  MOCK_KITCHEN_SCREENS,
-  MOCK_KITCHEN_QUEUES,
-  MOCK_KITCHEN_RECORDS,
-} from "@/modules/kitchen/constants/mock-data";
-
 export type * from "@/modules/kitchen/types/kitchen";
 
 export * from "@/modules/kitchen/utils/kitchen-selectors";
 export * from "@/modules/kitchen/utils/kitchen-queue-utils";
 export * from "@/modules/kitchen/utils/kitchen-timer-utils";
-
-export {
-  KitchenRepository,
-  kitchenRepository,
-} from "@/modules/kitchen/repository/kitchen-repository";
-
-export { KitchenService, kitchenService } from "@/modules/kitchen/services/kitchen.service";
-
-export {
-  buildKitchenPlatformContext,
-  buildKitchenPlatformSnapshot,
-  getDefaultKitchenSnapshot,
-  getActiveKitchenOrders,
-  getDelayedKitchenOrders,
-  type KitchenPlatformSnapshot,
-  type KitchenPlatformInput,
-} from "@/modules/kitchen/services/kitchen-platform.service";
 
 export { KitchenProvider } from "@/modules/kitchen/providers/kitchen-provider";
 export { KitchenContext } from "@/modules/kitchen/contexts/kitchen-context";
@@ -72,6 +48,11 @@ export { useKitchenStation } from "@/modules/kitchen/hooks/use-kitchen-station";
 export { KitchenStatusBadge } from "@/modules/kitchen/components/kitchen-status-badge";
 export { KitchenStationBadge } from "@/modules/kitchen/components/kitchen-station-badge";
 export { KitchenPriorityBadge } from "@/modules/kitchen/components/kitchen-priority-badge";
+export { KitchenDisplayManager } from "@/modules/kitchen/components/kitchen-display-manager";
+export { KitchenOverview } from "@/modules/kitchen/components/kitchen-overview";
+export { KitchenManagementLoading } from "@/modules/kitchen/components/kitchen-management-loading";
+export { KitchenManagementEmpty } from "@/modules/kitchen/components/kitchen-management-empty";
+export { KitchenManagementError } from "@/modules/kitchen/components/kitchen-management-error";
 
 export {
   registerKitchenAiTools,
@@ -84,4 +65,12 @@ export {
   estimatePreparationTime,
   recommendWorkflowImprovements,
   detectKitchenBottlenecks,
+  forecastKitchenLoad,
+  suggestStaffAllocation,
+  recommendStationBalancing,
 } from "@/modules/kitchen/ai";
+
+export { getKitchenDisplayContext } from "@/modules/kitchen/lib/get-kitchen-display-context";
+export { getKitchenModuleContext } from "@/modules/kitchen/lib/get-kitchen-module-context";
+
+export { buildKitchenPlatformContext } from "@/modules/kitchen/lib/kitchen-platform-context";

@@ -4,18 +4,39 @@ import {
   PLATFORM_TOOL_PERMISSIONS,
 } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
+  buildReservationAiContext,
+  estimateWaitTime,
   manageWaitlist,
-  optimizeSeatingForBranch,
+  optimizeReservationSchedule,
   predictNoShows,
   recommendBestTable,
+  recommendStaffAllocation,
   sendReservationReminder,
+  suggestPeakCapacity,
 } from "@/modules/reservations/ai/reservation-ai-context";
-import { DEFAULT_RESERVATION_SCOPE } from "@/modules/reservations/constants/mock-data";
-import { RESERVATION_AI_TOOL_IDS } from "@/modules/reservations/constants/reservation-status";
-import { reservationService } from "@/modules/reservations/services/reservation.service";
+import { RESERVATION_AI_TOOL_IDS, RESERVATION_SOURCES } from "@/modules/reservations/constants/reservation-status";
 import type { ReservationStatus } from "@/modules/reservations/constants/reservation-status";
+import { reservationService } from "@/modules/reservations/services/reservation.service";
+import type { ReservationPlatformContext } from "@/modules/reservations/types/reservations";
+
+function toReservationContext(context: PlatformExecutionContext): ReservationPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for reservation tools");
+  }
+
+  return {
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  };
+}
 
 function defineReservationTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -59,7 +80,7 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredBranchScope: "required",
       inputSchema: {
         type: "object",
-        required: ["partySize", "scheduledDate", "startTime", "guestFirstName", "guestLastName"],
+        required: ["partySize", "scheduledDate", "startTime", "guestFirstName"],
         properties: {
           partySize: { type: "number" },
           scheduledDate: { type: "string" },
@@ -83,17 +104,19 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
-      const record = reservationService.create({
-        branchId: DEFAULT_RESERVATION_SCOPE.branchId,
+    async (input, executionContext) => {
+      const context = toReservationContext(executionContext);
+      const record = await reservationService.create(context, {
+        branchId: context.branchId,
         partySize: typeof input.partySize === "number" ? input.partySize : 2,
-        scheduledDate: typeof input.scheduledDate === "string" ? input.scheduledDate : "2026-02-16",
+        scheduledDate: typeof input.scheduledDate === "string" ? input.scheduledDate : new Date().toISOString().slice(0, 10),
         startTime: typeof input.startTime === "string" ? input.startTime : "19:00",
         guestFirstName: typeof input.guestFirstName === "string" ? input.guestFirstName : "Guest",
-        guestLastName: typeof input.guestLastName === "string" ? input.guestLastName : "Name",
+        guestLastName: typeof input.guestLastName === "string" ? input.guestLastName : "",
         guestEmail: typeof input.guestEmail === "string" ? input.guestEmail : undefined,
-        guestPhone: typeof input.guestPhone === "string" ? input.guestPhone : undefined,
+        guestPhone: typeof input.guestPhone === "string" ? input.guestPhone : "+44000000000",
         isVip: input.isVip === true,
+        source: RESERVATION_SOURCES.PHONE,
       });
 
       return {
@@ -130,9 +153,10 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toReservationContext(executionContext);
       const reservationId = typeof input.reservationId === "string" ? input.reservationId : "";
-      const updated = reservationService.update({
+      const updated = await reservationService.update(context, {
         reservationId,
         status: typeof input.status === "string" ? (input.status as ReservationStatus) : undefined,
         partySize: typeof input.partySize === "number" ? input.partySize : undefined,
@@ -165,10 +189,12 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
-      const cancelled = reservationService.cancel({
+    async (input, executionContext) => {
+      const context = toReservationContext(executionContext);
+      const cancelled = await reservationService.cancel(context, {
         reservationId: typeof input.reservationId === "string" ? input.reservationId : "",
         reason: typeof input.reason === "string" ? input.reason : "Guest request",
+        cancelledBy: context.userId,
       });
 
       return cancelled
@@ -196,9 +222,10 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toReservationContext(executionContext);
       const reservationId = typeof input.reservationId === "string" ? input.reservationId : "";
-      return recommendBestTable(reservationId) ?? { error: "Reservation not found." };
+      return (await recommendBestTable(context, reservationId)) ?? { error: "Reservation not found." };
     },
   ),
   defineReservationTool(
@@ -220,9 +247,10 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toReservationContext(executionContext);
       const limit = typeof input.limit === "number" ? input.limit : 5;
-      return predictNoShows(limit);
+      return predictNoShows(context, limit);
     },
   ),
   defineReservationTool(
@@ -241,7 +269,7 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => optimizeSeatingForBranch(),
+    async (_input, executionContext) => optimizeReservationSchedule(toReservationContext(executionContext)),
   ),
   defineReservationTool(
     {
@@ -252,21 +280,14 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredModules: [PLATFORM_MODULES.RESERVATIONS],
       requiredTenantScope: "required",
       requiredBranchScope: "required",
-      inputSchema: {
-        type: "object",
-        properties: { branchId: { type: "string" } },
-      },
+      inputSchema: { type: "object", properties: {} },
       outputSchema: { type: "object" },
       supportedAgents: [BUILTIN_AGENT_SLUGS.OPERATIONS, BUILTIN_AGENT_SLUGS.BUSINESS_ASSISTANT],
       capabilityId: "capability.reservations",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
-      const branchId =
-        typeof input.branchId === "string" ? input.branchId : DEFAULT_RESERVATION_SCOPE.branchId;
-      return manageWaitlist(branchId);
-    },
+    async (_input, executionContext) => manageWaitlist(toReservationContext(executionContext)),
   ),
   defineReservationTool(
     {
@@ -288,16 +309,17 @@ export const RESERVATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "low" },
     },
-    async (input) => {
+    async (input, executionContext) => {
+      const context = toReservationContext(executionContext);
       const reservationId = typeof input.reservationId === "string" ? input.reservationId : "";
-      return sendReservationReminder(reservationId) ?? { error: "Reservation not found." };
+      return (await sendReservationReminder(context, reservationId)) ?? { error: "Reservation not found." };
     },
   ),
 ];
 
 let registered = false;
 
-/** Registers Reservation platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Reservation platform tools with the AI Tool Platform (idempotent). */
 export function registerReservationAiTools(): void {
   if (registered) {
     return;

@@ -4,6 +4,7 @@ import {
   type KitchenQueuePriority,
   type KitchenQueueStation,
   type KitchenQueueStatus,
+  type OrderStatus,
   type Prisma,
 } from "@prisma/client";
 
@@ -119,6 +120,119 @@ async function transitionQueueItem(
   return mapKitchenQueueItem(updated);
 }
 
+function mapRestaurantStatusToLegacy(status: string): OrderStatus {
+  switch (status) {
+    case "CANCELLED":
+      return "CANCELLED";
+    case "COMPLETED":
+      return "COMPLETED";
+    case "READY":
+    case "SERVED":
+      return "READY";
+    case "PREPARING":
+      return "PREPARING";
+    default:
+      return "PENDING";
+  }
+}
+
+export async function syncLegacyOrderForKitchen(input: {
+  businessId: string;
+  branchId: string;
+  orderSessionId: string;
+  orderNumber: string;
+  tableId?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  notes?: string | null;
+  subtotal: number;
+  discount?: number;
+  tax?: number;
+  total: number;
+  status?: string;
+  items: Array<{
+    menuItemId: string;
+    nameSnapshot: string;
+    unitPrice: number;
+    quantity: number;
+    totalPrice: number;
+    notes?: string | null;
+  }>;
+}): Promise<string> {
+  const existing = await prisma.legacyOrder.findUnique({
+    where: { orderSessionId: input.orderSessionId },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const legacy = await prisma.legacyOrder.create({
+    data: {
+      businessId: input.businessId,
+      branchId: input.branchId,
+      orderSessionId: input.orderSessionId,
+      orderNumber: input.orderNumber,
+      fulfilmentType: "DINE_IN",
+      tableId: input.tableId ?? null,
+      customerName: input.customerName ?? null,
+      customerPhone: input.customerPhone ?? null,
+      notes: input.notes ?? null,
+      subtotal: input.subtotal,
+      discount: input.discount ?? 0,
+      tax: input.tax ?? 0,
+      total: input.total,
+      status: mapRestaurantStatusToLegacy(input.status ?? "PENDING"),
+      items: {
+        create: input.items.map((item) => ({
+          menuItemId: item.menuItemId,
+          nameSnapshot: item.nameSnapshot,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          totalPrice: item.totalPrice,
+          notes: item.notes ?? null,
+        })),
+      },
+    },
+    select: { id: true },
+  });
+
+  return legacy.id;
+}
+
+async function resolveKitchenOrderId(businessId: string, orderId: string): Promise<string> {
+  const legacyOrder = await prisma.legacyOrder.findFirst({
+    where: { id: orderId, businessId },
+    select: { id: true },
+  });
+
+  if (legacyOrder) {
+    return legacyOrder.id;
+  }
+
+  const restaurantOrder = await prisma.restaurantOrder.findFirst({
+    where: { id: orderId, businessId },
+    select: { id: true, orderNumber: true },
+  });
+
+  if (!restaurantOrder) {
+    throw new Error("Order not found");
+  }
+
+  const linkedLegacy = await prisma.legacyOrder.findFirst({
+    where: { businessId, orderNumber: restaurantOrder.orderNumber },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (linkedLegacy) {
+    return linkedLegacy.id;
+  }
+
+  throw new Error("Kitchen order bridge not found for restaurant order");
+}
+
 export async function enqueueOrder(
   businessId: string,
   orderId: string,
@@ -128,17 +242,10 @@ export async function enqueueOrder(
     branchId?: string | null;
   } = {},
 ): Promise<KitchenQueueItemData> {
-  const order = await prisma.legacyOrder.findFirst({
-    where: { id: orderId, businessId },
-    select: { id: true },
-  });
-
-  if (!order) {
-    throw new Error("Order not found");
-  }
+  const kitchenOrderId = await resolveKitchenOrderId(businessId, orderId);
 
   const existing = await prisma.kitchenQueue.findUnique({
-    where: { orderId },
+    where: { orderId: kitchenOrderId },
     select: { id: true },
   });
 
@@ -150,7 +257,7 @@ export async function enqueueOrder(
     data: {
       businessId,
       branchId: options.branchId ?? null,
-      orderId,
+      orderId: kitchenOrderId,
       priority: options.priority ?? "NORMAL",
       station: options.station ?? "GENERAL",
       status: "NEW",

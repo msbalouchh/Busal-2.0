@@ -25,13 +25,7 @@ export {
   TABLE_MANAGEMENT_NAV_ITEMS,
 } from "@/modules/table-management/constants/routes";
 
-export {
-  DEFAULT_TABLE_SCOPE,
-  MOCK_TABLE_RECORD,
-  MOCK_TABLE_RECORDS,
-  MOCK_FLOOR_RECORD,
-  MOCK_FLOOR_RECORDS,
-} from "@/modules/table-management/constants/mock-data";
+export { TABLE_PERMISSIONS, type TablePermissionCode } from "@/modules/table-management/constants/permissions";
 
 export type * from "@/modules/table-management/types/table-management";
 export * from "@/modules/table-management/utils/table-selectors";
@@ -40,6 +34,7 @@ export * from "@/modules/table-management/utils/table-layout-utils";
 export {
   TableManagementRepository,
   tableManagementRepository,
+  type TableSearchResult,
 } from "@/modules/table-management/repository/table-management-repository";
 
 export {
@@ -48,13 +43,31 @@ export {
 } from "@/modules/table-management/services/table-management.service";
 
 export {
-  buildTablePlatformContext,
   buildTablePlatformSnapshot,
-  getDefaultTableSnapshot,
   getHighUtilizationTables,
-  type TablePlatformSnapshot,
-  type TablePlatformInput,
 } from "@/modules/table-management/services/table-platform.service";
+
+export {
+  buildTablePlatformContext,
+  type TablePlatformInput,
+} from "@/modules/table-management/lib/table-platform-context";
+
+export { getTableManagementContext, getTableManagementSnapshot } from "@/modules/table-management/lib/get-table-management-context";
+export * from "@/modules/table-management/lib/table-scope";
+
+export {
+  createFloorAction,
+  updateFloorAction,
+  createTableAction,
+  updateTableAction,
+  archiveTableAction,
+  restoreTableAction,
+  bulkUpdateTablesAction,
+  mergeTablesAction,
+  splitTablesAction,
+  assignTableAction,
+  transferTableAction,
+} from "@/modules/table-management/actions/table-management-actions";
 
 export { TableManagementProvider } from "@/modules/table-management/providers/table-management-provider";
 export { TableManagementContext } from "@/modules/table-management/contexts/table-management-context";
@@ -68,6 +81,10 @@ export { useTableFloor } from "@/modules/table-management/hooks/use-table-floor"
 
 export { TableStatusBadge } from "@/modules/table-management/components/table-status-badge";
 export { TableZoneBadge } from "@/modules/table-management/components/table-zone-badge";
+export { TableManagementOverview } from "@/modules/table-management/components/table-management-overview";
+export { TableManagementLoading } from "@/modules/table-management/components/table-management-loading";
+export { TableManagementEmpty } from "@/modules/table-management/components/table-management-empty";
+export { TableManagementError } from "@/modules/table-management/components/table-management-error";
 
 export {
   registerTableManagementAiTools,
@@ -76,6 +93,8 @@ export {
   recommendTableForParty,
   predictWaitTime,
   optimizeSeatingLayout,
+  detectIdleTables,
+  recommendMergeOrSplit,
   searchTablesForAi,
   buildFloorSummary,
 } from "@/modules/table-management/ai";

@@ -3,6 +3,7 @@ import "server-only";
 import { getRevopsDashboard } from "@/services/revops.service";
 import { getSalesDashboard } from "@/services/reporting.service";
 import { createFinanceInsight } from "@/services/ai-finance-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -60,22 +61,18 @@ export async function getBudgetSnapshot(ownerId: string): Promise<BudgetSnapshot
 }
 
 export async function generateBudgetInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getBudgetSnapshot(ownerId);
-  let created = 0;
-
-  await createFinanceInsight(businessId, {
-    title: "Budget overview",
-    description: `Budget status: ${snapshot.budgetStatus.replace("_", " ")}. Revenue variance: ${snapshot.revenueVariancePercent}%.`,
-    category: "budget",
-    priority: snapshot.budgetStatus === "OVER_BUDGET" ? "HIGH" : "MEDIUM",
-    recommendation:
-      snapshot.budgetStatus === "OVER_BUDGET"
-        ? "Expenses exceed budget — review discretionary spending."
-        : "Continue monitoring actuals against projected budget.",
-    metadata: { budgetStatus: snapshot.budgetStatus },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "finance",
+    task: "budget-insights",
+    loadContext: getBudgetSnapshot,
+    persistInsight: (businessId, insight) =>
+      createFinanceInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "budget",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  return created;
 }

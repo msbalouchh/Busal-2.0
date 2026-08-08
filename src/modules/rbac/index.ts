@@ -93,11 +93,18 @@ export {
 } from "@/modules/rbac/utils";
 
 export {
+  buildRbacFoundationSnapshot,
+  type RbacFoundationInput,
+} from "@/modules/rbac/services/rbac-foundation.service";
+
+/** @deprecated Dev/test fixtures only — use buildRbacFoundationSnapshot in production. */
+export type { RbacSelectionInput } from "@/modules/rbac/types/selection";
+
+export {
   buildRbacEngineContext,
   buildRbacSnapshot,
   getDefaultRbacSnapshot,
   createRbacContextValue,
-  type RbacSelectionInput,
 } from "@/modules/rbac/services/mock-rbac.service";
 
 export { RbacProvider } from "@/modules/rbac/providers/rbac-provider";

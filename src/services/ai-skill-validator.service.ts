@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import { validateSkillPayload } from "@/modules/ai-skills-management/lib/ai-skills-validation";
 import type {
   SkillRecord,

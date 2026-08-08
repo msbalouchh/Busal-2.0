@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { DashboardSectionLayout } from "@/components/layout/dashboard-section-layout";
+import { DASHBOARD_MODULE_DESCRIPTIONS } from "@/modules/dashboard/constants/module-descriptions";
 import { RevopsNav } from "@/modules/revops/components/revops-nav";
 
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function RevopsLayout({ children }: { children: React.ReactNode }) {
   return (
     <DashboardSectionLayout
-      description="Invoices, payments, recognition, profitability, forecasting, and collections."
+      description={DASHBOARD_MODULE_DESCRIPTIONS.revops}
       nav={<RevopsNav />}
     >
       {children}

@@ -73,6 +73,13 @@ export const PUBLIC_ROUTES = [
   "/terms",
 ] as const;
 
+/** Routes accessible to authenticated users pending email verification. */
+export const EMAIL_VERIFICATION_PENDING_ROUTES = [
+  ROUTES.verifyEmail,
+  ROUTES.authCallback,
+  ROUTES.authContinue,
+] as const;
+
 export const API_ROUTES = {
   health: "/api/health",
   session: "/api/auth/session",
@@ -81,5 +88,6 @@ export const API_ROUTES = {
   logout: "/api/auth/logout",
   forgotPassword: "/api/auth/forgot-password",
   resetPassword: "/api/auth/reset-password",
+  resendVerification: "/api/auth/resend-verification",
   google: "/api/auth/google",
 } as const;

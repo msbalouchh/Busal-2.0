@@ -6,8 +6,8 @@ import type {
 } from "@prisma/client";
 
 import {
+  deliverNotificationChannel,
   filterChannelsByPreferences,
-  simulateDelivery,
 } from "@/modules/notifications/engine/delivery-engine";
 import {
   resolveChannelsFromRules,
@@ -95,8 +95,15 @@ export function planNotificationDelivery(input: {
   };
 }
 
-export function simulateChannelDelivery(channel: NotificationChannel) {
-  return simulateDelivery(channel);
+export async function deliverChannelNotification(input: {
+  channel: NotificationChannel;
+  recipientEmail?: string | null;
+  recipientPhone?: string | null;
+  recipientUserId?: string | null;
+  subject?: string | null;
+  body: string;
+}) {
+  return deliverNotificationChannel(input);
 }
 
 export function isCategoryAllowed(

@@ -1,9 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-
-import { MOCK_WORKSPACE_NOTIFICATIONS } from "@/modules/application-shell/constants/mock-notifications";
-import { MOCK_WORKSPACES } from "@/modules/application-shell/constants/mock-workspaces";
 import type {
   WorkspaceNotification,
   WorkspaceShellContextValue,
@@ -21,9 +18,9 @@ interface WorkspaceShellProviderProps {
 
 export function WorkspaceShellProvider({
   children,
-  workspaceName = "Harbour Kitchen",
-  workspaces = MOCK_WORKSPACES,
-  initialNotifications = MOCK_WORKSPACE_NOTIFICATIONS,
+  workspaceName = "Workspace",
+  workspaces = [],
+  initialNotifications = [],
 }: WorkspaceShellProviderProps) {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(
     () => workspaces.find((workspace) => workspace.isActive)?.id ?? workspaces[0]?.id ?? "",

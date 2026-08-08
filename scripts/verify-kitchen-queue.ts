@@ -1,6 +1,3 @@
-import { PrismaClient } from "@prisma/client";
-
-import { addItem, createCart } from "../src/services/cart.service";
 import {
   acknowledgeOrder,
   getQueue,
@@ -10,11 +7,12 @@ import {
   markServed,
   startPreparation,
 } from "../src/services/kitchen-queue.service";
-import { createOrderFromSession } from "../src/services/order.service";
-import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
-import { createQRCode, deleteQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { createQRCode, deleteQRCode } from "../src/services/qr-menu.service";
+import { handleVerificationError } from "./lib/verify-db";
+import { cleanupRestaurantOrder, createOmsOrderFromQrFlow } from "./lib/verify-oms-order";
+import { getVerifyPrisma } from "./lib/verify-prisma";
 
-const prisma = new PrismaClient();
+const prisma = getVerifyPrisma();
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -29,40 +27,26 @@ async function main() {
   assert(business, "No business found");
 
   const ownerId = business.ownerId;
-  const suffix = Date.now();
-  const slug = `kitchen-queue-${suffix}`;
+  const suffix = Date.now().toString();
 
-  const qrCode = await createQRCode(ownerId, { slug });
-  const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
-    sessionToken: `kitchen-queue-token-${suffix}`,
-  });
+  const { order, branchId, cart, orderSession, visit, qrCode } = await createOmsOrderFromQrFlow(
+    prisma,
+    business.id,
+    ownerId,
+    suffix,
+    { slugPrefix: "kitchen-queue" },
+  );
 
-  let menuItem = await prisma.menuItem.findFirst({
-    where: { businessId: business.id, isAvailable: true },
+  const legacyOrder = await prisma.legacyOrder.findUnique({
+    where: { orderSessionId: orderSession.id },
     select: { id: true },
   });
-
-  if (!menuItem) {
-    menuItem = await prisma.menuItem.create({
-      data: {
-        businessId: business.id,
-        name: `Kitchen Queue Item ${suffix}`,
-        price: 10,
-        isAvailable: true,
-      },
-      select: { id: true },
-    });
-  }
-
-  const cart = await createCart(business.id, visit.session.id);
-  await addItem(business.id, visit.session.id, menuItem.id);
-
-  const orderSession = await createOrderSession(business.id, cart.id, visit.session.id);
-  await markOrderSessionReady(orderSession.id);
+  assert(legacyOrder, "legacy kitchen order missing");
 
   console.log("Queue entry created after Order creation");
-  const order = await createOrderFromSession(orderSession.id);
-  const queueItem = await prisma.kitchenQueue.findUnique({ where: { orderId: order.id } });
+  const queueItem = await prisma.kitchenQueue.findUnique({
+    where: { orderId: legacyOrder.id },
+  });
   assert(queueItem, "kitchen queue entry should exist");
   console.log("  PASS");
 
@@ -94,12 +78,12 @@ async function main() {
   console.log("Queue retrieval works");
   const fetched = await getQueueItem(queueItem.id);
   assert(fetched.id === queueItem.id, "getQueueItem failed");
-  const queue = await getQueue(business.id);
+  const queue = await getQueue(business.id, { branchId });
   assert(
     queue.some((entry) => entry.id === queueItem.id),
     "getQueue failed",
   );
-  const byStatus = await listOrdersByStatus(business.id, "SERVED");
+  const byStatus = await listOrdersByStatus(business.id, "SERVED", branchId);
   assert(
     byStatus.some((entry) => entry.id === queueItem.id),
     "listOrdersByStatus failed",
@@ -108,8 +92,9 @@ async function main() {
 
   console.log("Cleanup");
   await prisma.kitchenQueue.delete({ where: { id: queueItem.id } });
-  await prisma.legacyOrderItem.deleteMany({ where: { orderId: order.id } });
-  await prisma.legacyOrder.delete({ where: { id: order.id } });
+  await prisma.legacyOrderItem.deleteMany({ where: { orderId: legacyOrder.id } });
+  await prisma.legacyOrder.delete({ where: { id: legacyOrder.id } });
+  await cleanupRestaurantOrder(prisma, order.id);
   await prisma.orderSession.delete({ where: { id: orderSession.id } });
   await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
   await prisma.cart.delete({ where: { id: cart.id } });
@@ -121,10 +106,7 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error("\nFIRST ERROR:", error instanceof Error ? error.message : error);
-    process.exit(1);
-  })
+  .catch(handleVerificationError)
   .finally(async () => {
     await prisma.$disconnect();
   });

@@ -10,4 +10,6 @@ export {
   recommendStaffing,
   predictLabourDemand,
   detectAttendanceIssues,
+  suggestTraining,
+  optimizeWorkforceAllocation,
 } from "@/modules/staff/ai/staff-ai-context";

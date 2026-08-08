@@ -455,6 +455,8 @@ export interface PosContextValue {
   selectOrder: (orderId: string | null) => void;
   searchOrders: (query: PosSearchQuery) => PosRecord[];
   refresh: () => void;
+  isRefreshing?: boolean;
+  error?: string | null;
 }
 
 export interface PosCartContextValue {

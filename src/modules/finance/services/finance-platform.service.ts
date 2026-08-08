@@ -1,57 +1,43 @@
-import { INVOICE_STATUSES } from "@/modules/finance/constants/finance-status";
-import { DEFAULT_FINANCE_SCOPE } from "@/modules/finance/constants/mock-data";
-import { financeRepository } from "@/modules/finance/repository/finance-repository";
-import type {
-  FinancePlatformContext,
-  FinanceRecord,
-} from "@/modules/finance/types/finance-platform";
+import "server-only";
 
-export interface FinancePlatformSnapshot {
-  context: FinancePlatformContext;
-  record: FinanceRecord;
-  revenueCents: number;
-  expenseCents: number;
-  netProfitCents: number;
-  accountsReceivableCents: number;
-  accountsPayableCents: number;
-  cashOnHandCents: number;
-  invoiceCount: number;
-  overdueInvoiceCount: number;
-  unpaidInvoiceCount: number;
-  grossMarginBps: number;
-}
+import { INVOICE_STATUSES } from "@/modules/finance/constants/finance-status";
+import { assertFinanceFeatureAccess } from "@/modules/finance/feature-access/guards/feature.guard";
+import { buildFinancePlatformContext } from "@/modules/finance/lib/finance-platform-context";
+import { financeRepository } from "@/modules/finance/repository/finance-repository";
+import type { FinancePlatformContext, FinancePlatformSnapshot } from "@/modules/finance/types/finance-platform";
 
 export interface FinancePlatformInput {
   tenantId?: string;
   workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
+  businessId: string;
+  branchId: string;
   userId?: string;
   currentPeriodId?: string;
   baseCurrency?: string;
 }
 
-export function buildFinancePlatformContext(
-  input: FinancePlatformInput = {},
-): FinancePlatformContext {
-  return {
-    tenantId: input.tenantId ?? DEFAULT_FINANCE_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_FINANCE_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_FINANCE_SCOPE.businessId,
-    branchId: input.branchId ?? DEFAULT_FINANCE_SCOPE.branchId,
-    userId: input.userId ?? DEFAULT_FINANCE_SCOPE.userId,
-    currentPeriodId: input.currentPeriodId ?? DEFAULT_FINANCE_SCOPE.currentPeriodId,
-    baseCurrency: input.baseCurrency ?? DEFAULT_FINANCE_SCOPE.baseCurrency,
-  };
-}
+export { buildFinancePlatformContext };
 
-export function buildFinancePlatformSnapshot(
-  input: FinancePlatformInput = {},
-): FinancePlatformSnapshot {
-  const context = buildFinancePlatformContext(input);
-  const record = financeRepository.getRecord();
-  const overdue = financeRepository.getOverdueInvoices();
-  const unpaid = financeRepository.getUnpaidInvoices();
+export async function buildFinancePlatformSnapshot(
+  context: FinancePlatformContext,
+): Promise<FinancePlatformSnapshot> {
+  await assertFinanceFeatureAccess(context.businessId);
+
+  const scope = {
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+    baseCurrency: context.baseCurrency,
+    currentPeriodId: context.currentPeriodId,
+  };
+
+  const [record, overdue, unpaid] = await Promise.all([
+    financeRepository.getRecord(scope),
+    financeRepository.getOverdueInvoices(scope),
+    financeRepository.getUnpaidInvoices(scope),
+  ]);
 
   return {
     context,
@@ -69,14 +55,20 @@ export function buildFinancePlatformSnapshot(
   };
 }
 
-export function getDefaultFinanceSnapshot(): FinancePlatformSnapshot {
-  return buildFinancePlatformSnapshot();
-}
+export async function getOpenInvoices(context: FinancePlatformContext) {
+  await assertFinanceFeatureAccess(context.businessId);
 
-export function getOpenInvoices(): FinanceRecord["invoices"] {
-  return financeRepository
-    .getRecord()
-    .invoices.filter(
-      (inv) => inv.status === INVOICE_STATUSES.SENT || inv.status === INVOICE_STATUSES.OVERDUE,
-    );
+  const record = await financeRepository.getRecord({
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+    baseCurrency: context.baseCurrency,
+    currentPeriodId: context.currentPeriodId,
+  });
+
+  return record.invoices.filter(
+    (invoice) => invoice.status === INVOICE_STATUSES.SENT || invoice.status === INVOICE_STATUSES.OVERDUE,
+  );
 }

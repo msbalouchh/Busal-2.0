@@ -1,5 +1,10 @@
 import "server-only";
 
+import { DOMAIN_EVENT_TYPES } from "@/modules/platform-orchestration/constants/domain-events";
+import {
+  moduleScopeFromPlatform,
+  publishModuleDomainEvent,
+} from "@/modules/platform-orchestration/lib/publish-module-event";
 import type { MenuTenantScope } from "@/modules/menu/lib/menu-scope";
 import {
   menuRepository,
@@ -81,14 +86,29 @@ export class MenuService {
     input: CreateMenuItemInput,
     context: MenuPlatformContext,
   ): Promise<MenuItemRecord> {
-    return menuRepository.createItem(resolveScope(context), input);
+    const record = await menuRepository.createItem(resolveScope(context), input);
+    await publishModuleDomainEvent(moduleScopeFromPlatform(resolveScope(context)), {
+      eventType: DOMAIN_EVENT_TYPES.MENU_ITEM_CREATED,
+      aggregateId: record.item.id,
+      payload: { menuItemId: record.item.id, name: record.item.name },
+    });
+    return record;
   }
 
   async updateItem(
     input: UpdateMenuItemInput,
     context: MenuPlatformContext,
   ): Promise<MenuItemRecord | null> {
-    return menuRepository.updateItem(resolveScope(context), input);
+    const record = await menuRepository.updateItem(resolveScope(context), input);
+    if (record) {
+      await publishModuleDomainEvent(moduleScopeFromPlatform(resolveScope(context)), {
+        eventType: DOMAIN_EVENT_TYPES.MENU_ITEM_UPDATED,
+        aggregateId: record.item.id,
+        payload: { menuItemId: record.item.id },
+        idempotencyKey: `menu.item.updated:${record.item.id}:${Date.now()}`,
+      });
+    }
+    return record;
   }
 
   async archiveItem(itemId: string, context: MenuPlatformContext): Promise<boolean> {

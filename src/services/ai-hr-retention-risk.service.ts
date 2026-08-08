@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { createHrInsight, createHrRecommendation } from "@/services/ai-hr-insight.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -93,34 +94,26 @@ export async function identifyAtRiskEmployees(ownerId: string): Promise<Retentio
 }
 
 export async function generateRetentionInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const atRisk = await identifyAtRiskEmployees(ownerId);
-  let created = 0;
-
-  const critical = atRisk.filter((e) => e.riskLevel === "CRITICAL" || e.riskLevel === "HIGH");
-  if (critical.length > 0) {
-    await createHrInsight(businessId, {
-      title: "Retention risk alert",
-      description: `${critical.length} employees show elevated departure risk.`,
-      category: "retention",
-      priority: "CRITICAL",
-      recommendation: critical.map((e) => e.name).join(", "),
-      metadata: { staffIds: critical.map((e) => e.staffId) },
-    });
-    created += 1;
-  }
-
-  for (const employee of critical.slice(0, 3)) {
-    await createHrRecommendation(businessId, {
-      staffId: employee.staffId,
-      title: `Retention action: ${employee.name}`,
-      description: `Risk factors: ${employee.factors.join(", ")}`,
-      action: "Schedule 1:1 check-in, review compensation, and address concerns proactively.",
-      confidenceScore: employee.riskScore,
-      metadata: { riskLevel: employee.riskLevel, factors: employee.factors },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "hr",
+    task: "retention-insights",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createHrInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "retention",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+    persistRecommendation: (businessId, recommendation) =>
+      createHrRecommendation(businessId, {
+        title: recommendation.title,
+        description: recommendation.description,
+        action: recommendation.action ?? recommendation.recommendation ?? "Review AI recommendation",
+        confidenceScore: recommendation.confidenceScore,
+        metadata: recommendation.metadata,
+      }),
+  });
 }

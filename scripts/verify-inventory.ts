@@ -2,18 +2,29 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PrismaClient } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
 import { PERMISSION_CODES } from "../src/modules/authorization/constants/permissions";
 import { formatInventoryMoney } from "../src/modules/inventory/utils/inventory-utils";
 import { calculateRecipeLineCostPence } from "../src/modules/inventory/utils/inventory-cost";
 import { INVENTORY_ROUTES } from "../src/modules/inventory/constants/routes";
-import { addItem, createCart } from "../src/services/cart.service";
+import { addItem, calculateSubtotal, createCart } from "../src/services/cart.service";
+import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
+import { ORDER_SOURCES, ORDER_TYPES } from "../src/modules/orders/constants/order-status";
+import { buildOrderScopeFromInput } from "../src/modules/orders/lib/order-scope";
+import { orderRepository } from "../src/modules/orders/repository/order-repository";
+import { createQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { runBatchTransaction } from "../src/lib/prisma-transaction";
+import { prisma } from "../src/lib/prisma";
+import type { OrderData } from "../src/services/order.service";
+import { connectWithRetry, handleVerificationError } from "./lib/verify-db";
+import { ensureVerificationTenantContext } from "./lib/verify-oms-order";
+import { getVerifyPrisma } from "./lib/verify-prisma";
 import {
   createStockAdjustment,
   deductStockForCompletedOrder,
 } from "../src/services/inventory-stock.service";
+import { syncLegacyOrderForKitchen } from "../src/services/kitchen-queue.service";
 import {
   createIngredient,
   ensureDefaultIngredientCategories,
@@ -21,10 +32,7 @@ import {
   getInventoryDashboard,
   listIngredientCategories,
 } from "../src/services/inventory.service";
-import { createOrderFromSession } from "../src/services/order.service";
-import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
-import { recordPayment } from "../src/services/payment.service";
-import { createQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { recordPaymentForBusiness } from "../src/modules/payments/services/payment-business-bridge.service";
 import {
   calculateMenuItemCostPence,
   getRecipeByMenuItem,
@@ -32,8 +40,12 @@ import {
 } from "../src/services/recipe.service";
 import { moneyDecimalToPence } from "../src/modules/payments/utils/currency";
 
-const prisma = new PrismaClient();
+const verifyPrisma = getVerifyPrisma();
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+
+function toNumber(value: { toNumber(): number } | number): number {
+  return typeof value === "number" ? value : value.toNumber();
+}
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -57,33 +69,270 @@ function assertNoForbiddenPatterns(filePath: string, forbiddenPatterns: string[]
   }
 }
 
-async function createInventoryOrder(businessId: string, ownerId: string, suffix: string) {
-  const qrCode = await createQRCode(ownerId, { slug: `inventory-${suffix}` });
-  const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
-    sessionToken: `inventory-token-${suffix}`,
-  });
-
-  const menuItem = await prisma.menuItem.create({
-    data: {
+async function ensureProductForMenuItem(
+  businessId: string,
+  menuItem: { id: string; name: string; price: number | { toNumber(): number } },
+): Promise<void> {
+  const existing = await verifyPrisma.product.findFirst({
+    where: {
       businessId,
-      name: `Inventory Verify Item ${suffix}`,
-      price: 25,
-      isAvailable: true,
+      OR: [{ id: menuItem.id }, { name: menuItem.name, status: "ACTIVE" }],
     },
     select: { id: true },
   });
 
-  const cart = await createCart(businessId, visit.session.id);
-  await addItem(businessId, visit.session.id, menuItem.id, 2);
+  if (existing) {
+    return;
+  }
 
-  const orderSession = await createOrderSession(businessId, cart.id, visit.session.id);
+  let category = await verifyPrisma.category.findFirst({
+    where: { businessId },
+    select: { id: true },
+  });
+
+  if (!category) {
+    const menu =
+      (await verifyPrisma.menu.findFirst({
+        where: { businessId },
+        select: { id: true },
+      })) ??
+      (await verifyPrisma.menu.create({
+        data: { businessId, name: "Verify Menu" },
+        select: { id: true },
+      }));
+
+    category = await verifyPrisma.category.create({
+      data: {
+        businessId,
+        menuId: menu.id,
+        name: "Verify Category",
+        slug: `verify-cat-${Date.now()}`,
+      },
+      select: { id: true },
+    });
+  }
+
+  const price = typeof menuItem.price === "number" ? menuItem.price : menuItem.price.toNumber();
+  const productSuffix = menuItem.id.slice(0, 8);
+
+  await verifyPrisma.product.create({
+    data: {
+      id: menuItem.id,
+      businessId,
+      categoryId: category.id,
+      sku: `SKU-${productSuffix}`,
+      slug: `product-${productSuffix}`,
+      name: menuItem.name,
+      status: "ACTIVE",
+      price,
+    },
+  });
+}
+
+async function resolveProductIdForMenuItem(
+  businessId: string,
+  menuItemId: string,
+  menuItemName: string,
+): Promise<string> {
+  const linkedProduct = await prisma.product.findFirst({
+    where: {
+      businessId,
+      OR: [{ id: menuItemId }, { name: menuItemName, status: "ACTIVE" }],
+    },
+    select: { id: true },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  if (!linkedProduct) {
+    throw new Error(`No active product found for menu item ${menuItemName}`);
+  }
+
+  return linkedProduct.id;
+}
+
+async function createOrderFromSessionForVerification(
+  orderSessionId: string,
+  branchId: string,
+): Promise<OrderData> {
+  const session = await prisma.orderSession.findUnique({
+    where: { id: orderSessionId },
+    include: {
+      cart: {
+        include: {
+          items: {
+            include: {
+              menuItem: { select: { id: true, name: true } },
+            },
+            orderBy: [{ createdAt: "asc" }],
+          },
+        },
+      },
+    },
+  });
+
+  if (!session) {
+    throw new Error("Order session not found");
+  }
+
+  const scope = buildOrderScopeFromInput({
+    businessId: session.businessId,
+    branchId,
+    userId: "pos-terminal",
+  });
+
+  const orderItems = await Promise.all(
+    session.cart.items.map(async (item) => ({
+      productId: await resolveProductIdForMenuItem(
+        session.businessId,
+        item.menuItemId,
+        item.menuItem.name,
+      ),
+      productName: item.menuItem.name,
+      quantity: item.quantity,
+      unitPricePence: Math.round(toNumber(item.unitPrice) * 100),
+      notes: item.notes,
+    })),
+  );
+
+  const record = await orderRepository.create(scope, {
+    tenantId: scope.tenantId,
+    workspaceId: scope.workspaceId,
+    businessId: scope.businessId,
+    branchId,
+    customerName: session.customerName,
+    orderType: ORDER_TYPES.DINE_IN,
+    source: ORDER_SOURCES.POS,
+    tableId: session.tableId,
+    notes: session.orderNotes,
+    items: orderItems,
+  });
+
+  await runBatchTransaction([
+    prisma.cart.update({
+      where: { id: session.cartId },
+      data: { status: "COMPLETED" },
+    }),
+    prisma.orderSession.update({
+      where: { id: session.id },
+      data: { status: "COMPLETED" },
+    }),
+  ]);
+
+  const subtotal = calculateSubtotal(
+    session.cart.items.map((item) => ({ totalPrice: toNumber(item.totalPrice) })),
+  );
+
+  return {
+    id: record.order.id,
+    businessId: record.order.businessId,
+    orderSessionId: session.id,
+    orderNumber: record.order.orderNumber,
+    fulfilmentType: "DINE_IN",
+    tableId: session.tableId,
+    customerName: session.customerName,
+    customerPhone: session.customerPhone,
+    notes: session.orderNotes,
+    subtotal,
+    discount: record.order.discountTotalPence / 100,
+    tax: record.order.taxTotalPence / 100,
+    total: record.order.totalPence / 100,
+    status: "PENDING",
+    items: record.items.map((item) => ({
+      id: item.id,
+      orderId: record.order.id,
+      menuItemId: item.productId,
+      nameSnapshot: item.productName,
+      unitPrice: item.unitPricePence / 100,
+      quantity: item.quantity,
+      totalPrice: item.lineTotalPence / 100,
+      notes: item.notes,
+      createdAt: new Date(record.order.createdAt),
+    })),
+    createdAt: new Date(record.order.createdAt),
+    updatedAt: new Date(record.order.updatedAt),
+  };
+}
+
+async function createInventoryOrder(businessId: string, ownerId: string, suffix: string) {
+  const { branchId } = await ensureVerificationTenantContext(verifyPrisma, businessId);
+  const slug = `inventory-${suffix}`;
+  const qrCode = await createQRCode(ownerId, { slug, branchId });
+  const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
+    sessionToken: `${slug}-token`,
+  });
+
+  const menuItem = await verifyPrisma.menuItem.create({
+    data: {
+      businessId,
+      branchId,
+      name: `Inventory Verify Item ${suffix}`,
+      price: 25,
+      isAvailable: true,
+    },
+    select: { id: true, name: true, price: true },
+  });
+
+  await ensureProductForMenuItem(businessId, menuItem);
+
+  const cart = await createCart(businessId, visit.session.id, branchId);
+  await addItem(businessId, visit.session.id, menuItem.id, 2, branchId);
+
+  const orderSession = await createOrderSession(businessId, cart.id, visit.session.id, {
+    branchId,
+  });
   await markOrderSessionReady(orderSession.id);
-  const order = await createOrderFromSession(orderSession.id);
 
-  return { order, menuItemId: menuItem.id };
+  const order = await createOrderFromSessionForVerification(orderSession.id, branchId);
+
+  const session = await prisma.orderSession.findUnique({
+    where: { id: orderSession.id },
+    include: {
+      cart: {
+        include: {
+          items: {
+            include: { menuItem: { select: { id: true, name: true } } },
+          },
+        },
+      },
+    },
+  });
+
+  if (!session) {
+    throw new Error("Order session missing after create");
+  }
+
+  const legacyOrderId = await syncLegacyOrderForKitchen({
+    businessId,
+    branchId,
+    orderSessionId: orderSession.id,
+    orderNumber: order.orderNumber,
+    tableId: session.tableId,
+    customerName: session.customerName,
+    customerPhone: session.customerPhone,
+    notes: session.orderNotes,
+    subtotal: order.subtotal,
+    discount: order.discount,
+    tax: order.tax,
+    total: order.total,
+    status: order.status,
+    items: session.cart.items.map((item) => ({
+      menuItemId: item.menuItemId,
+      nameSnapshot: item.menuItem.name,
+      unitPrice: toNumber(item.unitPrice),
+      quantity: item.quantity,
+      totalPrice: toNumber(item.totalPrice),
+      notes: item.notes,
+    })),
+  });
+
+  return { order, branchId, menuItemId: menuItem.id, legacyOrderId };
 }
 
 async function main() {
+  await connectWithRetry(verifyPrisma);
+  await prisma.$disconnect().catch(() => undefined);
+  await connectWithRetry(prisma);
+
   console.log("Module structure");
   const moduleFiles = [
     "src/modules/inventory/index.ts",
@@ -150,7 +399,7 @@ async function main() {
   assert(/costPricePence\s+Int/.test(schemaSource), "ingredient cost must be integer pence");
   console.log("  PASS");
 
-  const business = await prisma.business.findFirst({
+  const business = await verifyPrisma.business.findFirst({
     select: { id: true, ownerId: true },
   });
   assert(business, "No business found");
@@ -174,7 +423,11 @@ async function main() {
   assert(ingredient.currentStock === "10", "ingredient stock mismatch");
   console.log("  PASS");
 
-  const { order, menuItemId } = await createInventoryOrder(business.id, business.ownerId, suffix);
+  const { order, menuItemId, branchId, legacyOrderId } = await createInventoryOrder(
+    business.id,
+    business.ownerId,
+    suffix,
+  );
 
   console.log("Recipe management");
   const recipe = await upsertRecipe(business.id, null, {
@@ -187,11 +440,11 @@ async function main() {
         wastePercent: "0",
       },
     ],
-  });
+  }, branchId);
   assert(recipe.lines.length === 1, "recipe line missing");
   assertIntegerPenceValue(recipe.totalCostPence, "recipe total cost");
   assert(recipe.totalCostPence === 500, "recipe total cost mismatch");
-  const menuItemCost = await calculateMenuItemCostPence(menuItemId, business.id);
+  const menuItemCost = await calculateMenuItemCostPence(menuItemId, business.id, branchId);
   assert(menuItemCost === 500, "menu item cost mismatch");
   console.log("  PASS");
 
@@ -207,29 +460,35 @@ async function main() {
   console.log("  PASS");
 
   console.log("Stock deduction on completed payment");
-  const orderRecord = await prisma.legacyOrder.findUnique({
+  const orderRecord = await verifyPrisma.restaurantOrder.findUnique({
     where: { id: order.id },
-    select: { total: true },
+    select: { totalAmount: true },
   });
   assert(orderRecord, "order record missing");
-  const orderTotalPence = moneyDecimalToPence(orderRecord.total);
+  const orderTotalPence = moneyDecimalToPence(orderRecord.totalAmount);
 
-  await recordPayment(business.id, order.id, null, {
+  await recordPaymentForBusiness(business.id, order.id, {
     method: "CARD",
     amountPence: orderTotalPence,
     amountTenderedPence: orderTotalPence,
+  }, branchId);
+
+  await verifyPrisma.restaurantOrder.update({
+    where: { id: order.id },
+    data: { status: "COMPLETED", completedAt: new Date() },
   });
+  await deductStockForCompletedOrder(business.id, order.id, null, null, branchId);
 
   const afterPayment = await getIngredient(ingredient.id, business.id);
   assert(afterPayment.currentStock === "7", "sale deduction stock mismatch");
 
-  const deductionRecord = await prisma.orderStockDeduction.findUnique({
-    where: { orderId: order.id },
+  const deductionRecord = await verifyPrisma.orderStockDeduction.findUnique({
+    where: { orderId: legacyOrderId },
   });
   assert(deductionRecord, "order stock deduction record missing");
 
-  const saleMovements = await prisma.stockMovement.findMany({
-    where: { orderId: order.id, movementType: "SALE_DEDUCTION" },
+  const saleMovements = await verifyPrisma.stockMovement.findMany({
+    where: { orderId: legacyOrderId, movementType: "SALE_DEDUCTION" },
   });
   assert(saleMovements.length === 1, "sale movement missing");
   assert(saleMovements[0]?.quantityChange.toString() === "-2", "deducted quantity mismatch");
@@ -252,8 +511,8 @@ async function main() {
 
   console.log("Idempotent stock deduction");
   await deductStockForCompletedOrder(business.id, order.id, null);
-  const movementCount = await prisma.stockMovement.count({
-    where: { orderId: order.id, movementType: "SALE_DEDUCTION" },
+  const movementCount = await verifyPrisma.stockMovement.count({
+    where: { orderId: legacyOrderId, movementType: "SALE_DEDUCTION" },
   });
   assert(movementCount === 1, "duplicate stock deduction should not occur");
   console.log("  PASS");
@@ -265,7 +524,7 @@ async function main() {
   console.log("  PASS");
 
   console.log("Business isolation");
-  const otherBusiness = await prisma.business.findFirst({
+  const otherBusiness = await verifyPrisma.business.findFirst({
     where: { id: { not: business.id } },
     select: { id: true },
   });
@@ -287,10 +546,7 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
+  .catch(handleVerificationError)
   .finally(async () => {
-    await prisma.$disconnect();
+    await verifyPrisma.$disconnect();
   });

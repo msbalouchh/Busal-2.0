@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { VoiceIntentDefinition } from "@/modules/ai-voice-agent-management/types/ai-voice-agent-types";
+import { runCentralAiInsightForOwner } from "@/services/ai-engine-bridge.service";
 
 export interface IntentDetectionResult {
   intent: string;
@@ -70,119 +71,109 @@ const VOICE_INTENTS: VoiceIntentDefinition[] = [
   },
 ];
 
-const INTENT_PATTERNS: Array<{
-  intent: string;
-  patterns: RegExp[];
-  action: string;
-  routePath: string | null;
-  responseTemplate: string | ((params: Record<string, string>) => string);
-}> = [
-  {
-    intent: "show_today_sales",
-    patterns: [/today'?s?\s+sales/i, /show\s+sales/i, /sales\s+today/i],
+const INTENT_ROUTE_MAP: Record<
+  string,
+  { action: string; routePath: string | null; responseTemplate: string }
+> = {
+  show_today_sales: {
     action: "navigate:sales_analytics",
     routePath: "/app/restaurant/analytics/sales",
     responseTemplate: "Opening today's sales analytics.",
   },
-  {
-    intent: "open_reservations",
-    patterns: [/open\s+reservations?/i, /show\s+reservations?/i, /view\s+bookings?/i],
+  open_reservations: {
     action: "navigate:reservations",
     routePath: "/app/restaurant/reservations",
     responseTemplate: "Opening reservations.",
   },
-  {
-    intent: "create_order",
-    patterns: [/create\s+(a\s+)?new\s+order/i, /new\s+order/i, /start\s+an?\s+order/i],
+  create_order: {
     action: "navigate:new_order",
     routePath: "/app/restaurant/orders/new",
     responseTemplate: "Opening new order screen.",
   },
-  {
-    intent: "find_customer",
-    patterns: [
-      /find\s+customer\s+(.+)/i,
-      /search\s+customer\s+(.+)/i,
-      /look\s+up\s+customer\s+(.+)/i,
-    ],
+  find_customer: {
     action: "navigate:customer_search",
     routePath: "/app/restaurant/customers",
-    responseTemplate: (params) =>
-      params.customerName
-        ? `Searching for customer ${params.customerName}.`
-        : "Opening customer search.",
+    responseTemplate: "Opening customer search.",
   },
-  {
-    intent: "check_inventory",
-    patterns: [/check\s+inventory/i, /show\s+inventory/i, /inventory\s+status/i],
+  check_inventory: {
     action: "navigate:inventory",
     routePath: "/app/restaurant/inventory",
     responseTemplate: "Opening inventory overview.",
   },
-  {
-    intent: "generate_daily_report",
-    patterns: [/generate\s+daily\s+report/i, /daily\s+report/i, /create\s+today'?s?\s+report/i],
+  generate_daily_report: {
     action: "navigate:reports",
     routePath: "/app/restaurant/analytics/reports",
     responseTemplate: "Opening reports to generate your daily summary.",
   },
-  {
-    intent: "show_low_stock",
-    patterns: [/low\s+stock/i, /running\s+low/i, /show\s+low\s+stock/i],
+  show_low_stock: {
     action: "navigate:low_stock",
     routePath: "/app/restaurant/inventory",
     responseTemplate: "Opening inventory to show low stock items.",
   },
-  {
-    intent: "summarize_business",
-    patterns: [/summarize\s+today'?s?\s+business/i, /business\s+summary/i, /how\s+is\s+business/i],
+  summarize_business: {
     action: "navigate:executive_dashboard",
     routePath: "/app/restaurant/analytics",
     responseTemplate: "Opening business analytics summary.",
   },
-];
+};
 
 export function listVoiceIntents(): VoiceIntentDefinition[] {
   return VOICE_INTENTS;
 }
 
-export function detectVoiceIntent(commandText: string): IntentDetectionResult {
+/** Routes voice intent detection through the centralized AI engine. */
+export async function detectVoiceIntent(
+  ownerId: string,
+  commandText: string,
+): Promise<IntentDetectionResult> {
   const normalized = commandText.trim();
 
-  for (const pattern of INTENT_PATTERNS) {
-    for (const regex of pattern.patterns) {
-      const match = normalized.match(regex);
-      if (match) {
-        const parameters: Record<string, string> = {};
-        if (pattern.intent === "find_customer" && match[1]) {
-          parameters.customerName = match[1].trim();
-        }
+  const engineResult = await runCentralAiInsightForOwner(ownerId, {
+    currentModule: "voice",
+    prompt: `Detect voice command intent for: "${normalized}"`,
+    contextData: {
+      commandText: normalized,
+      availableIntents: VOICE_INTENTS,
+    },
+    responseFormat: "json",
+  });
 
-        const responseText =
-          typeof pattern.responseTemplate === "function"
-            ? pattern.responseTemplate(parameters)
-            : pattern.responseTemplate;
-
-        return {
-          intent: pattern.intent,
-          confidence: 0.92,
-          action: pattern.action,
-          routePath: pattern.routePath,
-          responseText,
-          parameters,
-        };
+  const parsed = engineResult.parsed as
+    | {
+        intent?: string;
+        confidence?: number;
+        parameters?: Record<string, string>;
+        responseText?: string;
       }
-    }
+    | undefined;
+
+  const intent = parsed?.intent ?? "unknown";
+  const route = INTENT_ROUTE_MAP[intent];
+
+  if (route) {
+    return {
+      intent,
+      confidence: parsed?.confidence ?? 0.9,
+      action: route.action,
+      routePath: route.routePath,
+      responseText:
+        parsed?.responseText ??
+        (parsed?.parameters?.customerName
+          ? `Searching for customer ${parsed.parameters.customerName}.`
+          : route.responseTemplate),
+      parameters: parsed?.parameters ?? {},
+    };
   }
 
   return {
     intent: "unknown",
-    confidence: 0.2,
+    confidence: parsed?.confidence ?? 0.2,
     action: "fallback:unknown_intent",
     routePath: null,
     responseText:
+      parsed?.responseText ??
       "I didn't recognize that command. Try phrases like 'Show today's sales' or 'Open reservations'.",
-    parameters: {},
+    parameters: parsed?.parameters ?? {},
   };
 }
 

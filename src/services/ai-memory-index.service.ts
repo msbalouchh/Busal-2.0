@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { MemoryEmbeddingResult } from "@/modules/ai-memory-management/interfaces/memory-provider.interface";
 import { updateMemory } from "@/services/ai-memory.service";
 

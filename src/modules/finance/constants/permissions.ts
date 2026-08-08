@@ -1,0 +1,13 @@
+import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
+
+/** Finance permission aliases mapped to platform authorization codes. */
+export const FINANCE_MODULE_PERMISSIONS = {
+  FINANCE_READ: PERMISSION_CODES.REVENUE_VIEW,
+  FINANCE_CREATE: PERMISSION_CODES.INVOICES_MANAGE,
+  FINANCE_UPDATE: PERMISSION_CODES.EXPENSES_MANAGE,
+  FINANCE_DELETE: PERMISSION_CODES.REVENUE_MANAGE,
+  FINANCE_APPROVE: PERMISSION_CODES.REVENUE_MANAGE,
+} as const;
+
+export type FinanceModulePermissionCode =
+  (typeof FINANCE_MODULE_PERMISSIONS)[keyof typeof FINANCE_MODULE_PERMISSIONS];

@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import { getPlatformAgentDefinition } from "@/modules/ai-agent-platform-management/engine/agent-registry";
 import { ensurePlatformAiProviders } from "@/modules/ai-agent-platform-management/engine/bootstrap-platform-providers";
 import type { IAIAgent } from "@/modules/ai-agent-platform-management/interfaces/ai-agent.interface";

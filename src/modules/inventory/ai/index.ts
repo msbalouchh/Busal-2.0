@@ -13,4 +13,5 @@ export {
   detectInventoryWaste,
   suggestReorderQuantity,
   optimizeStockLevels,
+  predictExpiryRisk,
 } from "@/modules/inventory/ai/inventory-ai-context";

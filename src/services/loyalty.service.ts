@@ -116,16 +116,16 @@ export async function earnPointsForOrder(
     return;
   }
 
-  const order = await prisma.legacyOrder.findFirst({
+  const order = await prisma.restaurantOrder.findFirst({
     where: { id: orderId, businessId },
-    select: { total: true },
+    select: { totalAmount: true },
   });
 
   if (!order) {
     return;
   }
 
-  const orderTotalPence = moneyDecimalToPence(order.total);
+  const orderTotalPence = moneyDecimalToPence(order.totalAmount);
   const pointsToEarn = calculateEarnPoints(orderTotalPence, program.earnPointsPerPound);
 
   if (pointsToEarn <= 0) {

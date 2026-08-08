@@ -24,6 +24,7 @@ export const PLATFORM_PUBLIC_API_ROUTES = [
   "/api/auth/logout",
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
+  "/api/auth/resend-verification",
   "/api/auth/google",
   "/api/portal/auth/login",
   "/api/portal/auth/register",

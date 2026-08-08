@@ -148,8 +148,21 @@ export async function ensureUserAndBusiness(
     })
     .then(async (result) => {
       if (result.created.business) {
-        const { ensureTenantPlatformDefaults } = await import("@/services/tenant-platform.service");
-        await ensureTenantPlatformDefaults(result.business.id);
+        const { tenantFoundationService } = await import(
+          "@/modules/tenant/services/tenant-foundation.service"
+        );
+        const { prisma: db } = await import("@/lib/prisma");
+
+        const branchCount = await db.branch.count({ where: { businessId: result.business.id } });
+        if (branchCount === 0) {
+          await tenantFoundationService.createBusinessBranch({
+            businessId: result.business.id,
+            name: "Main Branch",
+            isMain: true,
+          });
+        }
+
+        await tenantFoundationService.provisionCommercialStack(result.business.id, "starter");
       }
 
       return result;

@@ -2,13 +2,24 @@
 
 import { Mail } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { ROUTES } from "@/constants/routes";
 import { AuthSubmitButton } from "@/modules/auth/components/auth-submit-button";
+import { fetchSession } from "@/modules/auth/lib/auth.client";
 import { useResendVerificationEmail } from "@/modules/auth/hooks/use-auth";
 
 export function VerifyEmailPanel() {
   const resend = useResendVerificationEmail();
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetchSession().then((session) => {
+      if (session?.email) {
+        setEmail(session.email);
+      }
+    });
+  }, []);
 
   return (
     <div className="auth-verify">
@@ -17,15 +28,21 @@ export function VerifyEmailPanel() {
       </div>
 
       <p className="auth-verify__message">
-        We sent a verification link to your inbox. Open the email and confirm your address to
-        activate your Busal OS workspace.
+        We sent a verification link to your inbox
+        {email ? ` (${email})` : ""}. Open the email and confirm your address to activate your
+        Busal OS workspace.
       </p>
 
       <AuthSubmitButton
         type="button"
         isLoading={resend.isPending}
         loadingLabel="Sending…"
-        onClick={() => resend.mutate("operator@getbusal.com")}
+        disabled={!email}
+        onClick={() => {
+          if (email) {
+            resend.mutate(email);
+          }
+        }}
       >
         Resend verification email
       </AuthSubmitButton>

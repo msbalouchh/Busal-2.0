@@ -14,11 +14,8 @@ import { RECEIPT_ROUTES } from "../src/modules/receipts/constants/routes";
 import { formatReceiptMoney } from "../src/modules/receipts/utils/receipt-utils";
 import { buildReceiptTemplateData } from "../src/modules/receipts/utils/templates/template-renderer";
 import { generateReceiptPdf } from "../src/modules/receipts/utils/pdf/generate-receipt-pdf";
-import { addItem, createCart } from "../src/services/cart.service";
-import { createOrderFromSession } from "../src/services/order.service";
-import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
-import { recordPayment } from "../src/services/payment.service";
-import { createQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { createOmsOrderFromQrFlow } from "./lib/verify-oms-order";
+import { recordPaymentForBusiness } from "../src/modules/payments/services/payment-business-bridge.service";
 import {
   createReceiptForPayment,
   getReceipt,
@@ -56,29 +53,15 @@ function assertNoForbiddenPatterns(filePath: string, forbiddenPatterns: string[]
 }
 
 async function createPayableOrder(businessId: string, ownerId: string, suffix: string) {
-  const qrCode = await createQRCode(ownerId, { slug: `receipts-${suffix}` });
-  const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
-    sessionToken: `receipts-token-${suffix}`,
-  });
+  const { order, branchId, qrCode, menuItem } = await createOmsOrderFromQrFlow(
+    prisma,
+    businessId,
+    ownerId,
+    suffix,
+    { slugPrefix: "receipts", quantity: 2, price: 30 },
+  );
 
-  const menuItem = await prisma.menuItem.create({
-    data: {
-      businessId,
-      name: `Receipt Verify Item ${suffix}`,
-      price: 30,
-      isAvailable: true,
-    },
-    select: { id: true },
-  });
-
-  const cart = await createCart(businessId, visit.session.id);
-  await addItem(businessId, visit.session.id, menuItem.id, 2);
-
-  const orderSession = await createOrderSession(businessId, cart.id, visit.session.id);
-  await markOrderSessionReady(orderSession.id);
-  const order = await createOrderFromSession(orderSession.id);
-
-  return { order, qrCodeId: qrCode.id, menuItemId: menuItem.id };
+  return { order, branchId, qrCodeId: qrCode.id, menuItemId: menuItem.id };
 }
 
 async function main() {
@@ -154,12 +137,9 @@ async function main() {
 
   console.log("Schema pence storage");
   const schemaSource = readFileSync(join(root, "prisma/schema.prisma"), "utf8");
-  assert(schemaSource.includes("subtotalPence    Int"), "receipt subtotal must be integer pence");
-  assert(schemaSource.includes("paymentAmountPence Int"), "payment amount must be integer pence");
-  assert(
-    schemaSource.includes("unitPricePence Int"),
-    "receipt item unit price must be integer pence",
-  );
+  assert(/subtotalPence\s+Int/.test(schemaSource), "receipt subtotal must be integer pence");
+  assert(/paymentAmountPence\s+Int/.test(schemaSource), "payment amount must be integer pence");
+  assert(/unitPricePence\s+Int/.test(schemaSource), "receipt item unit price must be integer pence");
   console.log("  PASS");
 
   console.log("UI centralized GBP formatting");
@@ -179,22 +159,28 @@ async function main() {
   assert(business, "No business found");
 
   const suffix = Date.now().toString();
-  const { order } = await createPayableOrder(business.id, business.ownerId, suffix);
-  const orderRecord = await prisma.legacyOrder.findUnique({
+  const { order, branchId } = await createPayableOrder(business.id, business.ownerId, suffix);
+  const orderRecord = await prisma.restaurantOrder.findUnique({
     where: { id: order.id },
-    select: { total: true, subtotal: true, discount: true, tax: true, orderNumber: true },
+    select: {
+      totalAmount: true,
+      subtotal: true,
+      discountAmount: true,
+      taxAmount: true,
+      orderNumber: true,
+    },
   });
   assert(orderRecord, "order record missing");
-  const orderTotalPence = moneyDecimalToPence(orderRecord.total);
+  const orderTotalPence = moneyDecimalToPence(orderRecord.totalAmount);
 
   console.log("Receipt creation after payment");
-  const paymentResult = await recordPayment(business.id, order.id, null, {
+  const paymentResult = await recordPaymentForBusiness(business.id, order.id, {
     method: "CASH",
     amountPence: orderTotalPence,
     amountTenderedPence: orderTotalPence + 500,
-  });
-  assert(paymentResult.receiptId, "payment should return receiptId");
-  const receipt = await getReceipt(paymentResult.receiptId, business.id);
+  }, branchId);
+  assert(paymentResult.payment, "payment record missing");
+  const receipt = await createReceiptForPayment(business.id, paymentResult.payment.id, null);
   assert(receipt.paymentId === paymentResult.payment.id, "receipt payment link failed");
   assert(receipt.receiptNumber.startsWith("R-"), "receipt number format failed");
   assert(receipt.currency === "GBP", "receipt currency should be GBP");

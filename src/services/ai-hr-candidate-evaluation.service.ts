@@ -1,7 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { createHrRecommendation } from "@/services/ai-hr-insight.service";
+import { createHrInsight, createHrRecommendation } from "@/services/ai-hr-insight.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -53,20 +54,26 @@ export async function evaluatePendingCandidates(ownerId: string): Promise<Candid
 }
 
 export async function generateCandidateRecommendations(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const evaluations = await evaluatePendingCandidates(ownerId);
-  let created = 0;
-
-  for (const candidate of evaluations.filter((c) => c.score < 0.6).slice(0, 5)) {
-    await createHrRecommendation(businessId, {
-      title: `Candidate follow-up: ${candidate.email}`,
-      description: candidate.assessment,
-      action: candidate.recommendation,
-      confidenceScore: candidate.score,
-      metadata: { invitationId: candidate.invitationId, type: "candidate_evaluation" },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "hr",
+    task: "candidate-recommendations",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createHrInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "recruitment",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+    persistRecommendation: (businessId, recommendation) =>
+      createHrRecommendation(businessId, {
+        title: recommendation.title,
+        description: recommendation.description,
+        action: recommendation.action ?? recommendation.recommendation ?? "Review AI recommendation",
+        confidenceScore: recommendation.confidenceScore,
+        metadata: recommendation.metadata,
+      }),
+  });
 }

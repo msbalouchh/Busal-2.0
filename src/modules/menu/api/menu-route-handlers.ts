@@ -143,11 +143,39 @@ export async function handleMenuItemAiInsights(_request: Request, itemId: string
     const platform = await protectedRoute({ permission: MENU_PERMISSIONS.MENU_READ });
     const context = toMenuPlatformContext(resolveMenuScope(platform));
     const { buildMenuItemAiContext } = await import("@/modules/menu/services/menu-ai.service");
-    const insights = await buildMenuItemAiContext(itemId, context);
+    const baseInsights = await buildMenuItemAiContext(itemId, context);
 
-    if (!insights) {
+    if (!baseInsights) {
       return NextResponse.json({ success: false, error: "Item not found" }, { status: 404 });
     }
+
+    const { aiEngine } = await import("@/modules/ai-engine/engine/ai-engine");
+    const aiInsight = await aiEngine.generateInsight(platform, {
+      currentModule: "menu",
+      prompt: `Analyze this menu item and return JSON with keys: summary, insights (array), upsellSuggestions (array), recommendedActions (array), pricingRecommendationPence (number|null). Item data: ${JSON.stringify(baseInsights)}`,
+      contextData: { itemId, baseInsights },
+      responseFormat: "json",
+    }).catch(() => null);
+
+    const insights = aiInsight?.parsed
+      ? {
+          ...baseInsights,
+          summary: String(aiInsight.parsed.summary ?? baseInsights.summary),
+          insights: Array.isArray(aiInsight.parsed.insights)
+            ? (aiInsight.parsed.insights as string[])
+            : baseInsights.insights,
+          upsellSuggestions: Array.isArray(aiInsight.parsed.upsellSuggestions)
+            ? (aiInsight.parsed.upsellSuggestions as string[])
+            : baseInsights.upsellSuggestions,
+          recommendedActions: Array.isArray(aiInsight.parsed.recommendedActions)
+            ? (aiInsight.parsed.recommendedActions as string[])
+            : baseInsights.recommendedActions,
+          pricingRecommendationPence:
+            typeof aiInsight.parsed.pricingRecommendationPence === "number"
+              ? aiInsight.parsed.pricingRecommendationPence
+              : baseInsights.pricingRecommendationPence,
+        }
+      : baseInsights;
 
     return jsonSuccess(insights);
   } catch (error) {

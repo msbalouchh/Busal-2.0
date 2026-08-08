@@ -290,22 +290,28 @@ export async function getCustomerOrderHistory(
 ): Promise<CustomerOrderHistory> {
   await getCustomer(customerId, businessId);
 
-  const orders = await prisma.legacyOrder.findMany({
+  const orders = await prisma.restaurantOrder.findMany({
     where: { customerId, businessId, ...branchFilter(branchId), status: "COMPLETED" },
     include: {
-      items: { select: { nameSnapshot: true, quantity: true } },
+      items: { select: { productNameSnapshot: true, quantity: true } },
     },
-    orderBy: [{ createdAt: "desc" }],
+    orderBy: [{ completedAt: "desc" }],
   });
 
-  const totalSpentPence = orders.reduce((sum, order) => sum + moneyDecimalToPence(order.total), 0);
+  const totalSpentPence = orders.reduce(
+    (sum, order) => sum + moneyDecimalToPence(order.totalAmount),
+    0,
+  );
   const totalOrders = orders.length;
   const averageOrderValuePence = totalOrders > 0 ? Math.trunc(totalSpentPence / totalOrders) : 0;
 
   const itemCounts = new Map<string, number>();
   for (const order of orders) {
     for (const item of order.items) {
-      itemCounts.set(item.nameSnapshot, (itemCounts.get(item.nameSnapshot) ?? 0) + item.quantity);
+      itemCounts.set(
+        item.productNameSnapshot,
+        (itemCounts.get(item.productNameSnapshot) ?? 0) + item.quantity,
+      );
     }
   }
 
@@ -318,7 +324,7 @@ export async function getCustomerOrderHistory(
     totalOrders,
     totalSpentPence,
     averageOrderValuePence,
-    lastOrderAt: orders[0]?.createdAt.toISOString() ?? null,
+    lastOrderAt: orders[0]?.completedAt?.toISOString() ?? orders[0]?.placedAt.toISOString() ?? null,
     favouriteItems,
   };
 }
@@ -370,15 +376,14 @@ export async function processCrmForCompletedOrder(
   staffId: string | null,
   paymentId?: string | null,
 ): Promise<void> {
-  const order = await prisma.legacyOrder.findFirst({
+  const order = await prisma.restaurantOrder.findFirst({
     where: { id: orderId, businessId },
     select: {
       id: true,
       orderNumber: true,
-      customerName: true,
-      customerPhone: true,
       customerId: true,
-      total: true,
+      totalAmount: true,
+      customer: { select: { name: true, phone: true } },
     },
   });
 
@@ -386,14 +391,18 @@ export async function processCrmForCompletedOrder(
     return;
   }
 
-  const customerId = await findOrCreateCustomerFromOrder(businessId, order);
+  const customerId = await findOrCreateCustomerFromOrder(businessId, {
+    customerId: order.customerId,
+    customerName: order.customer?.name ?? null,
+    customerPhone: order.customer?.phone ?? null,
+  });
 
   if (!customerId) {
     return;
   }
 
   if (!order.customerId) {
-    await prisma.legacyOrder.update({
+    await prisma.restaurantOrder.update({
       where: { id: orderId },
       data: { customerId },
     });

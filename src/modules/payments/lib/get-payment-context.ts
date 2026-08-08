@@ -6,12 +6,15 @@ import {
   serializePaymentOrderContext,
   serializeUnpaidOrder,
 } from "@/modules/payments/utils/payment-utils";
-import { getPaymentOrderContext, listUnpaidOrders } from "@/services/payment.service";
+import {
+  getPaymentOrderContextForBusiness,
+  listUnpaidOrdersForBusiness,
+} from "@/modules/payments/services/payment-business-bridge.service";
 import { prisma } from "@/lib/prisma";
 
 export const getPaymentsModuleContext = cache(async () => {
   const context = await protectedPage({ permission: PERMISSION_CODES.PAYMENT_CREATE });
-  const unpaidOrders = await listUnpaidOrders(context.business.id, context.branchId);
+  const unpaidOrders = await listUnpaidOrdersForBusiness(context.business.id, context.branchId);
 
   return {
     context,
@@ -22,7 +25,11 @@ export const getPaymentsModuleContext = cache(async () => {
 export const getPaymentOrderPageContext = cache(async (orderId: string) => {
   const context = await protectedPage({ permission: PERMISSION_CODES.PAYMENT_CREATE });
 
-  const { order, summary } = await getPaymentOrderContext(orderId, context.business.id);
+  const { order, summary } = await getPaymentOrderContextForBusiness(
+    orderId,
+    context.business.id,
+    context.branchId,
+  );
 
   const table = order.tableId
     ? await prisma.legacyTable.findUnique({

@@ -1,9 +1,9 @@
 import type { ReservationSource, ReservationStatus } from "@prisma/client";
 
-import type { ReservationData } from "@/services/reservation.service";
+import type { ClientReservationData } from "@/modules/reservations/lib/reservation-mappers";
 
 export type ClientReservation = Omit<
-  ReservationData,
+  ClientReservationData,
   "reservationDate" | "createdAt" | "updatedAt"
 > & {
   reservationDate: string;
@@ -11,7 +11,7 @@ export type ClientReservation = Omit<
   updatedAt: string;
 };
 
-export function serializeReservation(reservation: ReservationData): ClientReservation {
+export function serializeReservation(reservation: ClientReservationData): ClientReservation {
   return {
     ...reservation,
     reservationDate: reservation.reservationDate.toISOString(),
@@ -87,4 +87,8 @@ export function computeReservationStats(reservations: ClientReservation[]): Rese
     cancelled: reservations.filter((item) => item.status === "CANCELLED").length,
     noShow: reservations.filter((item) => item.status === "NO_SHOW").length,
   };
+}
+
+export function mapPrismaSourceToForm(source: ReservationSource): ReservationSource {
+  return source;
 }

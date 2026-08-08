@@ -6,6 +6,7 @@ import {
   getExecutiveDashboard,
 } from "@/services/restaurant-analytics.service";
 import { createOperationInsight } from "@/services/ai-operations-efficiency-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import {
   defaultAnalyticsFilters,
   weekAnalyticsFilters,
@@ -73,23 +74,18 @@ export async function getOperationalTrendSnapshot(
 }
 
 export async function generateTrendInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const trends = await getOperationalTrendSnapshot(ownerId);
-  let created = 0;
-
-  await createOperationInsight(businessId, {
-    title: "Operational trend summary",
-    description: trends.summary,
-    category: "trend",
-    priority: "MEDIUM",
-    recommendation:
-      "Compare daily metrics against weekly baseline to adjust staffing and inventory.",
-    metadata: {
-      orderPoints: trends.orderTrend.length,
-      avgPrepMinutes: trends.kitchenPrepMinutes,
-    },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "operations",
+    task: "trend-insights",
+    loadContext: getOperationalTrendSnapshot,
+    persistInsight: (businessId, insight) =>
+      createOperationInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "trend",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  return created;
 }

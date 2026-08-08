@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createOperationInsight } from "@/services/ai-operations-efficiency-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getWorkflowSnapshot } from "@/services/ai-operations-workflow-analysis.service";
 import { getResourceUtilizationSnapshot } from "@/services/ai-operations-resource-optimization.service";
 import { getInventoryHealthSnapshot } from "@/services/ai-operations-inventory-health.service";
@@ -73,20 +74,18 @@ export async function getOperationalHealthSnapshot(
 }
 
 export async function generateOperationalHealthInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getOperationalHealthSnapshot(ownerId);
-  let created = 0;
-
-  await createOperationInsight(businessId, {
-    title: "Operational health score",
-    description: `Health: ${snapshot.healthScore}% (${snapshot.healthLabel}). ${snapshot.bottleneckCount} bottlenecks · ${snapshot.lowStockCount} low-stock items.`,
-    category: "health",
-    priority:
-      snapshot.healthScore < 40 ? "CRITICAL" : snapshot.healthScore < 60 ? "HIGH" : "MEDIUM",
-    recommendation: "Address bottlenecks and inventory gaps to improve operational health.",
-    metadata: { healthScore: snapshot.healthScore },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "operations",
+    task: "operational-health-insights",
+    loadContext: getOperationalHealthSnapshot,
+    persistInsight: (businessId, insight) =>
+      createOperationInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "health",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  return created;
 }

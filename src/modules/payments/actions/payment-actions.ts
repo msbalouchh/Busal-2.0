@@ -7,11 +7,11 @@ import { protectedAction } from "@/modules/platform-guards/guards/action.guards"
 import { PAYMENT_ROUTES } from "@/modules/payments/constants/routes";
 import { serializePaymentSummary } from "@/modules/payments/utils/payment-utils";
 import {
-  getOrderPaymentSummary,
-  recordPayment,
-  refundPaymentPlaceholder,
-  voidPayment,
-} from "@/services/payment.service";
+  getOrderPaymentSummaryForBusiness,
+  recordPaymentForBusiness,
+  refundPaymentForBusiness,
+  voidPaymentForBusiness,
+} from "@/modules/payments/services/payment-business-bridge.service";
 import type { PaymentMethodOption } from "@/modules/payments/constants/routes";
 
 function revalidatePaymentPaths(orderId?: string) {
@@ -31,10 +31,9 @@ export async function recordPaymentAction(input: {
   return protectedAction(
     { all: [PERMISSION_CODES.PAYMENT_CREATE, PERMISSION_CODES.POS_USE] },
     async ({ business, platform }) => {
-      const result = await recordPayment(
+      const result = await recordPaymentForBusiness(
         business.id,
         input.orderId,
-        platform.staffSession?.staffId ?? null,
         {
           method: input.method,
           amountPence: input.amountPence,
@@ -56,8 +55,8 @@ export async function recordPaymentAction(input: {
 }
 
 export async function voidPaymentAction(input: { paymentId: string; orderId: string }) {
-  return protectedAction(PERMISSION_CODES.PAYMENT_CREATE, async ({ business }) => {
-    const summary = await voidPayment(input.paymentId, business.id);
+  return protectedAction(PERMISSION_CODES.PAYMENT_CREATE, async ({ business, platform }) => {
+    const summary = await voidPaymentForBusiness(input.paymentId, business.id, platform.branchId);
     revalidatePaymentPaths(input.orderId);
 
     return {
@@ -69,13 +68,17 @@ export async function voidPaymentAction(input: { paymentId: string; orderId: str
 
 export async function refundPaymentAction(input: { paymentId: string }) {
   return protectedAction(PERMISSION_CODES.PAYMENT_REFUND, async ({ business }) => {
-    await refundPaymentPlaceholder(input.paymentId, business.id);
+    await refundPaymentForBusiness(input.paymentId, business.id);
   });
 }
 
 export async function fetchPaymentSummaryAction(input: { orderId: string }) {
-  return protectedAction(PERMISSION_CODES.PAYMENT_CREATE, async ({ business }) => {
-    const summary = await getOrderPaymentSummary(input.orderId, business.id);
+  return protectedAction(PERMISSION_CODES.PAYMENT_CREATE, async ({ business, platform }) => {
+    const summary = await getOrderPaymentSummaryForBusiness(
+      input.orderId,
+      business.id,
+      platform.branchId,
+    );
 
     return {
       summary: serializePaymentSummary(summary),

@@ -4,6 +4,8 @@
  */
 import { PrismaClient } from "@prisma/client";
 
+import { connectWithRetry, handleVerificationError } from "./lib/verify-db";
+
 const prisma = new PrismaClient();
 
 type Check = { name: string; ok: boolean; detail?: string };
@@ -31,11 +33,12 @@ async function main() {
 
   // Connection
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await connectWithRetry(prisma);
     record("Database connection", true);
   } catch (error) {
     record("Database connection", false, error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    console.error("ENVIRONMENT_FAILURE: Database unavailable for production database verification");
+    process.exit(2);
   }
 
   // Migration history

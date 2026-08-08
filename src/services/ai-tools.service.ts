@@ -1,5 +1,8 @@
 import "server-only";
 
+/** Orchestrates domain AI inference via delegated services. */
+
+
 import type { AiToolExecutionStatus, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";

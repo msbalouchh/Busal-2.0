@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { WorkflowTimelineEntry } from "@/modules/ai-orchestrator-management/types/ai-orchestrator-types";
 import { getExecutionManagerSnapshot } from "@/services/ai-execution-manager.service";
 

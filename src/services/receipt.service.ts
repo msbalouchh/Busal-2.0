@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { runInteractiveTransaction } from "@/lib/prisma-transaction";
 import { branchFilter } from "@/modules/business-context/utils/branch-scope";
 import {
   DEFAULT_PAYMENT_CURRENCY,
@@ -274,7 +275,7 @@ export async function createReceiptForPayment(
       ? calculateChangeDuePence(payment.amount, payment.amountTendered)
       : 0;
 
-  const receipt = await prisma.$transaction(async (tx) => {
+  const receipt = await runInteractiveTransaction(async (tx) => {
     const receiptNumber = await allocateReceiptNumber(businessId, tx);
 
     const created = await tx.receipt.create({
@@ -399,7 +400,7 @@ async function recordPrintAttempt(
   options: PrintReceiptOptions,
   status: ReceiptPrintStatus,
 ): Promise<ReceiptData> {
-  const receipt = await prisma.$transaction(async (tx) => {
+  const receipt = await runInteractiveTransaction(async (tx) => {
     const current = await tx.receipt.findFirst({
       where: { id: receiptId, businessId },
       include: receiptInclude,

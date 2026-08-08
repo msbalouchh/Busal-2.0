@@ -70,15 +70,15 @@ async function main() {
   assert(schema.includes("model AIVoiceSession"), "AIVoiceSession model missing");
   assert(schema.includes("model AIVoiceCommand"), "AIVoiceCommand model missing");
 
-  const intent = detectVoiceIntent("Show today's sales");
-  assert(intent.intent === "show_today_sales", "Intent detection failed");
-
   const providerManager = getVoiceProviderManager();
   assert(providerManager.getSttProvider().providerId === "noop-stt", "STT provider missing");
   assert(providerManager.getTtsProvider().providerId === "noop-tts", "TTS provider missing");
 
   const business = await prisma.business.findFirst({ select: { id: true, ownerId: true } });
   assert(business, "No business found for integration test");
+
+  const intent = await detectVoiceIntent(business.ownerId, "Show today's sales");
+  assert(intent.intent === "show_today_sales", "Intent detection failed");
 
   const profile = await getOwnedBusinessById(business.ownerId, business.id);
   assert(profile, "Business profile missing");

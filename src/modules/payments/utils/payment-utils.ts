@@ -1,4 +1,8 @@
-import type { PaymentData, OrderPaymentSummary } from "@/services/payment.service";
+import type {
+  OrderPaymentRecord,
+  OrderPaymentSummary,
+  UnpaidOrderOption,
+} from "@/modules/payment-receipt-management/types/payment-receipt-types";
 import type {
   OrderPaymentSummaryView,
   PaymentOrderContextView,
@@ -12,21 +16,20 @@ import {
   parseDecimalInputToPence,
 } from "@/modules/payments/utils/currency";
 
-/** Format a pence amount using the default payment currency. */
 export function formatPaymentMoney(pence: number): string {
   return formatMoneyPence(pence);
 }
 
-export function serializePayment(payment: PaymentData): PaymentView {
+export function serializePayment(payment: OrderPaymentRecord): PaymentView {
   return {
     id: payment.id,
     orderId: payment.orderId,
-    method: payment.method,
-    amount: payment.amount,
-    amountTendered: payment.amountTendered,
-    status: payment.status,
-    notes: payment.notes,
-    createdAt: payment.createdAt.toISOString(),
+    method: payment.paymentMethod as PaymentView["method"],
+    amount: Math.round(payment.amountPaid * 100),
+    amountTendered: null,
+    status: payment.status as PaymentView["status"],
+    notes: null,
+    createdAt: payment.paidAt ?? payment.createdAt,
   };
 }
 
@@ -34,27 +37,27 @@ export function serializePaymentSummary(summary: OrderPaymentSummary): OrderPaym
   return {
     orderId: summary.orderId,
     orderNumber: summary.orderNumber,
-    orderTotal: summary.orderTotal,
-    amountPaid: summary.amountPaid,
-    remainingBalance: summary.remainingBalance,
-    changeDue: summary.changeDue,
-    isFullyPaid: summary.isFullyPaid,
+    orderTotal: Math.round(summary.orderTotal * 100),
+    amountPaid: Math.round(summary.amountPaid * 100),
+    remainingBalance: Math.round(summary.remainingBalance * 100),
+    changeDue: Math.round(summary.changeDue * 100),
+    isFullyPaid: summary.remainingBalance <= 0,
     payments: summary.payments.map(serializePayment),
   };
 }
 
-export function serializeUnpaidOrder(order: {
-  orderId: string;
-  orderNumber: string;
-  orderTotal: number;
-  amountPaid: number;
-  remainingBalance: number;
-  customerName: string | null;
-  tableName: string | null;
-  createdAt: string;
-  isFullyPaid: boolean;
-}): UnpaidOrderView {
-  return order;
+export function serializeUnpaidOrder(order: UnpaidOrderOption): UnpaidOrderView {
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    orderTotal: Math.round(order.totalAmount * 100),
+    amountPaid: Math.round(order.amountPaid * 100),
+    remainingBalance: Math.round(order.remainingBalance * 100),
+    customerName: null,
+    tableName: order.tableLabel,
+    createdAt: new Date().toISOString(),
+    isFullyPaid: order.remainingBalance <= 0,
+  };
 }
 
 export function serializePaymentOrderContext(input: {
@@ -72,7 +75,7 @@ export function serializePaymentOrderContext(input: {
   return {
     orderId: input.order.id,
     orderNumber: input.order.orderNumber,
-    orderTotal: input.summary.orderTotal,
+    orderTotal: Math.round(input.summary.orderTotal * 100),
     customerName: input.order.customerName,
     tableName: input.tableName,
     itemCount: input.order.items.length,

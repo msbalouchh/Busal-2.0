@@ -1,12 +1,15 @@
 /** Kitchen order lifecycle statuses. */
 export const KITCHEN_STATUSES = {
+  PENDING: "pending",
   QUEUED: "queued",
   ACCEPTED: "accepted",
   PREPARING: "preparing",
   READY: "ready",
   SERVED: "served",
+  COMPLETED: "completed",
   DELAYED: "delayed",
   CANCELLED: "cancelled",
+  HELD: "held",
 } as const;
 
 export type KitchenStatus = (typeof KITCHEN_STATUSES)[keyof typeof KITCHEN_STATUSES];
@@ -100,13 +103,16 @@ export const KITCHEN_PERMISSIONS = {
 export type KitchenPermission = (typeof KITCHEN_PERMISSIONS)[keyof typeof KITCHEN_PERMISSIONS];
 
 export const KITCHEN_STATUS_LABELS: Record<KitchenStatus, string> = {
+  pending: "Pending",
   queued: "Queued",
   accepted: "Accepted",
   preparing: "Preparing",
   ready: "Ready",
   served: "Served",
+  completed: "Completed",
   delayed: "Delayed",
   cancelled: "Cancelled",
+  held: "Held",
 };
 
 export const KITCHEN_STATION_LABELS: Record<KitchenStationType, string> = {

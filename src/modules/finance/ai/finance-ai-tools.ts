@@ -1,23 +1,60 @@
+import "server-only";
+
 import { BUILTIN_AGENT_SLUGS } from "@/modules/ai/constants/agent-slugs";
 import { PLATFORM_MODULES } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
+  analyzeExpenses,
+  analyzeProfitability,
   createInvoiceForAi,
   detectFinancialAnomalies,
+  detectFinancialRisk,
   forecastCashFlow,
   generateFinancialReports,
   predictRevenue,
+  recommendBudget,
   recommendCostSavings,
   recordExpenseForAi,
   recordPaymentForAi,
 } from "@/modules/finance/ai/finance-ai-context";
+import { assertFinanceFeatureAccess } from "@/modules/finance/feature-access/guards/feature.guard";
+import { buildFinancePlatformContext } from "@/modules/finance/lib/finance-platform-context";
 import {
   EXPENSE_CATEGORIES,
   FINANCE_AI_TOOL_IDS,
   FINANCE_PERMISSIONS,
 } from "@/modules/finance/constants/finance-status";
 import type { ExpenseCategory } from "@/modules/finance/constants/finance-status";
+import type { FinancePlatformContext } from "@/modules/finance/types/finance-platform";
+
+function toFinanceContext(context: PlatformExecutionContext): FinancePlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for Finance tools");
+  }
+
+  return buildFinancePlatformContext({
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  });
+}
+
+function withFinanceFeatureGuard(handler: RegisteredPlatformTool["handler"]): RegisteredPlatformTool["handler"] {
+  return async (input, context) => {
+    if (!context.businessId) {
+      throw new Error("Business scope is required for Finance tools");
+    }
+
+    await assertFinanceFeatureAccess(context.businessId);
+    return handler(input, context);
+  };
+}
 
 function defineFinanceTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -38,7 +75,7 @@ function defineFinanceTool(
       riskLevel: "low",
       ...partial.metadata,
     },
-    handler,
+    handler: withFinanceFeatureGuard(handler),
   };
 }
 
@@ -73,7 +110,7 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const lineItems = Array.isArray(input.lineItems) ? input.lineItems : [];
       const parsed = lineItems
         .filter(
@@ -85,7 +122,7 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
           unitPriceCents: typeof item.unitPriceCents === "number" ? item.unitPriceCents : 0,
         }));
 
-      return createInvoiceForAi({
+      return createInvoiceForAi(toFinanceContext(context), {
         customerName: typeof input.customerName === "string" ? input.customerName : "Customer",
         dueDate: typeof input.dueDate === "string" ? input.dueDate : "2026-03-01",
         lineItems: parsed,
@@ -117,14 +154,14 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) => {
+    async (input, context) => {
       const category =
         typeof input.category === "string" &&
         Object.values(EXPENSE_CATEGORIES).includes(input.category as ExpenseCategory)
           ? (input.category as ExpenseCategory)
           : EXPENSE_CATEGORIES.OTHER;
 
-      return recordExpenseForAi({
+      return recordExpenseForAi(toFinanceContext(context), {
         category,
         vendorName: typeof input.vendorName === "string" ? input.vendorName : "Vendor",
         description: typeof input.description === "string" ? input.description : "Expense",
@@ -156,8 +193,8 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) =>
-      recordPaymentForAi({
+    async (input, context) =>
+      recordPaymentForAi(toFinanceContext(context), {
         amountCents: typeof input.amountCents === "number" ? input.amountCents : 0,
         invoiceId: typeof input.invoiceId === "string" ? input.invoiceId : undefined,
         reference: typeof input.reference === "string" ? input.reference : undefined,
@@ -172,19 +209,16 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
       requiredModules: [PLATFORM_MODULES.FINANCE, PLATFORM_MODULES.ANALYTICS],
       requiredTenantScope: "required",
       requiredBranchScope: "optional",
-      inputSchema: {
-        type: "object",
-        properties: { daysAhead: { type: "number" } },
-      },
+      inputSchema: { type: "object", properties: { daysAhead: { type: "number" } } },
       outputSchema: { type: "object" },
       supportedAgents: [BUILTIN_AGENT_SLUGS.ANALYTICS, BUILTIN_AGENT_SLUGS.OPERATIONS],
       capabilityId: "capability.finance",
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => {
+    async (input, context) => {
       const daysAhead = typeof input.daysAhead === "number" ? input.daysAhead : 30;
-      return forecastCashFlow(daysAhead);
+      return forecastCashFlow(toFinanceContext(context), daysAhead);
     },
   ),
   defineFinanceTool(
@@ -203,7 +237,7 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true, riskLevel: "medium" },
     },
-    async () => detectFinancialAnomalies(),
+    async (_input, context) => detectFinancialAnomalies(toFinanceContext(context)),
   ),
   defineFinanceTool(
     {
@@ -221,7 +255,7 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => generateFinancialReports(),
+    async (_input, context) => generateFinancialReports(toFinanceContext(context)),
   ),
   defineFinanceTool(
     {
@@ -239,7 +273,7 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => predictRevenue(),
+    async (_input, context) => predictRevenue(toFinanceContext(context)),
   ),
   defineFinanceTool(
     {
@@ -257,13 +291,85 @@ export const FINANCE_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => recommendCostSavings(),
+    async (_input, context) => recommendCostSavings(toFinanceContext(context)),
+  ),
+  defineFinanceTool(
+    {
+      id: FINANCE_AI_TOOL_IDS.ANALYZE_EXPENSES,
+      name: "Analyze Expenses",
+      description: "Analyze expense breakdown and anomalies.",
+      requiredPermissions: [FINANCE_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [PLATFORM_MODULES.FINANCE, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: FINANCE_AGENT_SLUGS,
+      capabilityId: "capability.finance",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => analyzeExpenses(toFinanceContext(context)),
+  ),
+  defineFinanceTool(
+    {
+      id: FINANCE_AI_TOOL_IDS.ANALYZE_PROFITABILITY,
+      name: "Analyze Profitability",
+      description: "Analyze profit margins and P&L performance.",
+      requiredPermissions: [FINANCE_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [PLATFORM_MODULES.FINANCE, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: FINANCE_AGENT_SLUGS,
+      capabilityId: "capability.finance",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => analyzeProfitability(toFinanceContext(context)),
+  ),
+  defineFinanceTool(
+    {
+      id: FINANCE_AI_TOOL_IDS.RECOMMEND_BUDGET,
+      name: "Recommend Budget",
+      description: "Recommend budget allocations by expense category.",
+      requiredPermissions: [FINANCE_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [PLATFORM_MODULES.FINANCE, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: FINANCE_AGENT_SLUGS,
+      capabilityId: "capability.finance",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => recommendBudget(toFinanceContext(context)),
+  ),
+  defineFinanceTool(
+    {
+      id: FINANCE_AI_TOOL_IDS.DETECT_FINANCIAL_RISK,
+      name: "Detect Financial Risk",
+      description: "Detect financial risk indicators and cash flow concerns.",
+      requiredPermissions: [FINANCE_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [PLATFORM_MODULES.FINANCE, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: FINANCE_AGENT_SLUGS,
+      capabilityId: "capability.finance",
+      skillIds: [],
+      metadata: { readOnly: true, riskLevel: "medium" },
+    },
+    async (_input, context) => detectFinancialRisk(toFinanceContext(context)),
   ),
 ];
 
 let registered = false;
 
-/** Registers Finance platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Finance platform tools with the AI Tool Platform (idempotent). */
 export function registerFinanceAiTools(): void {
   if (registered) {
     return;

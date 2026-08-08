@@ -1,9 +1,11 @@
-import { DEFAULT_INTEGRATION_SCOPE } from "@/modules/integrations/constants/mock-data";
-import { integrationRepository } from "@/modules/integrations/repository/integration-repository";
+import "server-only";
+
 import type {
   IntegrationPlatformContext,
   IntegrationRecord,
 } from "@/modules/integrations/types/integration-platform";
+import { integrationRepository } from "@/modules/integrations/repository/integration-repository";
+import type { IntegrationTenantScope } from "@/modules/integrations/lib/integration-scope";
 import { getIntegrationSummary } from "@/modules/integrations/utils/integration-selectors";
 
 export interface IntegrationPlatformSnapshot {
@@ -20,45 +22,50 @@ export interface IntegrationPlatformSnapshot {
 export interface IntegrationPlatformInput {
   tenantId?: string;
   workspaceId?: string;
-  businessId?: string;
+  businessId: string;
+  branchId: string;
   userId?: string;
 }
 
-export function buildIntegrationPlatformContext(
-  input: IntegrationPlatformInput = {},
-): IntegrationPlatformContext {
+export function buildIntegrationPlatformContext(input: IntegrationPlatformInput): IntegrationPlatformContext {
   return {
-    tenantId: input.tenantId ?? DEFAULT_INTEGRATION_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_INTEGRATION_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_INTEGRATION_SCOPE.businessId,
-    userId: input.userId ?? DEFAULT_INTEGRATION_SCOPE.userId,
+    tenantId: input.tenantId ?? input.businessId,
+    workspaceId: input.workspaceId ?? input.businessId,
+    businessId: input.businessId,
+    branchId: input.branchId,
+    userId: input.userId ?? "system",
   };
 }
 
-export function buildIntegrationPlatformSnapshot(
-  input: IntegrationPlatformInput = {},
-): IntegrationPlatformSnapshot {
-  const context = buildIntegrationPlatformContext(input);
-  const record = integrationRepository.getRecord();
-  const failedEvents = integrationRepository.getFailedWebhookEvents();
+export async function buildIntegrationPlatformSnapshot(
+  context: IntegrationPlatformContext,
+): Promise<IntegrationPlatformSnapshot> {
+  const scope: IntegrationTenantScope = {
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  };
+
+  const record = await integrationRepository.getRecord(scope);
+  const failedEvents = record.webhookEvents.filter(
+    (event) => event.status === "failed" || event.status === "retrying",
+  );
 
   return {
     context,
     record,
-    connectedCount: integrationRepository.getConnectedIntegrations().length,
-    activeApiKeyCount: integrationRepository.getActiveApiKeys().length,
-    activeWebhookCount: record.webhooks.filter((w) => w.isActive).length,
+    connectedCount: record.integrations.filter((integration) => integration.status === "connected").length,
+    activeApiKeyCount: record.apiKeys.filter((key) => key.status === "active").length,
+    activeWebhookCount: record.webhooks.filter((webhook) => webhook.isActive).length,
     failedWebhookEventCount: failedEvents.length,
     totalApiRequests: record.developerAnalytics.totalRequests,
     errorRateBps: record.developerAnalytics.errorRateBps,
   };
 }
 
-export function getDefaultIntegrationSnapshot(): IntegrationPlatformSnapshot {
-  return buildIntegrationPlatformSnapshot();
-}
-
-export function getIntegrationPlatformSummary(input: IntegrationPlatformInput = {}): string {
-  const snapshot = buildIntegrationPlatformSnapshot(input);
+export async function getIntegrationPlatformSummary(context: IntegrationPlatformContext): Promise<string> {
+  const snapshot = await buildIntegrationPlatformSnapshot(context);
   return getIntegrationSummary(snapshot.record);
 }

@@ -1,5 +1,5 @@
+export { registerAnalyticsAiTools, ANALYTICS_AI_TOOLS, buildAnalyticsAiContext } from "@/modules/analytics/ai/analytics-ai-tools";
 export {
-  buildAnalyticsAiContext,
   generateReportForAi,
   explainKpiForAi,
   forecastRevenueForAi,
@@ -8,9 +8,10 @@ export {
   recommendImprovementsForAi,
   generateExecutiveSummaryForAi,
   compareBranchesForAi,
+  customerInsightsForAi,
+  churnPredictionForAi,
+  inventoryForecastForAi,
+  staffingRecommendationsForAi,
+  financialForecastForAi,
+  businessHealthScoreForAi,
 } from "@/modules/analytics/ai/analytics-ai-context";
-
-export {
-  registerAnalyticsAiTools,
-  ANALYTICS_AI_TOOLS,
-} from "@/modules/analytics/ai/analytics-ai-tools";

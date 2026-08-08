@@ -2,9 +2,11 @@
 
 import { ChevronDown, LogOut, Settings, UserCircle } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
-import { API_ROUTES } from "@/constants/routes";
+import { API_ROUTES, ROUTES } from "@/constants/routes";
 import { Button } from "@/components/ui/button";
+import { assignAppPath } from "@/lib/app-navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +22,22 @@ interface ProfileMenuProps {
 }
 
 export function ProfileMenu({ userEmail }: ProfileMenuProps) {
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setIsSigningOut(true);
+
+    try {
+      await fetch(API_ROUTES.logout, {
+        method: "POST",
+        credentials: "include",
+      });
+      assignAppPath(ROUTES.login);
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -43,11 +61,16 @@ export function ProfileMenu({ userEmail }: ProfileMenuProps) {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href={API_ROUTES.logout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign out
-          </Link>
+        <DropdownMenuItem
+          className="gap-2"
+          disabled={isSigningOut}
+          onSelect={(event) => {
+            event.preventDefault();
+            void handleSignOut();
+          }}
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

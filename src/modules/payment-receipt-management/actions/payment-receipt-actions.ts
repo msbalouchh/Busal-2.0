@@ -22,7 +22,7 @@ import {
   recordSplitOrderPayments,
   refundOrderPayment,
   voidOrderPayment,
-} from "@/services/restaurant-payment.service";
+} from "@/modules/payments/services/payment-platform.service";
 
 function revalidatePaymentPages(branchId: string, orderId?: string) {
   revalidatePath(PAYMENT_RECEIPT_ROUTES.dashboardForBranch(branchId));

@@ -2,6 +2,7 @@ import "server-only";
 
 import { getProfitabilityReport, getRevopsDashboard } from "@/services/revops.service";
 import { createFinanceInsight } from "@/services/ai-finance-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -48,34 +49,18 @@ export async function getProfitabilitySnapshot(ownerId: string): Promise<Profita
 }
 
 export async function generateProfitabilityInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getProfitabilitySnapshot(ownerId);
-  let created = 0;
-
-  await createFinanceInsight(businessId, {
-    title: "Profit margin analysis",
-    description: `Net profit: £${(snapshot.netProfitPence / 100).toFixed(2)} (${snapshot.profitMarginPercent}% margin).`,
-    category: "profitability",
-    priority: snapshot.profitMarginPercent < 10 ? "HIGH" : "MEDIUM",
-    recommendation:
-      snapshot.profitMarginPercent < 10
-        ? "Margins are thin — review pricing and cost structure."
-        : "Monitor margin trends monthly to protect profitability.",
-    metadata: { profitMarginPercent: snapshot.profitMarginPercent },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "finance",
+    task: "profitability-insights",
+    loadContext: getProfitabilitySnapshot,
+    persistInsight: (businessId, insight) =>
+      createFinanceInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "profitability",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  if (snapshot.lowMarginServices.length > 0) {
-    await createFinanceInsight(businessId, {
-      title: "Unprofitable services identified",
-      description: `${snapshot.lowMarginServices.length} service lines show negative profit.`,
-      category: "profitability",
-      priority: "HIGH",
-      recommendation: snapshot.lowMarginServices.map((s) => s.label).join(", "),
-      metadata: { services: snapshot.lowMarginServices.map((s) => s.label) },
-    });
-    created += 1;
-  }
-
-  return created;
 }

@@ -1,4 +1,12 @@
-import { orderRepository } from "@/modules/orders/repository/order-repository";
+import "server-only";
+
+import { DOMAIN_EVENT_TYPES } from "@/modules/platform-orchestration/constants/domain-events";
+import {
+  moduleScopeFromPlatform,
+  publishModuleDomainEvent,
+} from "@/modules/platform-orchestration/lib/publish-module-event";
+import { orderRepository, type OrderSearchResult } from "@/modules/orders/repository/order-repository";
+import { buildOrderScopeFromInput } from "@/modules/orders/lib/order-scope";
 import type {
   CreateOrderInput,
   ModifyOrderInput,
@@ -6,59 +14,150 @@ import type {
   OrderRecord,
   OrderSearchQuery,
 } from "@/modules/orders/types/order";
+import type {
+  BulkUpdateOrdersSchemaInput,
+  MergeOrdersSchemaInput,
+  SplitOrderSchemaInput,
+} from "@/modules/orders/validation/order-schemas";
+
+function toScope(context: OmsPlatformContext) {
+  return buildOrderScopeFromInput(context);
+}
 
 export class OrderService {
-  search(query: OrderSearchQuery, context?: OmsPlatformContext): OrderRecord[] {
-    return orderRepository.search({
+  async search(query: OrderSearchQuery, context: OmsPlatformContext): Promise<OrderSearchResult> {
+    return orderRepository.search(toScope(context), {
       ...query,
-      tenantId: query.tenantId ?? context?.tenantId,
-      businessId: query.businessId ?? context?.businessId,
-      branchId: query.branchId ?? context?.branchId,
+      tenantId: query.tenantId ?? context.tenantId,
+      businessId: query.businessId ?? context.businessId,
+      branchId: query.branchId ?? context.branchId,
     });
   }
 
-  getById(orderId: string): OrderRecord | undefined {
-    return orderRepository.findById(orderId);
+  async getById(context: OmsPlatformContext, orderId: string): Promise<OrderRecord | null> {
+    return orderRepository.findById(toScope(context), orderId);
   }
 
-  getByOrderNumber(orderNumber: string): OrderRecord | undefined {
-    return orderRepository.findByOrderNumber(orderNumber);
+  async getByOrderNumber(context: OmsPlatformContext, orderNumber: string): Promise<OrderRecord | null> {
+    return orderRepository.findByOrderNumber(toScope(context), orderNumber);
   }
 
-  create(input: CreateOrderInput): OrderRecord {
-    return orderRepository.create(input);
+  async create(context: OmsPlatformContext, input: CreateOrderInput): Promise<OrderRecord> {
+    const record = await orderRepository.create(toScope(context), input);
+    await publishModuleDomainEvent(moduleScopeFromPlatform(context), {
+      eventType: DOMAIN_EVENT_TYPES.ORDER_CREATED,
+      aggregateId: record.order.id,
+      payload: {
+        orderId: record.order.id,
+        status: record.order.status,
+        customerId: record.order.customerId ?? null,
+        tableId: null,
+      },
+    });
+    return record;
   }
 
-  modify(input: ModifyOrderInput): OrderRecord | undefined {
-    return orderRepository.modify(input);
+  async modify(context: OmsPlatformContext, input: ModifyOrderInput): Promise<OrderRecord | null> {
+    const record = await orderRepository.modify(toScope(context), input);
+    if (record) {
+      await publishModuleDomainEvent(moduleScopeFromPlatform(context), {
+        eventType: DOMAIN_EVENT_TYPES.ORDER_UPDATED,
+        aggregateId: record.order.id,
+        payload: { orderId: record.order.id, status: record.order.status },
+        idempotencyKey: `order.updated:${record.order.id}:${record.order.status}`,
+      });
+    }
+    return record;
   }
 
-  cancel(orderId: string, reason?: string): OrderRecord | undefined {
-    return orderRepository.cancel(orderId, reason);
+  async cancel(context: OmsPlatformContext, orderId: string, reason?: string): Promise<OrderRecord | null> {
+    const record = await orderRepository.cancel(toScope(context), orderId, reason);
+    if (record) {
+      await publishModuleDomainEvent(moduleScopeFromPlatform(context), {
+        eventType: DOMAIN_EVENT_TYPES.ORDER_CANCELLED,
+        aggregateId: record.order.id,
+        payload: { orderId: record.order.id, reason: reason ?? null },
+      });
+    }
+    return record;
   }
 
-  refund(orderId: string): OrderRecord | undefined {
-    return orderRepository.refund(orderId);
+  async refund(context: OmsPlatformContext, orderId: string, reason?: string): Promise<OrderRecord | null> {
+    return orderRepository.refund(toScope(context), orderId, reason);
   }
 
-  getTimeline(orderId: string) {
-    return orderRepository.findById(orderId)?.timeline ?? [];
+  async assignTable(context: OmsPlatformContext, orderId: string, tableId: string): Promise<OrderRecord | null> {
+    return orderRepository.assignTable(toScope(context), orderId, tableId);
   }
 
-  getPayments(orderId: string) {
-    return orderRepository.findById(orderId)?.payments ?? [];
+  async assignCustomer(
+    context: OmsPlatformContext,
+    orderId: string,
+    customerId: string,
+  ): Promise<OrderRecord | null> {
+    return orderRepository.assignCustomer(toScope(context), orderId, customerId);
   }
 
-  getFulfillment(orderId: string) {
-    return orderRepository.findById(orderId)?.fulfillment ?? null;
+  async transfer(
+    context: OmsPlatformContext,
+    orderId: string,
+    targetBranchId: string,
+    targetTableId?: string,
+  ): Promise<OrderRecord | null> {
+    return orderRepository.transfer(toScope(context), orderId, targetBranchId, targetTableId);
   }
 
-  getAnalytics(orderId: string) {
-    return orderRepository.findById(orderId)?.analytics ?? null;
+  async mergeOrders(context: OmsPlatformContext, input: MergeOrdersSchemaInput): Promise<OrderRecord | null> {
+    return orderRepository.mergeOrders(toScope(context), input);
   }
 
-  getAiContext(orderId: string) {
-    return orderRepository.findById(orderId)?.aiContext ?? null;
+  async splitOrder(context: OmsPlatformContext, input: SplitOrderSchemaInput): Promise<OrderRecord[]> {
+    return orderRepository.splitOrder(toScope(context), input);
+  }
+
+  async archive(context: OmsPlatformContext, orderId: string): Promise<OrderRecord | null> {
+    return orderRepository.archive(toScope(context), orderId);
+  }
+
+  async restore(context: OmsPlatformContext, orderId: string): Promise<OrderRecord | null> {
+    return orderRepository.restore(toScope(context), orderId);
+  }
+
+  async deleteHard(context: OmsPlatformContext, orderId: string): Promise<boolean> {
+    return orderRepository.deleteHard(toScope(context), orderId);
+  }
+
+  async bulkUpdate(context: OmsPlatformContext, input: BulkUpdateOrdersSchemaInput): Promise<number> {
+    return orderRepository.bulkUpdate(toScope(context), input);
+  }
+
+  async list(context: OmsPlatformContext): Promise<OrderRecord[]> {
+    return orderRepository.list(toScope(context));
+  }
+
+  async getTimeline(context: OmsPlatformContext, orderId: string) {
+    const record = await this.getById(context, orderId);
+    return record?.timeline ?? [];
+  }
+
+  async getPayments(context: OmsPlatformContext, orderId: string) {
+    const record = await this.getById(context, orderId);
+    return record?.payments ?? [];
+  }
+
+  async getFulfillment(context: OmsPlatformContext, orderId: string) {
+    const record = await this.getById(context, orderId);
+    return record?.fulfillment ?? null;
+  }
+
+  async getAnalytics(context: OmsPlatformContext, orderId: string) {
+    const record = await this.getById(context, orderId);
+    return record?.analytics ?? null;
+  }
+
+  async getAiContext(context: OmsPlatformContext, orderId: string) {
+    const record = await this.getById(context, orderId);
+    return record?.aiContext ?? null;
   }
 }
 

@@ -1,372 +1,731 @@
+import "server-only";
+
+import { Prisma } from "@prisma/client";
+import { randomBytes } from "node:crypto";
+
+import { prisma } from "@/lib/prisma";
+import { runInteractiveTransaction } from "@/lib/prisma-transaction";
 import {
-  FULFILLMENT_STATUSES,
+  ORDER_SOURCES,
   ORDER_STATUSES,
   ORDER_STATUS_TRANSITIONS,
   ORDER_TIMELINE_EVENT_TYPES,
-  PAYMENT_STATUSES,
 } from "@/modules/orders/constants/order-status";
-import { DEFAULT_OMS_SCOPE, MOCK_ORDER_RECORDS } from "@/modules/orders/constants/mock-data";
+import type { StoredOrderMeta } from "@/modules/orders/lib/order-mappers";
+import {
+  appendTimelineEvent,
+  composeOrderNotes,
+  decimalToPence,
+  mapDomainOrderTypeToPrisma,
+  mapDomainStatusToPrisma,
+  mapOrderToRecord,
+  mapPrismaOrderTypeToDomain,
+  mapPrismaStatusToDomain,
+  mapTimelineTypeForStatus,
+  penceToDecimal,
+  splitOrderNotes,
+  type RestaurantOrderWithRelations,
+} from "@/modules/orders/lib/order-mappers";
+import type { OrderTenantScope } from "@/modules/orders/lib/order-scope";
 import type {
   CreateOrderInput,
   ModifyOrderInput,
   OrderRecord,
   OrderSearchQuery,
 } from "@/modules/orders/types/order";
+import type {
+  BulkUpdateOrdersSchemaInput,
+  MergeOrdersSchemaInput,
+  SplitOrderSchemaInput,
+} from "@/modules/orders/validation/order-schemas";
 
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const DEFAULT_PAGE_SIZE = 25;
+
+const orderInclude = {
+  items: { include: { modifiers: true }, orderBy: { createdAt: "asc" } },
+  payments: { orderBy: { createdAt: "desc" } },
+  customer: { select: { id: true, firstName: true, lastName: true } },
+  restaurantTable: { select: { id: true, tableNumber: true, tableName: true } },
+  staff: { select: { id: true, firstName: true, lastName: true } },
+} satisfies Prisma.RestaurantOrderInclude;
+
+export interface OrderSearchResult {
+  records: OrderRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
-function computeTotals(items: CreateOrderInput["items"]) {
+function scopeWhere(scope: OrderTenantScope): Prisma.RestaurantOrderWhereInput {
+  return {
+    businessId: scope.businessId,
+    branchId: scope.branchId,
+  };
+}
+
+function isArchived(notes: string | null): boolean {
+  return splitOrderNotes(notes).meta.archived === true;
+}
+
+function buildOrderBy(
+  sortBy: OrderSearchQuery["sortBy"] = "placedAt",
+  sortDirection: "asc" | "desc" = "desc",
+): Prisma.RestaurantOrderOrderByWithRelationInput[] {
+  switch (sortBy) {
+    case "total":
+      return [{ totalAmount: sortDirection }, { placedAt: "desc" }];
+    case "status":
+      return [{ status: sortDirection }, { placedAt: "desc" }];
+    case "orderNumber":
+      return [{ orderNumber: sortDirection }];
+    case "placedAt":
+    default:
+      return [{ placedAt: sortDirection }];
+  }
+}
+
+async function generateOrderNumber(
+  businessId: string,
+  client: Pick<typeof prisma, "restaurantOrder"> = prisma,
+): Promise<string> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const suffix = randomBytes(2).toString("hex").toUpperCase();
+    const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${suffix}`;
+    const existing = await client.restaurantOrder.findFirst({
+      where: { businessId, orderNumber },
+      select: { id: true },
+    });
+    if (!existing) {
+      return orderNumber;
+    }
+  }
+  throw new Error("Unable to generate order number");
+}
+
+function computeTotals(items: CreateOrderInput["items"], discountPence = 0, servicePence = 0, deliveryPence = 0) {
   const subtotalPence = items.reduce((sum, item) => sum + item.quantity * item.unitPricePence, 0);
-  const taxPence = Math.round(subtotalPence * 0.2);
-  return { subtotalPence, taxPence, totalPence: subtotalPence + taxPence };
+  const taxPence = Math.round((subtotalPence - discountPence) * 0.2);
+  const totalPence = subtotalPence - discountPence + taxPence + servicePence + deliveryPence;
+  return { subtotalPence, taxPence, totalPence };
 }
 
-/** In-memory order repository (mock only, no backend). */
+async function loadOrder(scope: OrderTenantScope, orderId: string): Promise<RestaurantOrderWithRelations | null> {
+  return prisma.restaurantOrder.findFirst({
+    where: { id: orderId, ...scopeWhere(scope) },
+    include: orderInclude,
+  });
+}
+
+/** Prisma-backed order repository with tenant scoping. */
 export class OrderRepository {
-  private records: OrderRecord[] = [...MOCK_ORDER_RECORDS];
+  async list(scope: OrderTenantScope): Promise<OrderRecord[]> {
+    const orders = await prisma.restaurantOrder.findMany({
+      where: scopeWhere(scope),
+      include: orderInclude,
+      orderBy: [{ placedAt: "desc" }],
+    });
 
-  list(): OrderRecord[] {
-    return [...this.records];
+    return orders
+      .filter((order) => !isArchived(order.notes))
+      .map((order) => mapOrderToRecord(order, scope));
   }
 
-  findById(orderId: string): OrderRecord | undefined {
-    return this.records.find((record) => record.order.id === orderId);
+  async findById(scope: OrderTenantScope, orderId: string): Promise<OrderRecord | null> {
+    const order = await loadOrder(scope, orderId);
+    if (!order || isArchived(order.notes)) {
+      return null;
+    }
+    return mapOrderToRecord(order, scope);
   }
 
-  findByOrderNumber(orderNumber: string): OrderRecord | undefined {
-    return this.records.find((record) => record.order.orderNumber === orderNumber);
+  async findByOrderNumber(scope: OrderTenantScope, orderNumber: string): Promise<OrderRecord | null> {
+    const order = await prisma.restaurantOrder.findFirst({
+      where: { orderNumber, ...scopeWhere(scope) },
+      include: orderInclude,
+    });
+    if (!order || isArchived(order.notes)) {
+      return null;
+    }
+    return mapOrderToRecord(order, scope);
   }
 
-  search(query: OrderSearchQuery = {}): OrderRecord[] {
-    let results = this.records;
+  async search(scope: OrderTenantScope, query: OrderSearchQuery = {}): Promise<OrderSearchResult> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? query.limit ?? DEFAULT_PAGE_SIZE;
+    const prismaStatus = query.status ? mapDomainStatusToPrisma(query.status) : undefined;
 
-    if (query.tenantId) {
-      results = results.filter((record) => record.order.tenantId === query.tenantId);
-    }
-
-    if (query.businessId) {
-      results = results.filter((record) => record.order.businessId === query.businessId);
-    }
-
-    if (query.branchId) {
-      results = results.filter((record) => record.order.branchId === query.branchId);
-    }
-
-    if (query.status) {
-      results = results.filter((record) => record.order.status === query.status);
-    }
-
-    if (query.orderType) {
-      results = results.filter((record) => record.order.orderType === query.orderType);
-    }
-
-    if (query.customerId) {
-      results = results.filter((record) => record.order.customerId === query.customerId);
-    }
-
-    if (query.query) {
-      const normalized = query.query.toLowerCase();
-
-      results = results.filter((record) => {
-        const haystack = [
-          record.order.orderNumber,
-          record.order.customerName ?? "",
-          ...record.items.map((item) => item.productName),
-        ]
-          .join(" ")
-          .toLowerCase();
-
-        return haystack.includes(normalized);
-      });
-    }
-
-    const limit = query.limit ?? results.length;
-    return results.slice(0, limit);
-  }
-
-  create(input: CreateOrderInput): OrderRecord {
-    const id = createId("ord");
-    const orderNumber = `HBR-${Math.floor(1000 + Math.random() * 9000)}`;
-    const now = new Date().toISOString();
-    const { subtotalPence, taxPence, totalPence } = computeTotals(input.items);
-
-    const record: OrderRecord = {
-      order: {
-        id,
-        orderNumber,
-        tenantId: input.tenantId,
-        workspaceId: input.workspaceId,
-        businessId: input.businessId,
-        branchId: input.branchId,
-        customerId: input.customerId ?? null,
-        customerName: input.customerName ?? null,
-        orderType: input.orderType,
-        status: ORDER_STATUSES.PENDING,
-        currency: "GBP",
-        subtotalPence,
-        discountTotalPence: 0,
-        taxTotalPence: taxPence,
-        totalPence,
-        tableNumber: input.tableNumber ?? null,
-        scheduledFor: input.scheduledFor ?? null,
-        createdAt: now,
-        updatedAt: now,
-        completedAt: null,
-      },
-      items: input.items.map((item, index) => ({
-        id: `${id}-item-${index + 1}`,
-        orderId: id,
-        productId: item.productId,
-        productName: item.productName,
-        sku: null,
-        quantity: item.quantity,
-        unitPricePence: item.unitPricePence,
-        lineTotalPence: item.quantity * item.unitPricePence,
-        modifiers: item.modifiers ?? [],
-        notes: item.notes ?? null,
-      })),
-      timeline: [
-        {
-          id: createId("tl"),
-          orderId: id,
-          type: ORDER_TIMELINE_EVENT_TYPES.CREATED,
-          title: "Order created",
-          description: "New order submitted",
-          fromStatus: null,
-          toStatus: ORDER_STATUSES.PENDING,
-          metadata: { source: input.source },
-          occurredAt: now,
-          createdBy: DEFAULT_OMS_SCOPE.userId,
-        },
-      ],
-      payments: [],
-      discounts: [],
-      taxes: [
-        {
-          id: createId("tax"),
-          orderId: id,
-          name: "VAT",
-          rate: 20,
-          amountPence: taxPence,
-        },
-      ],
-      notes: [],
-      source: {
-        orderId: id,
-        source: input.source,
-        channel: input.orderType,
-        deviceId: null,
-        staffId: DEFAULT_OMS_SCOPE.userId,
-        referrer: null,
-      },
-      fulfillment: {
-        orderId: id,
-        status: FULFILLMENT_STATUSES.QUEUED,
-        assignedTo: null,
-        stationId: "kitchen-main",
-        estimatedReadyAt: null,
-        dispatchedAt: null,
-        deliveredAt: null,
-        deliveryAddress: null,
-        trackingReference: null,
-      },
-      history: [
-        {
-          id: createId("hist"),
-          orderId: id,
-          action: "order.created",
-          snapshot: { status: ORDER_STATUSES.PENDING },
-          performedBy: DEFAULT_OMS_SCOPE.userId,
-          performedAt: now,
-        },
-      ],
-      analytics: {
-        orderId: id,
-        itemCount: input.items.reduce((sum, item) => sum + item.quantity, 0),
-        prepTimeMinutes: null,
-        fulfillmentTimeMinutes: null,
-        marginEstimatePence: Math.round(subtotalPence * 0.6),
-        upsellPotentialPence: 650,
-        delayRiskScore: 0.1,
-      },
-      aiContext: {
-        orderId: id,
-        summary: `${orderNumber} — new ${input.orderType.replace("_", " ")} order`,
-        insights: ["Order just created — confirm kitchen queue"],
-        recommendedActions: ["Send confirmation to customer"],
-        upsellSuggestions: ["Side dish", "Beverage upgrade"],
-        delayPredictionMinutes: null,
-        lastGeneratedAt: now,
-      },
+    const where: Prisma.RestaurantOrderWhereInput = {
+      ...scopeWhere(scope),
+      ...(prismaStatus ? { status: prismaStatus } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.orderType
+        ? { orderType: mapDomainOrderTypeToPrisma(query.orderType) }
+        : {}),
+      ...(query.query
+        ? {
+            OR: [
+              { orderNumber: { contains: query.query, mode: "insensitive" } },
+              { notes: { contains: query.query, mode: "insensitive" } },
+            ],
+          }
+        : {}),
     };
 
-    this.records.unshift(record);
-    return record;
+    const [orders, total] = await Promise.all([
+      prisma.restaurantOrder.findMany({
+        where,
+        include: orderInclude,
+        orderBy: buildOrderBy(query.sortBy, query.sortDirection),
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.restaurantOrder.count({ where }),
+    ]);
+
+    const records = orders
+      .filter((order) => query.includeArchived || !isArchived(order.notes))
+      .filter((order) => {
+        if (!query.orderType) {
+          return true;
+        }
+        return mapPrismaOrderTypeToDomain(order.orderType, order.qrSessionId) === query.orderType;
+      })
+      .map((order) => mapOrderToRecord(order, scope));
+
+    return {
+      records,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
-  modify(input: ModifyOrderInput): OrderRecord | undefined {
-    const record = this.findById(input.orderId);
+  async create(scope: OrderTenantScope, input: CreateOrderInput): Promise<OrderRecord> {
+    const discountPence = input.discountAmountPence ?? 0;
+    const servicePence = input.serviceChargePence ?? 0;
+    const deliveryPence = input.deliveryChargePence ?? 0;
+    const { subtotalPence, taxPence, totalPence } = computeTotals(
+      input.items,
+      discountPence,
+      servicePence,
+      deliveryPence,
+    );
 
-    if (!record) {
-      return undefined;
-    }
+    const meta = {
+      source: input.source,
+      scheduledFor: input.scheduledFor ?? null,
+      timeline: [],
+    };
 
-    const now = new Date().toISOString();
+    const orderNumber = await generateOrderNumber(scope.businessId);
+    const modifierOptionIds = [
+      ...new Set(
+        input.items.flatMap((item) => item.modifierOptionIds ?? []).filter(Boolean),
+      ),
+    ];
+    const modifierOptions =
+      modifierOptionIds.length > 0
+        ? await prisma.modifierOption.findMany({
+            where: { id: { in: modifierOptionIds } },
+            select: { id: true, name: true, priceAdjustment: true },
+          })
+        : [];
+    const modifierById = new Map(modifierOptions.map((option) => [option.id, option]));
 
-    if (input.status && input.status !== record.order.status) {
-      const allowed = ORDER_STATUS_TRANSITIONS[record.order.status];
+    const order = await runInteractiveTransaction(async (tx) => {
+      const created = await tx.restaurantOrder.create({
+        data: {
+          businessId: scope.businessId,
+          branchId: input.branchId,
+          orderNumber,
+          orderType: mapDomainOrderTypeToPrisma(input.orderType),
+          customerId: input.customerId ?? null,
+          restaurantTableId: input.tableId ?? null,
+          reservationId: input.reservationId ?? null,
+          qrSessionId: input.qrSessionId ?? null,
+          status: input.source === "pos" ? "PENDING" : "PENDING",
+          subtotal: penceToDecimal(subtotalPence),
+          discountAmount: penceToDecimal(discountPence),
+          taxAmount: penceToDecimal(taxPence),
+          serviceCharge: penceToDecimal(servicePence),
+          deliveryCharge: penceToDecimal(deliveryPence),
+          totalAmount: penceToDecimal(totalPence),
+          notes: composeOrderNotes(input.notes ?? null, meta),
+        },
+      });
 
-      if (!allowed.includes(input.status)) {
-        return undefined;
+      for (const item of input.items) {
+        const lineTotal = item.quantity * item.unitPricePence;
+        const createdItem = await tx.restaurantOrderItem.create({
+          data: {
+            orderId: created.id,
+            productId: item.productId,
+            productNameSnapshot: item.productName,
+            quantity: item.quantity,
+            unitPrice: penceToDecimal(item.unitPricePence),
+            totalAmount: penceToDecimal(lineTotal),
+            specialInstructions: item.notes ?? null,
+          },
+        });
+
+        const modifierRows = (item.modifierOptionIds ?? [])
+          .map((modifierOptionId) => modifierById.get(modifierOptionId))
+          .filter((option): option is NonNullable<typeof option> => Boolean(option))
+          .map((option) => ({
+            orderItemId: createdItem.id,
+            modifierOptionId: option.id,
+            nameSnapshot: option.name,
+            priceAdjustment: option.priceAdjustment,
+          }));
+
+        if (modifierRows.length > 0) {
+          await tx.restaurantOrderItemModifier.createMany({ data: modifierRows });
+        }
       }
 
-      record.timeline.unshift({
-        id: createId("tl"),
-        orderId: record.order.id,
-        type: ORDER_TIMELINE_EVENT_TYPES.STATUS_CHANGED,
+      return created;
+    });
+
+    const refreshed = await loadOrder(scope, order.id);
+    if (!refreshed) {
+      throw new Error("Failed to load created order");
+    }
+
+    const { guestNotes, meta: storedMeta } = splitOrderNotes(refreshed.notes);
+    const updatedMeta = appendTimelineEvent(storedMeta, {
+      orderId: order.id,
+      type: ORDER_TIMELINE_EVENT_TYPES.CREATED,
+      title: "Order created",
+      description: "New order submitted",
+      fromStatus: null,
+      toStatus: ORDER_STATUSES.PENDING,
+      metadata: { source: input.source },
+      occurredAt: refreshed.placedAt.toISOString(),
+      createdBy: scope.userId,
+    });
+
+    const updated = await prisma.restaurantOrder.update({
+      where: { id: order.id },
+      data: { notes: composeOrderNotes(guestNotes, updatedMeta) },
+      include: orderInclude,
+    });
+
+    return mapOrderToRecord(updated, scope);
+  }
+
+  async modify(scope: OrderTenantScope, input: ModifyOrderInput): Promise<OrderRecord | null> {
+    const existing = await loadOrder(scope, input.orderId);
+    if (!existing || isArchived(existing.notes)) {
+      return null;
+    }
+
+    const { guestNotes, meta } = splitOrderNotes(existing.notes);
+    let nextMeta: StoredOrderMeta = {
+      ...meta,
+      scheduledFor: input.scheduledFor ?? meta.scheduledFor ?? null,
+    };
+    const currentStatus = mapPrismaStatusToDomain(existing.status, existing.paymentStatus, meta);
+
+    if (input.status && input.status !== currentStatus) {
+      const allowed = ORDER_STATUS_TRANSITIONS[currentStatus];
+      if (!allowed.includes(input.status)) {
+        throw new Error(`Invalid status transition from ${currentStatus} to ${input.status}`);
+      }
+
+      nextMeta = appendTimelineEvent(nextMeta, {
+        orderId: input.orderId,
+        type: mapTimelineTypeForStatus(input.status),
         title: "Status updated",
         description: `Order moved to ${input.status.replace("_", " ")}`,
-        fromStatus: record.order.status,
+        fromStatus: currentStatus,
         toStatus: input.status,
         metadata: {},
-        occurredAt: now,
-        createdBy: DEFAULT_OMS_SCOPE.userId,
+        occurredAt: new Date().toISOString(),
+        createdBy: scope.userId,
       });
 
-      record.order.status = input.status;
-      record.order.completedAt =
-        input.status === ORDER_STATUSES.COMPLETED ? now : record.order.completedAt;
-    }
-
-    if (input.tableNumber !== undefined) {
-      record.order.tableNumber = input.tableNumber;
-    }
-
-    if (input.scheduledFor !== undefined) {
-      record.order.scheduledFor = input.scheduledFor;
-    }
-
-    if (input.items) {
-      const { subtotalPence, taxPence, totalPence } = computeTotals(input.items);
-
-      record.items = input.items.map((item, index) => ({
-        id: `${record.order.id}-item-${index + 1}`,
-        orderId: record.order.id,
-        productId: item.productId,
-        productName: item.productName,
-        sku: null,
-        quantity: item.quantity,
-        unitPricePence: item.unitPricePence,
-        lineTotalPence: item.quantity * item.unitPricePence,
-        modifiers: item.modifiers ?? [],
-        notes: item.notes ?? null,
-      }));
-
-      record.order.subtotalPence = subtotalPence;
-      record.order.taxTotalPence = taxPence;
-      record.order.totalPence = totalPence - record.order.discountTotalPence;
-      record.analytics.itemCount = input.items.reduce((sum, item) => sum + item.quantity, 0);
-
-      record.timeline.unshift({
-        id: createId("tl"),
-        orderId: record.order.id,
-        type: ORDER_TIMELINE_EVENT_TYPES.ITEM_MODIFIED,
-        title: "Items updated",
-        description: "Order line items were modified",
-        fromStatus: null,
-        toStatus: null,
-        metadata: { itemCount: String(record.analytics.itemCount) },
-        occurredAt: now,
-        createdBy: DEFAULT_OMS_SCOPE.userId,
-      });
+      if (input.status === ORDER_STATUSES.OUT_FOR_DELIVERY) {
+        nextMeta.domainStatus = ORDER_STATUSES.OUT_FOR_DELIVERY;
+      } else if (input.status === ORDER_STATUSES.DRAFT) {
+        nextMeta.domainStatus = ORDER_STATUSES.DRAFT;
+      } else if (input.status === ORDER_STATUSES.REFUNDED) {
+        nextMeta.domainStatus = ORDER_STATUSES.REFUNDED;
+      } else {
+        nextMeta.domainStatus = undefined;
+      }
     }
 
     if (input.note) {
-      record.notes.unshift({
-        id: createId("note"),
-        orderId: record.order.id,
+      const note = {
+        id: `${input.orderId}-note-${Date.now()}`,
+        orderId: input.orderId,
         content: input.note,
         isInternal: true,
-        createdBy: DEFAULT_OMS_SCOPE.userId,
-        createdAt: now,
+        createdBy: scope.userId,
+        createdAt: new Date().toISOString(),
+      };
+      nextMeta = appendTimelineEvent(
+        { ...nextMeta, notes: [...(nextMeta.notes ?? []), note] },
+        {
+          orderId: input.orderId,
+          type: ORDER_TIMELINE_EVENT_TYPES.NOTE_ADDED,
+          title: "Note added",
+          description: input.note,
+          fromStatus: null,
+          toStatus: null,
+          metadata: { noteId: note.id },
+          occurredAt: note.createdAt,
+          createdBy: scope.userId,
+        },
+      );
+    }
+
+    let subtotal = existing.subtotal;
+    let taxAmount = existing.taxAmount;
+    let totalAmount = existing.totalAmount;
+    let discountAmount = existing.discountAmount;
+    let serviceCharge = existing.serviceCharge;
+
+    if (input.items) {
+      await runInteractiveTransaction(async (tx) => {
+        await tx.restaurantOrderItem.deleteMany({ where: { orderId: input.orderId } });
+        if (input.items && input.items.length > 0) {
+          await tx.restaurantOrderItem.createMany({
+            data: input.items.map((item) => ({
+              orderId: input.orderId,
+              productId: item.productId,
+              productNameSnapshot: item.productName,
+              quantity: item.quantity,
+              unitPrice: penceToDecimal(item.unitPricePence),
+              totalAmount: penceToDecimal(item.quantity * item.unitPricePence),
+              specialInstructions: item.notes ?? null,
+            })),
+          });
+        }
+      });
+
+      const totals = computeTotals(
+        input.items,
+        input.discountAmountPence ?? decimalToPence(existing.discountAmount),
+        input.serviceChargePence ?? decimalToPence(existing.serviceCharge),
+        decimalToPence(existing.deliveryCharge),
+      );
+      subtotal = penceToDecimal(totals.subtotalPence);
+      taxAmount = penceToDecimal(totals.taxPence);
+      totalAmount = penceToDecimal(totals.totalPence);
+      discountAmount = penceToDecimal(input.discountAmountPence ?? decimalToPence(existing.discountAmount));
+      serviceCharge = penceToDecimal(input.serviceChargePence ?? decimalToPence(existing.serviceCharge));
+    } else if (input.discountAmountPence !== undefined || input.serviceChargePence !== undefined) {
+      const refreshedItems = existing.items.map((item) => ({
+        productId: item.productId,
+        productName: item.productNameSnapshot,
+        quantity: item.quantity,
+        unitPricePence: decimalToPence(item.unitPrice),
+      }));
+      const totals = computeTotals(
+        refreshedItems,
+        input.discountAmountPence ?? decimalToPence(existing.discountAmount),
+        input.serviceChargePence ?? decimalToPence(existing.serviceCharge),
+        decimalToPence(existing.deliveryCharge),
+      );
+      subtotal = penceToDecimal(totals.subtotalPence);
+      taxAmount = penceToDecimal(totals.taxPence);
+      totalAmount = penceToDecimal(totals.totalPence);
+      discountAmount = penceToDecimal(input.discountAmountPence ?? decimalToPence(existing.discountAmount));
+      serviceCharge = penceToDecimal(input.serviceChargePence ?? decimalToPence(existing.serviceCharge));
+    }
+
+    const updated = await prisma.restaurantOrder.update({
+      where: { id: input.orderId },
+      data: {
+        ...(input.status ? { status: mapDomainStatusToPrisma(input.status) } : {}),
+        ...(input.tableId !== undefined ? { restaurantTableId: input.tableId } : {}),
+        ...(input.customerId !== undefined ? { customerId: input.customerId } : {}),
+        ...(input.status === ORDER_STATUSES.PREPARING ? { kitchenPreparingAt: new Date() } : {}),
+        ...(input.status === ORDER_STATUSES.READY ? { kitchenReadyAt: new Date() } : {}),
+        ...(input.status === ORDER_STATUSES.SERVED ? { kitchenServedAt: new Date() } : {}),
+        ...(input.status === ORDER_STATUSES.COMPLETED
+          ? { completedAt: new Date(), paymentStatus: "PAID" }
+          : {}),
+        ...(input.status === ORDER_STATUSES.CANCELLED ? { cancelledAt: new Date() } : {}),
+        subtotal,
+        discountAmount,
+        taxAmount,
+        serviceCharge,
+        totalAmount,
+        notes: composeOrderNotes(input.note ? guestNotes : guestNotes, nextMeta),
+      },
+      include: orderInclude,
+    });
+
+    return mapOrderToRecord(updated, scope);
+  }
+
+  async cancel(scope: OrderTenantScope, orderId: string, reason?: string): Promise<OrderRecord | null> {
+    return this.modify(scope, {
+      orderId,
+      status: ORDER_STATUSES.CANCELLED,
+      note: reason,
+    });
+  }
+
+  async refund(scope: OrderTenantScope, orderId: string, reason?: string): Promise<OrderRecord | null> {
+    const existing = await loadOrder(scope, orderId);
+    if (!existing) {
+      return null;
+    }
+
+    await prisma.orderPayment.create({
+      data: {
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+        orderId,
+        paymentNumber: `REF-${Date.now()}`,
+        paymentMethod: "CARD",
+        status: "REFUNDED",
+        subtotal: existing.subtotal,
+        amountPaid: existing.totalAmount,
+        paidAt: new Date(),
+        transactionReference: reason ?? "manual-refund",
+      },
+    });
+
+    const updated = await prisma.restaurantOrder.update({
+      where: { id: orderId },
+      data: { paymentStatus: "REFUNDED" },
+      include: orderInclude,
+    });
+
+    const { guestNotes, meta } = splitOrderNotes(updated.notes);
+    const nextMeta = appendTimelineEvent(
+      { ...meta, domainStatus: ORDER_STATUSES.REFUNDED },
+      {
+        orderId,
+        type: ORDER_TIMELINE_EVENT_TYPES.REFUNDED,
+        title: "Order refunded",
+        description: reason ?? "Refund processed",
+        fromStatus: ORDER_STATUSES.COMPLETED,
+        toStatus: ORDER_STATUSES.REFUNDED,
+        metadata: {},
+        occurredAt: new Date().toISOString(),
+        createdBy: scope.userId,
+      },
+    );
+
+    const finalOrder = await prisma.restaurantOrder.update({
+      where: { id: orderId },
+      data: { notes: composeOrderNotes(guestNotes, nextMeta) },
+      include: orderInclude,
+    });
+
+    return mapOrderToRecord(finalOrder, scope);
+  }
+
+  async assignTable(scope: OrderTenantScope, orderId: string, tableId: string): Promise<OrderRecord | null> {
+    return this.modify(scope, { orderId, tableId });
+  }
+
+  async assignCustomer(
+    scope: OrderTenantScope,
+    orderId: string,
+    customerId: string,
+  ): Promise<OrderRecord | null> {
+    return this.modify(scope, { orderId, customerId });
+  }
+
+  async transfer(
+    scope: OrderTenantScope,
+    orderId: string,
+    targetBranchId: string,
+    targetTableId?: string,
+  ): Promise<OrderRecord | null> {
+    const existing = await loadOrder(scope, orderId);
+    if (!existing) {
+      return null;
+    }
+
+    const branch = await prisma.branch.findFirst({
+      where: { id: targetBranchId, businessId: scope.businessId },
+    });
+    if (!branch) {
+      throw new Error("Target branch not found");
+    }
+
+    const { guestNotes, meta } = splitOrderNotes(existing.notes);
+    const nextMeta = {
+      ...meta,
+      transferHistory: [
+        ...(meta.transferHistory ?? []),
+        { branchId: targetBranchId, transferredAt: new Date().toISOString() },
+      ],
+    };
+
+    const updated = await prisma.restaurantOrder.update({
+      where: { id: orderId },
+      data: {
+        branchId: targetBranchId,
+        restaurantTableId: targetTableId ?? null,
+        notes: composeOrderNotes(guestNotes, nextMeta),
+      },
+      include: orderInclude,
+    });
+
+    return mapOrderToRecord(updated, scope);
+  }
+
+  async mergeOrders(scope: OrderTenantScope, input: MergeOrdersSchemaInput): Promise<OrderRecord | null> {
+    const target = await loadOrder(scope, input.targetOrderId);
+    if (!target) {
+      return null;
+    }
+
+    for (const sourceId of input.sourceOrderIds) {
+      const source = await loadOrder(scope, sourceId);
+      if (!source) {
+        continue;
+      }
+
+      await prisma.restaurantOrderItem.updateMany({
+        where: { orderId: sourceId },
+        data: { orderId: input.targetOrderId },
+      });
+
+      await prisma.restaurantOrder.update({
+        where: { id: sourceId },
+        data: {
+          status: "CANCELLED",
+          cancelledAt: new Date(),
+          mergedFromOrderId: input.targetOrderId,
+        },
       });
     }
 
-    record.order.updatedAt = now;
-    record.history.unshift({
-      id: createId("hist"),
-      orderId: record.order.id,
-      action: "order.modified",
-      snapshot: { status: record.order.status },
-      performedBy: DEFAULT_OMS_SCOPE.userId,
-      performedAt: now,
-    });
-
-    return record;
-  }
-
-  cancel(orderId: string, reason?: string): OrderRecord | undefined {
-    const record = this.modify({ orderId, status: ORDER_STATUSES.CANCELLED });
-
-    if (!record) {
-      return undefined;
+    const refreshed = await loadOrder(scope, input.targetOrderId);
+    if (!refreshed) {
+      return null;
     }
 
-    const now = new Date().toISOString();
+    const items = refreshed.items.map((item) => ({
+      productId: item.productId,
+      productName: item.productNameSnapshot,
+      quantity: item.quantity,
+      unitPricePence: decimalToPence(item.unitPrice),
+    }));
+    const totals = computeTotals(items, decimalToPence(refreshed.discountAmount), decimalToPence(refreshed.serviceCharge), decimalToPence(refreshed.deliveryCharge));
 
-    record.timeline.unshift({
-      id: createId("tl"),
-      orderId,
-      type: ORDER_TIMELINE_EVENT_TYPES.CANCELLED,
-      title: "Order cancelled",
-      description: reason ?? "Order cancelled by request",
-      fromStatus: record.order.status,
-      toStatus: ORDER_STATUSES.CANCELLED,
-      metadata: reason ? { reason } : {},
-      occurredAt: now,
-      createdBy: DEFAULT_OMS_SCOPE.userId,
+    const updated = await prisma.restaurantOrder.update({
+      where: { id: input.targetOrderId },
+      data: {
+        subtotal: penceToDecimal(totals.subtotalPence),
+        taxAmount: penceToDecimal(totals.taxPence),
+        totalAmount: penceToDecimal(totals.totalPence),
+      },
+      include: orderInclude,
     });
 
-    return record;
+    return mapOrderToRecord(updated, scope);
   }
 
-  refund(orderId: string): OrderRecord | undefined {
-    const record = this.findById(orderId);
-
-    if (!record || record.order.status !== ORDER_STATUSES.COMPLETED) {
-      return undefined;
+  async splitOrder(scope: OrderTenantScope, input: SplitOrderSchemaInput): Promise<OrderRecord[]> {
+    const source = await loadOrder(scope, input.orderId);
+    if (!source) {
+      return [];
     }
 
-    const now = new Date().toISOString();
-    record.order.status = ORDER_STATUSES.REFUNDED;
-    record.order.updatedAt = now;
+    const splitItems = source.items.filter((item) => input.itemIds.includes(item.id));
+    if (splitItems.length === 0) {
+      return [];
+    }
 
-    record.payments.push({
-      id: createId("pay"),
-      orderId,
-      method: "card",
-      status: PAYMENT_STATUSES.REFUNDED,
-      amountPence: record.order.totalPence,
-      reference: "refund_mock",
-      processedAt: now,
+    const newOrder = await this.create(scope, {
+      tenantId: scope.tenantId,
+      workspaceId: scope.workspaceId,
+      businessId: scope.businessId,
+      branchId: scope.branchId,
+      orderType: mapPrismaOrderTypeToDomain(source.orderType, source.qrSessionId),
+      source: splitOrderNotes(source.notes).meta.source ?? ORDER_SOURCES.POS,
+      tableId: source.restaurantTableId,
+      items: splitItems.map((item) => ({
+        productId: item.productId,
+        productName: item.productNameSnapshot,
+        quantity: item.quantity,
+        unitPricePence: decimalToPence(item.unitPrice),
+        notes: item.specialInstructions,
+      })),
     });
 
-    record.timeline.unshift({
-      id: createId("tl"),
-      orderId,
-      type: ORDER_TIMELINE_EVENT_TYPES.REFUNDED,
-      title: "Order refunded",
-      description: "Full refund processed",
-      fromStatus: ORDER_STATUSES.COMPLETED,
-      toStatus: ORDER_STATUSES.REFUNDED,
-      metadata: {},
-      occurredAt: now,
-      createdBy: DEFAULT_OMS_SCOPE.userId,
+    await prisma.restaurantOrderItem.deleteMany({
+      where: { id: { in: input.itemIds }, orderId: input.orderId },
     });
 
-    return record;
+    const remaining = await this.findById(scope, input.orderId);
+    return [newOrder, ...(remaining ? [remaining] : [])];
+  }
+
+  async archive(scope: OrderTenantScope, orderId: string): Promise<OrderRecord | null> {
+    const existing = await loadOrder(scope, orderId);
+    if (!existing) {
+      return null;
+    }
+
+    const { guestNotes, meta } = splitOrderNotes(existing.notes);
+    const updated = await prisma.restaurantOrder.update({
+      where: { id: orderId },
+      data: {
+        notes: composeOrderNotes(guestNotes, {
+          ...meta,
+          archived: true,
+          archivedAt: new Date().toISOString(),
+        }),
+      },
+      include: orderInclude,
+    });
+
+    return mapOrderToRecord(updated, scope);
+  }
+
+  async restore(scope: OrderTenantScope, orderId: string): Promise<OrderRecord | null> {
+    const existing = await loadOrder(scope, orderId);
+    if (!existing) {
+      return null;
+    }
+
+    const { guestNotes, meta } = splitOrderNotes(existing.notes);
+    const updated = await prisma.restaurantOrder.update({
+      where: { id: orderId },
+      data: {
+        notes: composeOrderNotes(guestNotes, {
+          ...meta,
+          archived: false,
+          archivedAt: undefined,
+        }),
+      },
+      include: orderInclude,
+    });
+
+    return mapOrderToRecord(updated, scope);
+  }
+
+  async deleteHard(scope: OrderTenantScope, orderId: string): Promise<boolean> {
+    const result = await prisma.restaurantOrder.deleteMany({
+      where: { id: orderId, ...scopeWhere(scope) },
+    });
+    return result.count > 0;
+  }
+
+  async bulkUpdate(scope: OrderTenantScope, input: BulkUpdateOrdersSchemaInput): Promise<number> {
+    let updated = 0;
+    for (const orderId of input.orderIds) {
+      if (input.status) {
+        const record = await this.modify(scope, { orderId, status: input.status });
+        if (record) {
+          updated += 1;
+        }
+      }
+    }
+    return updated;
   }
 }
 

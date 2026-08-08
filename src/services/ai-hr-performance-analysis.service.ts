@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getStaffAnalytics } from "@/services/reporting.service";
 import { createHrInsight, createHrRecommendation } from "@/services/ai-hr-insight.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 
 async function getOwnedBusinessId(ownerId: string): Promise<string> {
@@ -57,47 +58,26 @@ export async function getPerformanceSnapshot(ownerId: string): Promise<Performan
 }
 
 export async function generatePerformanceInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getPerformanceSnapshot(ownerId);
-  let created = 0;
-
-  if (snapshot.topPerformers.length > 0) {
-    const top = snapshot.topPerformers[0]!;
-    await createHrInsight(businessId, {
-      staffId: top.staffId,
-      title: "High-performing employee identified",
-      description: `${top.name} handled ${top.ordersHandled} orders this period.`,
-      category: "performance",
-      priority: "MEDIUM",
-      recommendation: "Recognize top performers and consider mentorship roles.",
-      metadata: { ordersHandled: top.ordersHandled },
-    });
-    created += 1;
-  }
-
-  if (snapshot.lowPerformers.length > 0) {
-    await createHrInsight(businessId, {
-      title: "Performance coaching opportunity",
-      description: `${snapshot.lowPerformers.length} staff members are below average activity.`,
-      category: "performance",
-      priority: "HIGH",
-      recommendation: "Schedule performance reviews and identify training needs.",
-      metadata: { staffIds: snapshot.lowPerformers.map((p) => p.staffId) },
-    });
-    created += 1;
-  }
-
-  for (const performer of snapshot.topPerformers.slice(0, 2)) {
-    await createHrRecommendation(businessId, {
-      staffId: performer.staffId,
-      title: `Recognize ${performer.name}`,
-      description: `Strong performance with ${performer.ordersHandled} orders handled.`,
-      action: "Consider bonus, recognition, or leadership development opportunity.",
-      confidenceScore: 0.85,
-      metadata: { type: "performance_recognition" },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "hr",
+    task: "performance-insights",
+    loadContext: getPerformanceSnapshot,
+    persistInsight: (businessId, insight) =>
+      createHrInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "performance",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+    persistRecommendation: (businessId, recommendation) =>
+      createHrRecommendation(businessId, {
+        title: recommendation.title,
+        description: recommendation.description,
+        action: recommendation.action ?? recommendation.recommendation ?? "Review AI recommendation",
+        confidenceScore: recommendation.confidenceScore,
+        metadata: recommendation.metadata,
+      }),
+  });
 }

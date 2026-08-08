@@ -1,5 +1,8 @@
 import "server-only";
 
+/** Orchestrates domain AI inference via delegated services. */
+
+
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -86,7 +89,7 @@ export async function processVoiceCommand(
     throw new Error("Voice session not found or not active");
   }
 
-  const detection = detectVoiceIntent(commandText);
+  const detection = await detectVoiceIntent(ownerId, commandText);
   const routing = routeVoiceIntent(detection);
   const isUnknown = detection.intent === "unknown";
 

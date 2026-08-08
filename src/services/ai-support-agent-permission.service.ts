@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
 import { hasPermission } from "@/modules/authorization/services/authorization.service";
 

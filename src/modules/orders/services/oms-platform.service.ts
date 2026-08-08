@@ -1,5 +1,8 @@
-import { DEFAULT_OMS_SCOPE } from "@/modules/orders/constants/mock-data";
+import "server-only";
+
+import { ORDER_STATUSES, type OrderStatus } from "@/modules/orders/constants/order-status";
 import { orderRepository } from "@/modules/orders/repository/order-repository";
+import { buildOrderScopeFromInput } from "@/modules/orders/lib/order-scope";
 import type { OmsPlatformContext, OrderRecord } from "@/modules/orders/types/order";
 
 export interface OmsPlatformSnapshot {
@@ -12,53 +15,36 @@ export interface OmsPlatformSnapshot {
   totalRevenuePence: number;
 }
 
-export interface OmsPlatformInput {
-  tenantId?: string;
-  workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
-  userId?: string;
-}
+export async function buildOmsPlatformSnapshot(
+  context: OmsPlatformContext,
+): Promise<OmsPlatformSnapshot> {
+  const scope = buildOrderScopeFromInput(context);
+  const orders = await orderRepository.list(scope);
 
-export function buildOmsPlatformContext(input: OmsPlatformInput = {}): OmsPlatformContext {
-  return {
-    tenantId: input.tenantId ?? DEFAULT_OMS_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_OMS_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_OMS_SCOPE.businessId,
-    branchId: input.branchId ?? DEFAULT_OMS_SCOPE.branchId,
-    userId: input.userId ?? DEFAULT_OMS_SCOPE.userId,
-  };
-}
-
-export function buildOmsPlatformSnapshot(input: OmsPlatformInput = {}): OmsPlatformSnapshot {
-  const context = buildOmsPlatformContext(input);
-  const orders = orderRepository.search({
-    tenantId: context.tenantId,
-    businessId: context.businessId,
-    branchId: context.branchId,
-  });
-
-  const activeStatuses = new Set([
-    "pending",
-    "confirmed",
-    "preparing",
-    "ready",
-    "out_for_delivery",
+  const activeStatuses = new Set<OrderStatus>([
+    ORDER_STATUSES.PENDING,
+    ORDER_STATUSES.CONFIRMED,
+    ORDER_STATUSES.PREPARING,
+    ORDER_STATUSES.READY,
+    ORDER_STATUSES.SERVED,
+    ORDER_STATUSES.OUT_FOR_DELIVERY,
   ]);
+
+  const today = new Date().toISOString().slice(0, 10);
 
   return {
     context,
     orders,
     activeCount: orders.filter((record) => activeStatuses.has(record.order.status)).length,
-    preparingCount: orders.filter((record) => record.order.status === "preparing").length,
-    deliveryCount: orders.filter((record) => record.order.status === "out_for_delivery").length,
-    completedTodayCount: orders.filter((record) => record.order.status === "completed").length,
+    preparingCount: orders.filter((record) => record.order.status === ORDER_STATUSES.PREPARING).length,
+    deliveryCount: orders.filter((record) => record.order.status === ORDER_STATUSES.OUT_FOR_DELIVERY).length,
+    completedTodayCount: orders.filter(
+      (record) =>
+        record.order.status === ORDER_STATUSES.COMPLETED &&
+        record.order.completedAt?.slice(0, 10) === today,
+    ).length,
     totalRevenuePence: orders
-      .filter((record) => record.order.status === "completed")
+      .filter((record) => record.order.status === ORDER_STATUSES.COMPLETED)
       .reduce((sum, record) => sum + record.order.totalPence, 0),
   };
-}
-
-export function getDefaultOmsSnapshot(): OmsPlatformSnapshot {
-  return buildOmsPlatformSnapshot();
 }

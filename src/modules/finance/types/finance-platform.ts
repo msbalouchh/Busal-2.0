@@ -10,6 +10,57 @@ import type {
   TaxType,
 } from "@/modules/finance/constants/finance-status";
 
+/** Cost centre for expense allocation. */
+export interface CostCenter {
+  id: string;
+  tenantId: string;
+  businessId: string;
+  branchId: string;
+  code: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Budget allocation for an account/period. */
+export interface Budget {
+  id: string;
+  tenantId: string;
+  businessId: string;
+  branchId: string;
+  costCenterId: string | null;
+  accountId: string;
+  periodId: string;
+  name: string;
+  allocatedCents: number;
+  spentCents: number;
+  currency: string;
+  isActive: boolean;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Bank reconciliation record. */
+export interface BankReconciliation {
+  id: string;
+  tenantId: string;
+  businessId: string;
+  branchId: string;
+  bankAccountId: string;
+  statementDate: string;
+  statementBalanceCents: number;
+  ledgerBalanceCents: number;
+  differenceCents: number;
+  isReconciled: boolean;
+  reconciledAt: string | null;
+  reconciledByUserId: string | null;
+  createdAt: string;
+}
+
 /** Chart of accounts entry. */
 export interface ChartOfAccount {
   id: string;
@@ -373,6 +424,8 @@ export interface FinanceAiContext {
 export interface FinanceRecord {
   period: FinancialPeriod;
   chartOfAccounts: ChartOfAccount[];
+  costCenters: CostCenter[];
+  budgets: Budget[];
   ledgers: Ledger[];
   journalEntries: JournalEntry[];
   transactions: FinanceTransaction[];
@@ -384,6 +437,7 @@ export interface FinanceRecord {
   taxes: FinanceTax[];
   cashRegisters: CashRegister[];
   bankAccounts: BankAccount[];
+  bankReconciliations: BankReconciliation[];
   payrollTransactions: PayrollTransaction[];
   supplierPayments: SupplierPayment[];
   customerPayments: CustomerPayment[];
@@ -392,6 +446,21 @@ export interface FinanceRecord {
   cashFlow: CashFlow;
   analytics: FinanceAnalytics;
   aiContext: FinanceAiContext;
+}
+
+export interface FinancePlatformSnapshot {
+  context: FinancePlatformContext;
+  record: FinanceRecord;
+  revenueCents: number;
+  expenseCents: number;
+  netProfitCents: number;
+  accountsReceivableCents: number;
+  accountsPayableCents: number;
+  cashOnHandCents: number;
+  invoiceCount: number;
+  overdueInvoiceCount: number;
+  unpaidInvoiceCount: number;
+  grossMarginBps: number;
 }
 
 export interface FinanceSearchQuery {
@@ -449,11 +518,25 @@ export interface FinancePlatformContext {
 export interface FinanceContextValue {
   context: FinancePlatformContext;
   record: FinanceRecord;
+  revenueCents: number;
+  expenseCents: number;
+  netProfitCents: number;
+  accountsReceivableCents: number;
+  accountsPayableCents: number;
+  cashOnHandCents: number;
+  invoiceCount: number;
+  overdueInvoiceCount: number;
+  unpaidInvoiceCount: number;
+  grossMarginBps: number;
   selectedInvoiceId: string | null;
   selectedInvoice: Invoice | null;
   selectInvoice: (invoiceId: string | null) => void;
   searchTransactions: (query: FinanceSearchQuery) => FinanceTransaction[];
   refresh: () => void;
+  isRefreshing: boolean;
+  error: string | null;
+  featureAccessDenied: boolean;
+  featureAccessMessage: string | null;
 }
 
 export interface FinanceLedgerContextValue {

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSalesDashboard as getCrmSalesDashboard } from "@/services/sales-crm.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { createSalesInsight } from "@/services/ai-sales-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 
 export interface PipelineStageInsight {
   stageName: string;
@@ -46,49 +47,20 @@ export async function getPipelineAnalysisSnapshot(
 }
 
 export async function generatePipelineInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getPipelineAnalysisSnapshot(ownerId);
-  let created = 0;
-
-  await createSalesInsight(businessId, {
-    title: "Pipeline overview",
-    description: `${snapshot.totalOpportunities} total opportunities with £${(snapshot.openOpportunityValuePence / 100).toFixed(2)} in open pipeline value.`,
-    category: "pipeline",
-    priority: snapshot.totalOpportunities === 0 ? "HIGH" : "MEDIUM",
-    recommendation:
-      snapshot.openLeads > 0
-        ? `${snapshot.openLeads} leads awaiting qualification. Review and convert to opportunities.`
-        : "Focus on generating new leads to fill the pipeline.",
-    metadata: { snapshot },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "sales",
+    task: "pipeline-insights",
+    loadContext: getPipelineAnalysisSnapshot,
+    persistInsight: (businessId, insight) =>
+      createSalesInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "pipeline",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  const bottleneck = snapshot.stages.find((stage) => stage.count >= 3);
-  if (bottleneck) {
-    await createSalesInsight(businessId, {
-      title: `Pipeline bottleneck: ${bottleneck.stageName}`,
-      description: `${bottleneck.count} opportunities stuck at ${bottleneck.stageName} stage.`,
-      category: "pipeline",
-      priority: "HIGH",
-      recommendation: `Review ${bottleneck.stageName} stage deals and schedule follow-ups.`,
-      metadata: { stage: bottleneck },
-    });
-    created += 1;
-  }
-
-  if (snapshot.pendingTasks > 0) {
-    await createSalesInsight(businessId, {
-      title: "Pending sales tasks",
-      description: `${snapshot.pendingTasks} sales tasks require attention.`,
-      category: "follow_up",
-      priority: snapshot.pendingTasks > 5 ? "CRITICAL" : "HIGH",
-      recommendation: "Complete overdue tasks to maintain pipeline momentum.",
-      metadata: { pendingTasks: snapshot.pendingTasks },
-    });
-    created += 1;
-  }
-
-  return created;
 }
 
 export async function listPipelineOpportunities(ownerId: string) {

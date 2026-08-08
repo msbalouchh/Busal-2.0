@@ -5,6 +5,7 @@ import type { CampaignStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { createMarketingInsight } from "@/services/ai-marketing-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 
 export interface CampaignPerformanceItem {
   id: string;
@@ -81,37 +82,20 @@ export async function listMarketingCampaigns(ownerId: string) {
 }
 
 export async function generateCampaignInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getCampaignAnalysisSnapshot(ownerId);
-  let created = 0;
-
-  await createMarketingInsight(businessId, {
-    title: "Campaign portfolio overview",
-    description: `${snapshot.activeCampaigns} active, ${snapshot.plannedCampaigns} planned, ${snapshot.completedCampaigns} completed campaigns.`,
-    category: "campaign",
-    priority: snapshot.activeCampaigns === 0 ? "HIGH" : "MEDIUM",
-    recommendation:
-      snapshot.plannedCampaigns > 0
-        ? "Review planned campaigns and activate high-priority initiatives."
-        : "Plan a new acquisition or retention campaign for the upcoming period.",
-    metadata: { snapshot },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "marketing",
+    task: "campaign-insights",
+    loadContext: getCampaignAnalysisSnapshot,
+    persistInsight: (businessId, insight) =>
+      createMarketingInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "campaign",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  const active = snapshot.campaigns.filter((c) => c.status === "ACTIVE");
-  if (active.length > 0) {
-    await createMarketingInsight(businessId, {
-      title: "Active campaign performance",
-      description: `${active.length} campaigns currently running: ${active.map((c) => c.name).join(", ")}.`,
-      category: "campaign",
-      priority: "MEDIUM",
-      recommendation: "Monitor engagement metrics and adjust targeting mid-campaign if needed.",
-      metadata: { campaignIds: active.map((c) => c.id) },
-    });
-    created += 1;
-  }
-
-  return created;
 }
 
 export async function ensureSampleCampaigns(ownerId: string): Promise<void> {

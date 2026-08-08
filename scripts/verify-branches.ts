@@ -2,12 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PrismaClient } from "@prisma/client";
-
+import { getVerifyPrisma } from "./lib/verify-prisma";
+import { connectWithRetry, handleVerificationError } from "./lib/verify-db";
+import { bootstrapVerificationEnvironment } from "./lib/verify-bootstrap";
+import { createOmsOrderFromQrFlow } from "./lib/verify-oms-order";
 import { PERMISSION_CODES } from "../src/modules/authorization/constants/permissions";
 import { branchFilter } from "../src/modules/business-context/utils/branch-scope";
 import { BRANCH_ROUTES } from "../src/modules/branches/constants/routes";
-import { addItem, createCart } from "../src/services/cart.service";
 import { getBranchDashboard, getCentralBranchDashboard } from "../src/services/branch.service";
 import {
   createBranch,
@@ -15,13 +16,10 @@ import {
   listBranches,
 } from "../src/services/business-management.service";
 import { listOrders } from "../src/services/order.service";
-import { createOrderFromSession } from "../src/services/order.service";
-import { createOrderSession, markOrderSessionReady } from "../src/services/order-session.service";
-import { recordPayment } from "../src/services/payment.service";
-import { createQRCode, recordPublicMenuVisit } from "../src/services/qr-menu.service";
+import { recordPaymentForBusiness } from "../src/modules/payments/services/payment-business-bridge.service";
 import { moneyDecimalToPence } from "../src/modules/payments/utils/currency";
 
-const prisma = new PrismaClient();
+const prisma = getVerifyPrisma();
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -36,43 +34,23 @@ async function createBranchOrder(
   branchId: string,
   suffix: string,
 ) {
-  const qrCode = await createQRCode(ownerId, { slug: `branch-${suffix}`, branchId });
-  const visit = await recordPublicMenuVisit(ownerId, qrCode.id, {
-    sessionToken: `branch-token-${suffix}`,
-  });
-
-  const menuItem = await prisma.menuItem.create({
-    data: {
-      businessId,
-      branchId,
-      name: `Branch Verify Item ${suffix}`,
-      price: 12,
-      isAvailable: true,
-    },
-    select: { id: true },
-  });
-
-  const cart = await createCart(businessId, visit.session.id, branchId);
-  await addItem(businessId, visit.session.id, menuItem.id, 1, branchId);
-
-  const orderSession = await createOrderSession(businessId, cart.id, visit.session.id, {
+  const { order } = await createOmsOrderFromQrFlow(prisma, businessId, ownerId, suffix, {
+    slugPrefix: "branch",
     branchId,
+    price: 12,
   });
-  await markOrderSessionReady(orderSession.id);
 
-  const order = await createOrderFromSession(orderSession.id, branchId);
-  const orderRecord = await prisma.legacyOrder.findUniqueOrThrow({
+  const orderRecord = await prisma.restaurantOrder.findUniqueOrThrow({
     where: { id: order.id },
-    select: { total: true, branchId: true },
+    select: { totalAmount: true, branchId: true },
   });
 
   assert(orderRecord.branchId === branchId, "order should belong to branch");
 
-  const orderTotalPence = moneyDecimalToPence(orderRecord.total);
-  await recordPayment(
+  const orderTotalPence = moneyDecimalToPence(orderRecord.totalAmount);
+  await recordPaymentForBusiness(
     businessId,
     order.id,
-    null,
     {
       method: "CASH",
       amountPence: orderTotalPence,
@@ -85,6 +63,9 @@ async function createBranchOrder(
 }
 
 async function main() {
+  bootstrapVerificationEnvironment();
+  await connectWithRetry(prisma);
+
   console.log("Module structure");
   const moduleFiles = [
     "src/modules/branches/index.ts",
@@ -207,10 +188,7 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
+  .catch(handleVerificationError)
   .finally(async () => {
     await prisma.$disconnect();
   });

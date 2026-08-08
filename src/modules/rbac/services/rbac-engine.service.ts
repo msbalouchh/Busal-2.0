@@ -12,8 +12,6 @@ export {
 } from "@/modules/rbac/utils/authorization-engine";
 
 export {
-  buildRbacEngineContext,
-  buildRbacSnapshot,
-  getDefaultRbacSnapshot,
-  createRbacContextValue,
-} from "@/modules/rbac/services/mock-rbac.service";
+  buildRbacFoundationSnapshot,
+  type RbacFoundationInput,
+} from "@/modules/rbac/services/rbac-foundation.service";

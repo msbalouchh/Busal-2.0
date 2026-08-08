@@ -4,6 +4,7 @@ import { getCrmDashboard } from "@/services/crm.service";
 import { getCustomerAnalytics } from "@/services/reporting.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { createMarketingInsight } from "@/services/ai-marketing-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 
 export interface AudienceSnapshot {
   totalCustomers: number;
@@ -39,34 +40,18 @@ export async function getAudienceSnapshot(ownerId: string): Promise<AudienceSnap
 }
 
 export async function generateAudienceInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getAudienceSnapshot(ownerId);
-  let created = 0;
-
-  await createMarketingInsight(businessId, {
-    title: "Audience overview",
-    description: `${snapshot.totalCustomers} total customers · ${snapshot.newCustomers} new this month · ${snapshot.retentionRatePercent}% retention.`,
-    category: "audience",
-    priority: "MEDIUM",
-    recommendation:
-      snapshot.newCustomers < snapshot.returningCustomers
-        ? "Focus acquisition campaigns to balance new vs returning customer ratio."
-        : "Strong returning base — prioritize loyalty and upsell campaigns.",
-    metadata: { snapshot },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "marketing",
+    task: "audience-insights",
+    loadContext: getAudienceSnapshot,
+    persistInsight: (businessId, insight) =>
+      createMarketingInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "audience",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  if (snapshot.vipCustomers > 0) {
-    await createMarketingInsight(businessId, {
-      title: "VIP audience segment",
-      description: `${snapshot.vipCustomers} VIP customers identified for premium campaigns.`,
-      category: "audience",
-      priority: "HIGH",
-      recommendation: "Launch exclusive offers or early-access promotions for VIP segment.",
-      metadata: { vipCustomers: snapshot.vipCustomers },
-    });
-    created += 1;
-  }
-
-  return created;
 }

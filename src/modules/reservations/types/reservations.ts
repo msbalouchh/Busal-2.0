@@ -227,6 +227,11 @@ export interface ReservationSearchQuery {
   partySizeMin?: number;
   isVip?: boolean;
   limit?: number;
+  page?: number;
+  pageSize?: number;
+  sortBy?: "date" | "time" | "partySize" | "status" | "createdAt";
+  sortDirection?: "asc" | "desc";
+  includeArchived?: boolean;
 }
 
 export interface CreateReservationInput {
@@ -234,13 +239,18 @@ export interface CreateReservationInput {
   partySize: number;
   scheduledDate: string;
   startTime: string;
+  endTime?: string;
   durationMinutes?: number;
   source?: ReservationSource;
-  guestFirstName: string;
-  guestLastName: string;
+  guestFirstName?: string;
+  guestLastName?: string;
   guestEmail?: string;
   guestPhone?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
   specialRequests?: string;
+  notes?: string;
   isVip?: boolean;
   tableId?: string;
 }
@@ -251,8 +261,18 @@ export interface UpdateReservationInput {
   partySize?: number;
   scheduledDate?: string;
   startTime?: string;
+  endTime?: string;
   specialRequests?: string;
+  notes?: string | null;
   tableId?: string | null;
+  guestFirstName?: string;
+  guestLastName?: string;
+  guestEmail?: string | null;
+  guestPhone?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string | null;
+  source?: ReservationSource;
 }
 
 export interface CancelReservationInput {
@@ -264,7 +284,7 @@ export interface CancelReservationInput {
 export interface AssignTableInput {
   reservationId: string;
   tableId: string;
-  floorId: string;
+  floorId?: string;
   assignedBy?: string;
   isAutoSuggested?: boolean;
 }
@@ -293,4 +313,6 @@ export interface ReservationContextValue {
   selectReservation: (reservationId: string | null) => void;
   searchReservations: (query: ReservationSearchQuery) => ReservationRecord[];
   refresh: () => void;
+  isRefreshing?: boolean;
+  error?: string | null;
 }

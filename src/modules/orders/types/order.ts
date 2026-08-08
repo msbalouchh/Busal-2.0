@@ -169,6 +169,11 @@ export interface OrderSearchQuery {
   orderType?: OrderType;
   customerId?: string;
   limit?: number;
+  page?: number;
+  pageSize?: number;
+  sortBy?: "placedAt" | "total" | "status" | "orderNumber";
+  sortDirection?: "asc" | "desc";
+  includeArchived?: boolean;
 }
 
 export interface CreateOrderInput {
@@ -180,14 +185,22 @@ export interface CreateOrderInput {
   customerName?: string | null;
   orderType: OrderType;
   source: OrderSource;
+  tableId?: string | null;
+  reservationId?: string | null;
+  qrSessionId?: string | null;
   tableNumber?: string | null;
   scheduledFor?: string | null;
+  notes?: string | null;
+  discountAmountPence?: number;
+  serviceChargePence?: number;
+  deliveryChargePence?: number;
   items: Array<{
     productId: string;
     productName: string;
     quantity: number;
     unitPricePence: number;
     modifiers?: string[];
+    modifierOptionIds?: string[];
     notes?: string | null;
   }>;
 }
@@ -195,10 +208,15 @@ export interface CreateOrderInput {
 export interface ModifyOrderInput {
   orderId: string;
   status?: OrderStatus;
+  tableId?: string | null;
+  customerId?: string | null;
+  customerName?: string | null;
   tableNumber?: string | null;
   scheduledFor?: string | null;
   items?: CreateOrderInput["items"];
   note?: string;
+  discountAmountPence?: number;
+  serviceChargePence?: number;
 }
 
 export interface OmsPlatformContext {
@@ -216,4 +234,6 @@ export interface OrdersContextValue {
   selectOrder: (orderId: string | null) => void;
   searchOrders: (query: OrderSearchQuery) => OrderRecord[];
   refresh: () => void;
+  isRefreshing?: boolean;
+  error?: string | null;
 }

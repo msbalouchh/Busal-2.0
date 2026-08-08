@@ -1,24 +1,33 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { resolveCanonicalOriginForHost } from "@/config/app-url";
+import { ROUTES } from "@/constants/routes";
 import { USER_ROLES } from "@/constants/roles";
 import { createClient } from "@/lib/supabase/middleware";
 import {
   isBusinessAuthRoute,
   isCustomerPortalAuthRoute,
   isCustomerPortalProtectedRoute,
+  isEmailVerificationPendingApiRoute,
+  isEmailVerificationPendingRoute,
   isPlatformAuthRoute,
   isPlatformProtectedApiRoute,
   isPlatformProtectedAppRoute,
   redirectAuthenticatedToCustomerPortal,
   redirectAuthenticatedToDashboard,
   redirectUnauthenticatedToLogin,
+  redirectUnverifiedToVerifyEmail,
   unauthenticatedApiResponse,
+  unverifiedApiResponse,
 } from "@/modules/platform-guards/middleware/platform-guards-middleware";
 
 function resolveUserRole(user: { user_metadata?: Record<string, unknown> }): string {
   const role = user.user_metadata?.role;
   return typeof role === "string" ? role : USER_ROLES.OWNER;
+}
+
+function hasVerifiedEmail(user: { email_confirmed_at?: string | null }): boolean {
+  return Boolean(user.email_confirmed_at);
 }
 
 export async function middleware(request: NextRequest) {
@@ -46,6 +55,27 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = isPlatformAuthRoute(pathname);
   const userRole = user ? resolveUserRole(user) : null;
   const isCustomerUser = userRole === USER_ROLES.CUSTOMER;
+  const emailVerified = user ? hasVerifiedEmail(user) : true;
+
+  if (user && !emailVerified) {
+    const isPendingRoute =
+      isEmailVerificationPendingRoute(pathname) || isEmailVerificationPendingApiRoute(pathname);
+
+    if (!isPendingRoute) {
+      if (isProtectedApiRoute || pathname.startsWith("/api/")) {
+        return unverifiedApiResponse();
+      }
+
+      if (
+        isProtectedAppRoute ||
+        isPortalProtectedRoute ||
+        pathname === ROUTES.businessOnboarding ||
+        pathname.startsWith(`${ROUTES.businessOnboarding}/`)
+      ) {
+        return redirectUnverifiedToVerifyEmail(request);
+      }
+    }
+  }
 
   if ((isProtectedAppRoute || isProtectedApiRoute || isPortalProtectedRoute) && !user) {
     if (isProtectedApiRoute || pathname.startsWith("/api/portal/")) {

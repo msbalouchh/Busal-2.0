@@ -1,4 +1,7 @@
-import { DEFAULT_ANALYTICS_SCOPE } from "@/modules/analytics/constants/mock-data";
+import "server-only";
+
+import { buildAnalyticsPlatformContext as buildContext } from "@/modules/analytics/lib/analytics-platform-context";
+import type { AnalyticsTenantScope } from "@/modules/analytics/lib/analytics-scope";
 import { analyticsRepository } from "@/modules/analytics/repository/analytics-repository";
 import type {
   AnalyticsPlatformContext,
@@ -23,31 +26,30 @@ export interface AnalyticsPlatformSnapshot {
 export interface AnalyticsPlatformInput {
   tenantId?: string;
   workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
+  businessId: string;
+  branchId: string;
   userId?: string;
   baseCurrency?: string;
 }
 
-export function buildAnalyticsPlatformContext(
-  input: AnalyticsPlatformInput = {},
-): AnalyticsPlatformContext {
-  return {
-    tenantId: input.tenantId ?? DEFAULT_ANALYTICS_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_ANALYTICS_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_ANALYTICS_SCOPE.businessId,
-    branchId: input.branchId ?? DEFAULT_ANALYTICS_SCOPE.branchId,
-    userId: input.userId ?? DEFAULT_ANALYTICS_SCOPE.userId,
-    baseCurrency: input.baseCurrency ?? DEFAULT_ANALYTICS_SCOPE.baseCurrency,
-  };
-}
+export { buildContext as buildAnalyticsPlatformContext };
 
-export function buildAnalyticsPlatformSnapshot(
-  input: AnalyticsPlatformInput = {},
-): AnalyticsPlatformSnapshot {
-  const context = buildAnalyticsPlatformContext(input);
-  const record = analyticsRepository.getRecord();
-  const criticalAlerts = analyticsRepository.getCriticalAlerts();
+export async function buildAnalyticsPlatformSnapshot(
+  context: AnalyticsPlatformContext,
+): Promise<AnalyticsPlatformSnapshot> {
+  const scope: AnalyticsTenantScope = {
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+    baseCurrency: context.baseCurrency,
+  };
+
+  const record = await analyticsRepository.getRecord(scope);
+  const criticalAlerts = record.alerts.filter(
+    (alert) => alert.severity === "critical" && !alert.isAcknowledged,
+  );
 
   return {
     context,
@@ -55,7 +57,7 @@ export function buildAnalyticsPlatformSnapshot(
     revenueCents: record.sales.totalRevenueCents,
     orderCount: record.sales.orderCount,
     kpiCount: record.kpis.length,
-    alertCount: record.alerts.filter((a) => !a.isAcknowledged).length,
+    alertCount: record.alerts.filter((alert) => !alert.isAcknowledged).length,
     criticalAlertCount: criticalAlerts.length,
     insightCount: record.insights.length,
     forecastCount: record.forecasts.length,
@@ -64,11 +66,7 @@ export function buildAnalyticsPlatformSnapshot(
   };
 }
 
-export function getDefaultAnalyticsSnapshot(): AnalyticsPlatformSnapshot {
-  return buildAnalyticsPlatformSnapshot();
-}
-
-export function getAnalyticsPlatformSummary(input: AnalyticsPlatformInput = {}): string {
-  const snapshot = buildAnalyticsPlatformSnapshot(input);
+export async function getAnalyticsPlatformSummary(context: AnalyticsPlatformContext): Promise<string> {
+  const snapshot = await buildAnalyticsPlatformSnapshot(context);
   return getAnalyticsSummary(snapshot.record);
 }

@@ -13,6 +13,7 @@ const TYPE_VARIANT: Record<AccountType, "default" | "secondary" | "outline" | "d
   equity: "secondary",
   revenue: "default",
   expense: "destructive",
+  cogs: "destructive",
 };
 
 export function AccountTypeBadge({ accountType, className }: AccountTypeBadgeProps) {

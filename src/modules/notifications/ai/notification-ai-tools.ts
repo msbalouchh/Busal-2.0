@@ -1,14 +1,23 @@
+import "server-only";
+
 import { BUILTIN_AGENT_SLUGS } from "@/modules/ai/constants/agent-slugs";
 import { PLATFORM_MODULES } from "@/modules/ai-tools/constants/platform-tools";
 import { registerPlatformTool } from "@/modules/ai-tools/registry/platform-tool-registry";
-import type { RegisteredPlatformTool } from "@/modules/ai-tools/types/platform-tool";
+import type {
+  PlatformExecutionContext,
+  RegisteredPlatformTool,
+} from "@/modules/ai-tools/types/platform-tool";
 import {
+  analyzeDeliveryFailuresForAi,
   detectNotificationFailuresForAi,
   generateNotificationForAi,
   generateTemplatesForAi,
+  optimizeCampaignForAi,
   optimizeSendTimeForAi,
+  predictCustomerEngagementForAi,
   predictDeliveryForAi,
   recommendChannelForAi,
+  recommendNotificationPriorityForAi,
   scheduleNotificationForAi,
   summarizeNotificationsForAi,
 } from "@/modules/notifications/ai/notification-ai-context";
@@ -18,10 +27,26 @@ import {
   NOTIFICATION_EVENT_SOURCES,
   NOTIFICATION_PERMISSIONS,
 } from "@/modules/notifications/constants/notification-status";
+import { toNotificationPlatformContext } from "@/modules/notifications/lib/notification-scope";
 import type {
   NotificationChannel,
   NotificationEventSource,
 } from "@/modules/notifications/constants/notification-status";
+import type { NotificationPlatformContext } from "@/modules/notifications/types/notification-platform";
+
+function toNotificationContext(context: PlatformExecutionContext): NotificationPlatformContext {
+  if (!context.businessId || !context.branchId) {
+    throw new Error("Business and branch scope are required for Notification tools");
+  }
+
+  return toNotificationPlatformContext({
+    tenantId: context.tenantId ?? context.businessId,
+    workspaceId: context.workspaceId ?? context.businessId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  });
+}
 
 function defineNotificationTool(
   partial: Omit<RegisteredPlatformTool, "handler" | "version" | "isEnabled" | "metadata"> & {
@@ -94,8 +119,8 @@ export const NOTIFICATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) =>
-      generateNotificationForAi({
+    async (input, context) =>
+      generateNotificationForAi(toNotificationContext(context), {
         title: typeof input.title === "string" ? input.title : "Notification",
         body: typeof input.body === "string" ? input.body : "",
         channel: parseChannel(input.channel),
@@ -123,8 +148,8 @@ export const NOTIFICATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) =>
-      recommendChannelForAi({
+    async (input, context) =>
+      recommendChannelForAi(toNotificationContext(context), {
         eventSource: parseEventSource(input.eventSource),
         priority: typeof input.priority === "string" ? input.priority : undefined,
       }),
@@ -154,8 +179,8 @@ export const NOTIFICATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true, riskLevel: "medium" },
     },
-    async (input) =>
-      scheduleNotificationForAi({
+    async (input, context) =>
+      scheduleNotificationForAi(toNotificationContext(context), {
         title: typeof input.title === "string" ? input.title : "Scheduled Notification",
         body: typeof input.body === "string" ? input.body : "",
         scheduledAt:
@@ -182,7 +207,8 @@ export const NOTIFICATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async (input) => predictDeliveryForAi({ channel: parseChannel(input.channel) }),
+    async (input, context) =>
+      predictDeliveryForAi(toNotificationContext(context), { channel: parseChannel(input.channel) }),
   ),
   defineNotificationTool(
     {
@@ -200,7 +226,7 @@ export const NOTIFICATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true, riskLevel: "medium" },
     },
-    async () => detectNotificationFailuresForAi(),
+    async (_input, context) => detectNotificationFailuresForAi(toNotificationContext(context)),
   ),
   defineNotificationTool(
     {
@@ -218,7 +244,7 @@ export const NOTIFICATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => optimizeSendTimeForAi(),
+    async (_input, context) => optimizeSendTimeForAi(toNotificationContext(context)),
   ),
   defineNotificationTool(
     {
@@ -236,7 +262,7 @@ export const NOTIFICATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { readOnly: true },
     },
-    async () => summarizeNotificationsForAi(),
+    async (_input, context) => summarizeNotificationsForAi(toNotificationContext(context)),
   ),
   defineNotificationTool(
     {
@@ -260,17 +286,95 @@ export const NOTIFICATION_AI_TOOLS: RegisteredPlatformTool[] = [
       skillIds: [],
       metadata: { confirmationRequired: true },
     },
-    async (input) =>
-      generateTemplatesForAi({
+    async (input, context) =>
+      generateTemplatesForAi(toNotificationContext(context), {
         eventSource: parseEventSource(input.eventSource),
         eventKey: typeof input.eventKey === "string" ? input.eventKey : undefined,
       }),
+  ),
+  defineNotificationTool(
+    {
+      id: NOTIFICATION_AI_TOOL_IDS.PREDICT_ENGAGEMENT,
+      name: "Predict Customer Engagement",
+      description: "Predict customer engagement based on delivery and read rates.",
+      requiredPermissions: [NOTIFICATION_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [PLATFORM_MODULES.NOTIFICATIONS, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: NOTIFICATION_AGENT_SLUGS,
+      capabilityId: "capability.notifications",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => predictCustomerEngagementForAi(toNotificationContext(context)),
+  ),
+  defineNotificationTool(
+    {
+      id: NOTIFICATION_AI_TOOL_IDS.RECOMMEND_PRIORITY,
+      name: "Recommend Notification Priority",
+      description: "Recommend priority level for an event source.",
+      requiredPermissions: [NOTIFICATION_PERMISSIONS.READ],
+      requiredModules: [PLATFORM_MODULES.NOTIFICATIONS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: {
+        type: "object",
+        properties: { eventSource: { type: "string" } },
+      },
+      outputSchema: { type: "object" },
+      supportedAgents: NOTIFICATION_AGENT_SLUGS,
+      capabilityId: "capability.notifications",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (input, context) =>
+      recommendNotificationPriorityForAi(toNotificationContext(context), {
+        eventSource: parseEventSource(input.eventSource),
+      }),
+  ),
+  defineNotificationTool(
+    {
+      id: NOTIFICATION_AI_TOOL_IDS.OPTIMIZE_CAMPAIGN,
+      name: "Optimize Campaign",
+      description: "Recommend campaign optimization strategies.",
+      requiredPermissions: [NOTIFICATION_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [PLATFORM_MODULES.NOTIFICATIONS, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: NOTIFICATION_AGENT_SLUGS,
+      capabilityId: "capability.notifications",
+      skillIds: [],
+      metadata: { readOnly: true },
+    },
+    async (_input, context) => optimizeCampaignForAi(toNotificationContext(context)),
+  ),
+  defineNotificationTool(
+    {
+      id: NOTIFICATION_AI_TOOL_IDS.ANALYZE_DELIVERY_FAILURES,
+      name: "Analyze Delivery Failures",
+      description: "Analyze delivery failures and recommend remediation.",
+      requiredPermissions: [NOTIFICATION_PERMISSIONS.ANALYTICS_READ],
+      requiredModules: [PLATFORM_MODULES.NOTIFICATIONS, PLATFORM_MODULES.ANALYTICS],
+      requiredTenantScope: "required",
+      requiredBranchScope: "optional",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: { type: "object" },
+      supportedAgents: NOTIFICATION_AGENT_SLUGS,
+      capabilityId: "capability.notifications",
+      skillIds: [],
+      metadata: { readOnly: true, riskLevel: "medium" },
+    },
+    async (_input, context) => analyzeDeliveryFailuresForAi(toNotificationContext(context)),
   ),
 ];
 
 let registered = false;
 
-/** Registers Notification platform tools with the AI Tool Platform (mock, idempotent). */
+/** Registers Notification platform tools with the AI Tool Platform (idempotent). */
 export function registerNotificationAiTools(): void {
   if (registered) {
     return;

@@ -16,16 +16,9 @@ import type { AccessScope } from "@/modules/rbac/types/access-scope";
 import type { PermissionKey } from "@/modules/rbac/types/permission";
 import type { RbacEngineContext, RbacSnapshot } from "@/modules/rbac/types/context";
 import type { RoleSlug } from "@/modules/rbac/types/role";
+import type { RbacSelectionInput } from "@/modules/rbac/types/selection";
 import { normalizePermissionKeys } from "@/modules/rbac/utils/permission-utils";
 import { createAuthorizationEngine } from "@/modules/rbac/utils/authorization-engine";
-
-export interface RbacSelectionInput {
-  userId?: string;
-  tenantId?: string;
-  workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
-}
 
 function resolveRolePermissionKeys(
   roleSlugs: RoleSlug[],

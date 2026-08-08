@@ -1,5 +1,10 @@
 import "server-only";
 
+import { DOMAIN_EVENT_TYPES } from "@/modules/platform-orchestration/constants/domain-events";
+import {
+  moduleScopeFromPlatform,
+  publishModuleDomainEvent,
+} from "@/modules/platform-orchestration/lib/publish-module-event";
 import type { CrmTenantScope } from "@/modules/crm/lib/crm-scope";
 import {
   customerRepository,
@@ -76,10 +81,16 @@ export class CustomerService {
       workspaceId: input.workspaceId,
       businessId: input.businessId,
       branchId: input.branchId ?? null,
-      userId: "system",
+      userId: staffId ?? "system",
     });
 
-    return customerRepository.create(scope, input, staffId);
+    const record = await customerRepository.create(scope, input, staffId);
+    await publishModuleDomainEvent(moduleScopeFromPlatform(scope), {
+      eventType: DOMAIN_EVENT_TYPES.CUSTOMER_CREATED,
+      aggregateId: record.customer.id,
+      payload: { customerId: record.customer.id, email: record.profile.email ?? null },
+    });
+    return record;
   }
 
   async update(
@@ -87,7 +98,16 @@ export class CustomerService {
     context: CrmPlatformContext,
     staffId: string | null = null,
   ): Promise<CustomerRecord | null> {
-    return customerRepository.update(resolveScope(context), input, staffId);
+    const record = await customerRepository.update(resolveScope(context), input, staffId);
+    if (record) {
+      await publishModuleDomainEvent(moduleScopeFromPlatform(resolveScope(context)), {
+        eventType: DOMAIN_EVENT_TYPES.CUSTOMER_UPDATED,
+        aggregateId: record.customer.id,
+        payload: { customerId: record.customer.id },
+        idempotencyKey: `customer.updated:${record.customer.id}:${Date.now()}`,
+      });
+    }
+    return record;
   }
 
   async softDelete(

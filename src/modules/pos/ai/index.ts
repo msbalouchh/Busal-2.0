@@ -10,4 +10,7 @@ export {
   detectSuspiciousRefunds,
   suggestPromotions,
   forecastRevenue,
+  predictSales,
+  detectFraud,
+  analyzePeakHours,
 } from "@/modules/pos/ai/pos-ai-context";

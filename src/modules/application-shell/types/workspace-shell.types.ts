@@ -57,6 +57,8 @@ export interface WorkspaceShellContextValue {
 export interface WorkspaceShellLayoutProps {
   children: ReactNode;
   workspaceName?: string;
+  businessName?: string;
+  branchName?: string | null;
   userName?: string;
   userEmail?: string;
   workspaces?: WorkspaceSummary[];

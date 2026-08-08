@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { MemoryContextBundle } from "@/modules/ai-memory-management/types/ai-memory-types";
 import {
   retrieveAgentMemories,

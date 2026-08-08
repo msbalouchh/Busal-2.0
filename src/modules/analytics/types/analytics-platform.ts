@@ -4,7 +4,9 @@ import type {
   ChartType,
   DashboardType,
   KpiTrend,
+  ReportExportFormat,
   ReportStatus,
+  ReportType,
   ScheduleFrequency,
   WidgetType,
 } from "@/modules/analytics/constants/analytics-status";
@@ -25,6 +27,7 @@ export interface Dashboard {
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 /** Dashboard widget (drag-and-drop capable). */
@@ -100,6 +103,78 @@ export interface ChartDataset {
   color: string | null;
 }
 
+/** Reusable report template definition. */
+export interface ReportTemplate {
+  id: string;
+  tenantId: string;
+  businessId: string;
+  name: string;
+  description: string;
+  reportType: ReportType;
+  moduleSources: AnalyticsModuleSource[];
+  defaultChartIds: string[];
+  defaultKpiIds: string[];
+  isSystem: boolean;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+/** Connected analytics data source. */
+export interface DataSource {
+  id: string;
+  tenantId: string;
+  businessId: string;
+  branchId: string | null;
+  name: string;
+  moduleSource: AnalyticsModuleSource;
+  connectionType: "prisma" | "api" | "manual";
+  isActive: boolean;
+  lastSyncedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+/** Persisted dashboard layout configuration. */
+export interface DashboardLayout {
+  id: string;
+  tenantId: string;
+  businessId: string;
+  dashboardId: string;
+  name: string;
+  columns: number;
+  rowHeight: number;
+  widgetPlacements: Array<{
+    widgetId: string;
+    positionX: number;
+    positionY: number;
+    width: number;
+    height: number;
+  }>;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+/** User saved analytics view/filter preset. */
+export interface SavedView {
+  id: string;
+  tenantId: string;
+  businessId: string;
+  branchId: string | null;
+  name: string;
+  dashboardId: string | null;
+  filters: Record<string, string | number | boolean | string[]>;
+  sortBy: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 /** Analytics report definition. */
 export interface Report {
   id: string;
@@ -117,6 +192,7 @@ export interface Report {
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 /** User-saved report snapshot. */
@@ -364,12 +440,16 @@ export interface AnalyticsRecord {
   kpis: KPI[];
   charts: Chart[];
   reports: Report[];
+  reportTemplates: ReportTemplate[];
   savedReports: SavedReport[];
   scheduledReports: ScheduledReport[];
   insights: BusinessInsight[];
   forecasts: Forecast[];
   alerts: Alert[];
   benchmarks: Benchmark[];
+  dataSources: DataSource[];
+  dashboardLayouts: DashboardLayout[];
+  savedViews: SavedView[];
   sales: SalesAnalytics;
   customers: CustomerAnalytics;
   menu: MenuAnalytics;
@@ -389,7 +469,26 @@ export interface AnalyticsSearchQuery {
   branchId?: string;
   moduleSource?: AnalyticsModuleSource;
   dashboardType?: DashboardType;
+  reportType?: ReportType;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
   limit?: number;
+  includeDeleted?: boolean;
+}
+
+export interface AnalyticsSearchResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface ExportReportInput {
+  reportId: string;
+  format: ReportExportFormat;
 }
 
 export interface GenerateReportInput {
@@ -423,6 +522,8 @@ export interface AnalyticsContextValue {
   selectedDashboard: Dashboard | null;
   selectDashboard: (dashboardId: string | null) => void;
   refresh: () => void;
+  isRefreshing: boolean;
+  error: string | null;
 }
 
 export interface AnalyticsDashboardContextValue {

@@ -204,10 +204,17 @@ export async function listTables(
   sortBy: TableSortValue = "name",
 ): Promise<TableData[]> {
   const business = await getOwnedBusiness(ownerId);
+  return listTablesForBusiness(business.id, filters, sortBy);
+}
 
+export async function listTablesForBusiness(
+  businessId: string,
+  filters: ListTablesFilters = {},
+  sortBy: TableSortValue = "name",
+): Promise<TableData[]> {
   const tables = await prisma.legacyTable.findMany({
     where: {
-      businessId: business.id,
+      businessId,
       ...branchFilter(filters.branchId ?? null),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.section !== undefined ? { section: filters.section.trim() || null } : {}),

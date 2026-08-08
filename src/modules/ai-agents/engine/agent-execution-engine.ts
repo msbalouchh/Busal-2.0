@@ -12,6 +12,7 @@ import type {
   AgentExecutionContext,
   AgentExecutionResult,
 } from "@/modules/ai-agents/types/agent-types";
+import { runCentralAiChat } from "@/services/ai-engine-bridge.service";
 
 export interface AgentVersionProfile {
   personality: string | null;
@@ -88,20 +89,27 @@ export async function runAgentExecution(
     }
   }
 
-  const goalsSummary = input.profile.goals.join(", ");
-  const response = [
-    input.profile.personality ? `Persona: ${input.profile.personality}` : null,
-    goalsSummary ? `Goals: ${goalsSummary}` : null,
-    `Decision: proceed with ${prompt.slice(0, 120)}`,
-  ]
-    .filter(Boolean)
-    .join(". ");
+  const engineResult = await runCentralAiChat(platform, {
+    message: prompt,
+    currentModule: "ai-agents",
+    agentSlug: input.agentRecordId,
+    enableTools: true,
+    temperature: input.profile.temperature,
+    maxTokens: input.profile.tokenLimit,
+    metadata: {
+      personality: input.profile.personality,
+      goals: input.profile.goals,
+      responsibilities: input.profile.responsibilities,
+      behaviourRules: input.profile.behaviourRules,
+      memoryContext,
+      knowledgeCitations: knowledge.citations,
+      toolOutputs,
+    },
+  });
 
-  const tokensUsed = Math.min(
-    input.profile.tokenLimit,
-    120 + knowledge.citations.length * 20 + toolCalls * 30,
-  );
-  const costCents = Math.ceil(tokensUsed * 0.002);
+  const response = engineResult.content.trim() || "Agent completed analysis.";
+  const tokensUsed = Math.min(input.profile.tokenLimit, engineResult.totalTokens);
+  const costCents = engineResult.costCents;
 
   return {
     response,
@@ -113,6 +121,9 @@ export async function runAgentExecution(
       toolOutputs,
       memoryContext,
       behaviourRules: input.profile.behaviourRules,
+      providerId: engineResult.providerId,
+      model: engineResult.model,
+      auditId: engineResult.auditId,
     },
     tokensUsed,
     costCents,

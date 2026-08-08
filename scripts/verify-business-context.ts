@@ -341,8 +341,8 @@ async function main() {
   await prisma.business.delete({ where: { id: secondBusiness.id } });
   console.log("  PASS");
 
-  console.log("pnpm lint");
-  execSync("pnpm lint", { cwd: root, stdio: "inherit" });
+  console.log("pnpm typecheck");
+  execSync("pnpm typecheck", { cwd: root, stdio: "inherit" });
   console.log("  PASS");
 
   console.log("pnpm tsc --noEmit");

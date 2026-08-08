@@ -3,15 +3,17 @@
 import { useMemo } from "react";
 
 import { useReservations } from "@/modules/reservations/hooks/use-reservations";
-import { reservationService } from "@/modules/reservations/services/reservation.service";
 
 export function useReservation(reservationId: string | null) {
-  const { selectedReservation, selectReservation, refresh } = useReservations();
+  const { selectedReservation, selectReservation, refresh, reservations } = useReservations();
 
   const reservation = useMemo(() => {
-    if (!reservationId) return selectedReservation;
-    return reservationService.getById(reservationId) ?? null;
-  }, [reservationId, selectedReservation]);
+    if (!reservationId) {
+      return selectedReservation;
+    }
+
+    return reservations.find((record) => record.reservation.id === reservationId) ?? null;
+  }, [reservationId, selectedReservation, reservations]);
 
   return {
     reservation,

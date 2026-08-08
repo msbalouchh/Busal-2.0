@@ -12,12 +12,15 @@ interface DashboardTypeBadgeProps {
 
 const TYPE_VARIANT: Record<DashboardType, "default" | "secondary" | "outline" | "destructive"> = {
   executive: "default",
+  restaurant: "secondary",
+  sales: "default",
   operations: "secondary",
   kitchen: "outline",
   finance: "default",
   marketing: "secondary",
   inventory: "outline",
   staff: "outline",
+  crm: "outline",
   owner: "default",
   custom: "secondary",
 };

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { moneyDecimalToPence } from "@/modules/payments/utils/currency";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { createMarketingInsight } from "@/services/ai-marketing-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 
 export interface CustomerSegment {
   id: string;
@@ -102,37 +103,20 @@ export async function listCustomerSegments(ownerId: string): Promise<CustomerSeg
 }
 
 export async function generateSegmentationInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const segments = await listCustomerSegments(ownerId);
-  let created = 0;
-
-  const topSegment = segments.find((s) => s.customerCount > 0 && s.slug !== "at-risk");
-  if (topSegment) {
-    await createMarketingInsight(businessId, {
-      title: `Highest value segment: ${topSegment.name}`,
-      description: `${topSegment.customerCount} customers with £${(topSegment.totalSpendPence / 100).toFixed(2)} total lifetime value.`,
-      category: "segment",
-      priority: "HIGH",
-      recommendation: `Target ${topSegment.name} with personalized promotions to maximize LTV.`,
-      metadata: { segmentId: topSegment.id },
-    });
-    created += 1;
-  }
-
-  const atRisk = segments.find((s) => s.slug === "at-risk");
-  if (atRisk && atRisk.customerCount > 0) {
-    await createMarketingInsight(businessId, {
-      title: "Customers at risk of leaving",
-      description: `${atRisk.customerCount} customers inactive for ${INACTIVE_DAYS}+ days.`,
-      category: "retention",
-      priority: "CRITICAL",
-      recommendation: "Launch a win-back loyalty campaign with personalized offers.",
-      metadata: { atRiskCount: atRisk.customerCount },
-    });
-    created += 1;
-  }
-
-  return created;
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "marketing",
+    task: "segmentation-insights",
+    loadContext: async (ownerId) => ({ ownerId }),
+    persistInsight: (businessId, insight) =>
+      createMarketingInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        category: insight.category ?? "segment",
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
+  });
 }
 
 export async function getLoyaltyCampaignTargets(ownerId: string) {

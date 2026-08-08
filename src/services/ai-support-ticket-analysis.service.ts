@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCommunicationDashboard } from "@/services/communication.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { createSupportInsight } from "@/services/ai-support-response-recommendation.service";
+import { runOwnerDomainInsightTask } from "@/services/ai-domain-insight-runner.service";
 
 export interface TicketSnapshot {
   id: string;
@@ -90,36 +91,19 @@ export async function getTicketAnalysisSnapshot(ownerId: string): Promise<Ticket
 }
 
 export async function generateTicketInsights(ownerId: string): Promise<number> {
-  const businessId = await getOwnedBusinessId(ownerId);
-  const snapshot = await getTicketAnalysisSnapshot(ownerId);
-  let created = 0;
-
-  await createSupportInsight(businessId, {
-    title: "Support ticket overview",
-    description: `${snapshot.totalOpen} open tickets · ${snapshot.waitingStaff} waiting for staff · ${snapshot.urgentCount} urgent.`,
-    priority: snapshot.urgentCount > 0 ? "CRITICAL" : snapshot.waitingStaff > 3 ? "HIGH" : "MEDIUM",
-    recommendation:
-      snapshot.waitingStaff > 0
-        ? "Prioritize tickets in WAITING_STAFF status to reduce response times."
-        : "Ticket queue is manageable — review AI-handled conversations for quality.",
-    metadata: { snapshot },
+  return runOwnerDomainInsightTask(ownerId, {
+    module: "support",
+    task: "ticket-insights",
+    loadContext: getTicketAnalysisSnapshot,
+    persistInsight: (businessId, insight) =>
+      createSupportInsight(businessId, {
+        title: insight.title,
+        description: insight.description,
+        priority: (insight.priority as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") ?? "MEDIUM",
+        recommendation: insight.recommendation,
+        metadata: insight.metadata,
+      }),
   });
-  created += 1;
-
-  for (const ticket of snapshot.tickets.filter((t) => t.openDurationHours > 24).slice(0, 3)) {
-    await createSupportInsight(businessId, {
-      ticketId: ticket.id,
-      customerId: ticket.customerId ?? undefined,
-      title: `Unresolved ticket: ${ticket.subject ?? "No subject"}`,
-      description: `Open for ${ticket.openDurationHours} hours · ${ticket.messageCount} messages.`,
-      priority: ticket.openDurationHours > 48 ? "CRITICAL" : "HIGH",
-      recommendation: "Assign to staff or send follow-up to customer.",
-      metadata: { ticketId: ticket.id },
-    });
-    created += 1;
-  }
-
-  return created;
 }
 
 export async function listOpenTickets(ownerId: string) {

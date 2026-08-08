@@ -1,13 +1,19 @@
+import "server-only";
+
+import type { Prisma } from "@prisma/client";
+import { randomBytes } from "node:crypto";
+
+import { prisma } from "@/lib/prisma";
+import { runInteractiveTransaction } from "@/lib/prisma-transaction";
+import { TABLE_STATUSES } from "@/modules/table-management/constants/table-status";
 import {
-  TABLE_KINDS,
-  TABLE_RESERVATION_STATES,
-  TABLE_STATUSES,
-  TABLE_TIMELINE_EVENT_TYPES,
-} from "@/modules/table-management/constants/table-status";
-import {
-  DEFAULT_TABLE_SCOPE,
-  MOCK_FLOOR_RECORDS,
-} from "@/modules/table-management/constants/mock-data";
+  mapDomainStatusToPrisma,
+  mapFloorToRecord,
+  mapTableToRecord,
+  type RestaurantFloorWithTables,
+  type RestaurantTableWithRelations,
+} from "@/modules/table-management/lib/table-mappers";
+import type { TableTenantScope } from "@/modules/table-management/lib/table-scope";
 import type {
   AssignTableInput,
   CreateTableInput,
@@ -19,402 +25,598 @@ import type {
   TransferTableInput,
   UpdateTableInput,
 } from "@/modules/table-management/types/table-management";
+import type {
+  CreateFloorInput,
+  TableSearchInput,
+  UpdateFloorInput,
+} from "@/modules/table-management/validation/table-schemas";
 
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const DEFAULT_PAGE_SIZE = 25;
+
+const tableInclude = {
+  floor: true,
+  tableQrCodes: { where: { status: "ACTIVE" }, take: 1 },
+  reservations: {
+    where: { status: { in: ["PENDING", "CONFIRMED", "SEATED"] } },
+    orderBy: { reservationDate: "asc" },
+    take: 3,
+  },
+  mergedSources: { where: { status: { not: "ARCHIVED" } } },
+} satisfies Prisma.RestaurantTableInclude;
+
+const floorInclude = {
+  tables: {
+    where: { status: { not: "ARCHIVED" } },
+    include: tableInclude,
+    orderBy: { tableNumber: "asc" },
+  },
+} satisfies Prisma.RestaurantFloorInclude;
+
+export interface TableSearchResult {
+  records: TableRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
-/** In-memory table repository (mock only, no backend). */
+function scopeWhere(scope: TableTenantScope): Prisma.RestaurantTableWhereInput {
+  return {
+    businessId: scope.businessId,
+    branchId: scope.branchId,
+  };
+}
+
+function buildNotes(input: CreateTableInput): string | null {
+  const tags: string[] = [];
+  if (input.isVip) tags.push("vip");
+  if (input.isOutdoor) tags.push("outdoor");
+  if (input.isPrivateRoom) tags.push("private");
+  return tags.length > 0 ? tags.join(",") : null;
+}
+
+function resolveZoneId(floorId: string, zoneId?: string): string {
+  return zoneId ?? `${floorId}-main-dining`;
+}
+
+function resolveTableOrderBy(
+  sortBy: TableSearchInput["sortBy"] = "number",
+  sortDirection: "asc" | "desc" = "asc",
+): Prisma.RestaurantTableOrderByWithRelationInput[] {
+  switch (sortBy) {
+    case "capacity":
+      return [{ capacity: sortDirection }];
+    case "status":
+      return [{ status: sortDirection }, { tableNumber: "asc" }];
+    case "createdAt":
+      return [{ createdAt: sortDirection }];
+    case "label":
+      return [{ tableName: sortDirection }, { tableNumber: "asc" }];
+    case "number":
+    default:
+      return [{ tableNumber: sortDirection }];
+  }
+}
+
+/** Prisma-backed table management repository with tenant scoping. */
 export class TableManagementRepository {
-  private floors: FloorRecord[] = structuredClone(MOCK_FLOOR_RECORDS);
+  async listFloors(scope: TableTenantScope): Promise<FloorRecord[]> {
+    const floors = await prisma.restaurantFloor.findMany({
+      where: {
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+        status: { not: "ARCHIVED" },
+      },
+      include: floorInclude,
+      orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+    });
 
-  listFloors(): FloorRecord[] {
-    return structuredClone(this.floors);
+    return floors.map((floor) => mapFloorToRecord(floor as RestaurantFloorWithTables, scope));
   }
 
-  findFloorById(floorId: string): FloorRecord | undefined {
-    return this.floors.find((record) => record.floor.id === floorId);
+  async findFloorById(scope: TableTenantScope, floorId: string): Promise<FloorRecord | null> {
+    const floor = await prisma.restaurantFloor.findFirst({
+      where: {
+        id: floorId,
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+      },
+      include: floorInclude,
+    });
+
+    return floor ? mapFloorToRecord(floor as RestaurantFloorWithTables, scope) : null;
   }
 
-  listTables(): TableRecord[] {
-    return this.floors.flatMap((floor) => floor.tables);
+  async createFloor(scope: TableTenantScope, input: CreateFloorInput): Promise<FloorRecord> {
+    const floor = await prisma.restaurantFloor.create({
+      data: {
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        displayOrder: input.displayOrder ?? 0,
+        status: "ACTIVE",
+      },
+      include: floorInclude,
+    });
+
+    return mapFloorToRecord(floor as RestaurantFloorWithTables, scope);
   }
 
-  findTableById(tableId: string): TableRecord | undefined {
-    for (const floor of this.floors) {
-      const table = floor.tables.find((record) => record.table.id === tableId);
-      if (table) return table;
+  async updateFloor(scope: TableTenantScope, input: UpdateFloorInput): Promise<FloorRecord | null> {
+    const existing = await prisma.restaurantFloor.findFirst({
+      where: {
+        id: input.floorId,
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+      },
+    });
+
+    if (!existing) {
+      return null;
     }
-    return undefined;
+
+    const floor = await prisma.restaurantFloor.update({
+      where: { id: input.floorId },
+      data: {
+        name: input.name?.trim(),
+        description: input.description?.trim(),
+        displayOrder: input.displayOrder,
+        status:
+          input.isActive === undefined ? undefined : input.isActive ? "ACTIVE" : "INACTIVE",
+      },
+      include: floorInclude,
+    });
+
+    return mapFloorToRecord(floor as RestaurantFloorWithTables, scope);
   }
 
-  searchTables(query: TableSearchQuery = {}): TableRecord[] {
-    let results = this.listTables();
+  async archiveFloor(scope: TableTenantScope, floorId: string): Promise<boolean> {
+    const result = await prisma.restaurantFloor.updateMany({
+      where: {
+        id: floorId,
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+      },
+      data: { status: "ARCHIVED" },
+    });
 
-    if (query.tenantId) {
-      results = results.filter((record) => {
-        const floor = this.floors.find((f) => f.floor.id === record.table.floorId);
-        return floor?.floor.tenantId === query.tenantId;
-      });
+    return result.count > 0;
+  }
+
+  async findTableById(scope: TableTenantScope, tableId: string): Promise<TableRecord | null> {
+    const table = await prisma.restaurantTable.findFirst({
+      where: { id: tableId, ...scopeWhere(scope) },
+      include: tableInclude,
+    });
+
+    if (!table) {
+      return null;
     }
 
-    if (query.businessId) {
-      results = results.filter((record) => {
-        const floor = this.floors.find((f) => f.floor.id === record.table.floorId);
-        return floor?.floor.businessId === query.businessId;
-      });
-    }
+    return mapTableToRecord(
+      table as RestaurantTableWithRelations,
+      scope,
+      resolveZoneId(table.floorId),
+    );
+  }
 
-    if (query.branchId) {
-      results = results.filter((record) => record.table.branchId === query.branchId);
-    }
+  async searchTables(
+    scope: TableTenantScope,
+    query: TableSearchQuery & TableSearchInput = {},
+  ): Promise<TableSearchResult> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? query.limit ?? DEFAULT_PAGE_SIZE;
+    const where: Prisma.RestaurantTableWhereInput = {
+      ...scopeWhere(scope),
+      ...(query.includeArchived ? {} : { status: { not: "ARCHIVED" } }),
+    };
 
     if (query.floorId) {
-      results = results.filter((record) => record.table.floorId === query.floorId);
-    }
-
-    if (query.zoneId) {
-      results = results.filter((record) => record.table.zoneId === query.zoneId);
+      where.floorId = query.floorId;
     }
 
     if (query.status) {
-      results = results.filter((record) => record.table.status === query.status);
-    }
-
-    if (query.kind) {
-      results = results.filter((record) => record.table.kind === query.kind);
+      where.status = mapDomainStatusToPrisma(query.status);
     }
 
     if (query.minCapacity) {
-      results = results.filter((record) => record.table.seatCapacity >= query.minCapacity!);
+      where.capacity = { gte: query.minCapacity };
     }
 
-    if (query.query) {
-      const normalized = query.query.toLowerCase();
-      results = results.filter((record) => {
-        const haystack = [
-          record.table.label,
-          record.table.id,
-          record.reservationState.guestName ?? "",
-        ]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(normalized);
-      });
+    if (query.query?.trim()) {
+      const search = query.query.trim();
+      where.OR = [
+        { tableNumber: { contains: search, mode: "insensitive" } },
+        { tableName: { contains: search, mode: "insensitive" } },
+        { notes: { contains: search, mode: "insensitive" } },
+      ];
     }
 
-    const limit = query.limit ?? results.length;
-    return structuredClone(results.slice(0, limit));
+    const [tables, total] = await Promise.all([
+      prisma.restaurantTable.findMany({
+        where,
+        include: tableInclude,
+        orderBy: resolveTableOrderBy(query.sortBy, query.sortDirection),
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.restaurantTable.count({ where }),
+    ]);
+
+    const zoneId = query.floorId ? resolveZoneId(query.floorId, query.zoneId) : "default-zone";
+
+    return {
+      records: tables.map((table) =>
+        mapTableToRecord(table as RestaurantTableWithRelations, scope, zoneId),
+      ),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
-  createTable(input: CreateTableInput): TableRecord {
-    const floor = this.findFloorById(input.floorId);
+  async createTable(scope: TableTenantScope, input: CreateTableInput): Promise<TableRecord> {
+    const floor = await prisma.restaurantFloor.findFirst({
+      where: {
+        id: input.floorId,
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+      },
+    });
+
     if (!floor) {
       throw new Error(`Floor not found: ${input.floorId}`);
     }
 
-    const id = createId("tbl");
-    const now = new Date().toISOString();
-    const number = floor.tables.length + 1;
+    const tableNumber = `T${Date.now().toString().slice(-8)}`;
+    const zoneId = resolveZoneId(input.floorId, input.zoneId);
 
-    const record: TableRecord = {
-      table: {
-        id,
+    const table = await prisma.restaurantTable.create({
+      data: {
+        businessId: scope.businessId,
+        branchId: scope.branchId,
         floorId: input.floorId,
-        zoneId: input.zoneId,
-        branchId: floor.floor.branchId,
-        label: input.label,
-        number,
-        kind: TABLE_KINDS.SINGLE,
-        status: TABLE_STATUSES.AVAILABLE,
-        seatCapacity: input.seatCapacity,
-        minCapacity: input.minCapacity ?? 1,
-        position: input.position ?? { x: 100, y: 100, rotation: 0 },
-        size: input.size ?? { width: 80, height: 80 },
-        isVip: input.isVip ?? false,
-        isOutdoor: input.isOutdoor ?? false,
-        isPrivateRoom: input.isPrivateRoom ?? false,
-        mergedIntoTableId: null,
-        splitFromTableId: null,
-        groupId: null,
-        dragDropReady: true,
-        createdAt: now,
-        updatedAt: now,
+        tableNumber,
+        tableName: input.label.trim(),
+        capacity: input.seatCapacity,
+        minimumCapacity: input.minCapacity ?? 1,
+        positionX: input.position?.x ?? 100,
+        positionY: input.position?.y ?? 100,
+        width: input.size?.width ?? 80,
+        height: input.size?.height ?? 80,
+        rotation: input.position?.rotation ?? 0,
+        notes: buildNotes(input),
+        status: "AVAILABLE",
       },
-      seats: Array.from({ length: input.seatCapacity }, (_, index) => ({
-        id: `${id}-seat-${index + 1}`,
-        tableId: id,
-        seatNumber: index + 1,
-        label: `Seat ${index + 1}`,
-        isOccupied: false,
-        guestId: null,
-      })),
-      reservationState: {
-        tableId: id,
-        reservationId: null,
-        state: TABLE_RESERVATION_STATES.NONE,
-        partySize: 0,
-        guestName: null,
-        reservedAt: null,
-        expectedArrivalAt: null,
-        seatedAt: null,
-      },
-      availability: {
-        tableId: id,
-        isAvailable: true,
-        availableAt: null,
-        blockedReason: null,
-        nextReservationAt: null,
-        occupancyPercent: 0,
-      },
-      qrCode: {
-        tableId: id,
-        token: `qr-${id}`,
-        url: `https://order.getbusal.com/t/${id}`,
-        isActive: true,
-        lastScannedAt: null,
-      },
-      analytics: {
-        tableId: id,
-        turnoverRate: 0,
-        avgOccupancyMinutes: 0,
-        revenueTodayPence: 0,
-        utilizationScore: 0,
-        waitTimeMinutes: 0,
-      },
-      aiContext: {
-        tableId: id,
-        summary: `${input.label} · ${input.seatCapacity} seats · available`,
-        insights: ["New table — no historical data yet"],
-        recommendedActions: ["Assign QR code and verify floor plan position"],
-        waitTimePredictionMinutes: null,
-        seatingScore: 0.5,
-        lastGeneratedAt: now,
-      },
-      timeline: [
-        {
-          id: `${id}-tl-create`,
-          tableId: id,
-          type: TABLE_TIMELINE_EVENT_TYPES.STATUS_CHANGED,
-          timestamp: now,
-          actorId: DEFAULT_TABLE_SCOPE.userId,
-          payload: { status: TABLE_STATUSES.AVAILABLE, action: "created" },
-        },
-      ],
-    };
+      include: tableInclude,
+    });
 
-    floor.tables.push(record);
-    return structuredClone(record);
+    await this.ensureQrCode(scope, table.id);
+
+    const refreshed = await prisma.restaurantTable.findFirstOrThrow({
+      where: { id: table.id },
+      include: tableInclude,
+    });
+
+    return mapTableToRecord(refreshed as RestaurantTableWithRelations, scope, zoneId);
   }
 
-  updateTable(input: UpdateTableInput): TableRecord | undefined {
-    const record = this.findTableById(input.tableId);
-    if (!record) return undefined;
+  async updateTable(scope: TableTenantScope, input: UpdateTableInput): Promise<TableRecord | null> {
+    const existing = await prisma.restaurantTable.findFirst({
+      where: { id: input.tableId, ...scopeWhere(scope) },
+    });
 
-    if (input.label !== undefined) record.table.label = input.label;
-    if (input.status !== undefined) record.table.status = input.status;
-    if (input.seatCapacity !== undefined) record.table.seatCapacity = input.seatCapacity;
-    if (input.position !== undefined) record.table.position = input.position;
-    if (input.zoneId !== undefined) record.table.zoneId = input.zoneId;
-    record.table.updatedAt = new Date().toISOString();
-
-    return structuredClone(record);
-  }
-
-  mergeTables(input: MergeTablesInput): TableRecord | undefined {
-    const floor = this.findFloorById(input.floorId);
-    if (!floor || input.sourceTableIds.length < 2) return undefined;
-
-    const sources = input.sourceTableIds
-      .map((id) => floor.tables.find((t) => t.table.id === id))
-      .filter(Boolean) as TableRecord[];
-
-    if (sources.length !== input.sourceTableIds.length) return undefined;
-
-    const targetId = createId("tbl-merged");
-    const now = new Date().toISOString();
-    const totalCapacity = sources.reduce((sum, s) => sum + s.table.seatCapacity, 0);
-    const anchor = sources[0]!;
-
-    const merged: TableRecord = {
-      ...structuredClone(anchor),
-      table: {
-        ...anchor.table,
-        id: targetId,
-        label: input.mergedLabel,
-        kind: TABLE_KINDS.MERGED,
-        status: TABLE_STATUSES.AVAILABLE,
-        seatCapacity: totalCapacity,
-        mergedIntoTableId: null,
-        groupId: createId("grp"),
-        updatedAt: now,
-      },
-      seats: sources.flatMap((s) =>
-        s.seats.map((seat, index) => ({
-          ...seat,
-          id: `${targetId}-seat-${index + 1}`,
-          tableId: targetId,
-        })),
-      ),
-      timeline: [
-        ...anchor.timeline,
-        {
-          id: `${targetId}-tl-merge`,
-          tableId: targetId,
-          type: TABLE_TIMELINE_EVENT_TYPES.MERGED,
-          timestamp: now,
-          actorId: input.actorId ?? DEFAULT_TABLE_SCOPE.userId,
-          payload: { sourceTableIds: input.sourceTableIds },
-        },
-      ],
-    };
-
-    for (const sourceId of input.sourceTableIds) {
-      const index = floor.tables.findIndex((t) => t.table.id === sourceId);
-      if (index >= 0) floor.tables.splice(index, 1);
+    if (!existing) {
+      return null;
     }
 
-    floor.tables.push(merged);
-    floor.groups.push({
-      id: merged.table.groupId!,
-      floorId: input.floorId,
-      label: input.mergedLabel,
-      tableIds: input.sourceTableIds,
-      seatCapacity: totalCapacity,
-      status: TABLE_STATUSES.AVAILABLE,
-      createdAt: now,
+    const table = await prisma.restaurantTable.update({
+      where: { id: input.tableId },
+      data: {
+        tableName: input.label?.trim(),
+        capacity: input.seatCapacity,
+        positionX: input.position?.x,
+        positionY: input.position?.y,
+        rotation: input.position?.rotation,
+        status: input.status ? mapDomainStatusToPrisma(input.status) : undefined,
+      },
+      include: tableInclude,
     });
 
-    return structuredClone(merged);
+    return mapTableToRecord(
+      table as RestaurantTableWithRelations,
+      scope,
+      resolveZoneId(table.floorId, input.zoneId),
+    );
   }
 
-  splitTable(input: SplitTableInput): TableRecord[] | undefined {
-    const floor = this.findFloorById(input.floorId);
-    if (!floor) return undefined;
+  async archiveTable(scope: TableTenantScope, tableId: string): Promise<TableRecord | null> {
+    const existing = await prisma.restaurantTable.findFirst({
+      where: { id: tableId, ...scopeWhere(scope) },
+    });
 
-    const sourceIndex = floor.tables.findIndex((t) => t.table.id === input.sourceTableId);
-    if (sourceIndex < 0) return undefined;
+    if (!existing) {
+      return null;
+    }
 
-    const source = floor.tables[sourceIndex]!;
-    const now = new Date().toISOString();
-    const capacityEach = Math.max(
-      1,
-      Math.floor(source.table.seatCapacity / input.newLabels.length),
+    const table = await prisma.restaurantTable.update({
+      where: { id: tableId },
+      data: { status: "ARCHIVED", mergedIntoTableId: null },
+      include: tableInclude,
+    });
+
+    return mapTableToRecord(
+      table as RestaurantTableWithRelations,
+      scope,
+      resolveZoneId(table.floorId),
     );
+  }
 
-    const created = input.newLabels.map((label, index) => {
-      const id = createId("tbl-split");
-      return {
-        ...structuredClone(source),
-        table: {
-          ...source.table,
-          id,
-          label,
-          number: floor.tables.length + index + 1,
-          kind: TABLE_KINDS.SPLIT,
-          status: TABLE_STATUSES.AVAILABLE,
-          seatCapacity: capacityEach,
-          splitFromTableId: input.sourceTableId,
-          groupId: null,
-          updatedAt: now,
+  async restoreTable(scope: TableTenantScope, tableId: string): Promise<TableRecord | null> {
+    const table = await prisma.restaurantTable.update({
+      where: { id: tableId },
+      data: { status: "AVAILABLE", mergedIntoTableId: null },
+      include: tableInclude,
+    });
+
+    if (table.businessId !== scope.businessId || table.branchId !== scope.branchId) {
+      return null;
+    }
+
+    return mapTableToRecord(
+      table as RestaurantTableWithRelations,
+      scope,
+      resolveZoneId(table.floorId),
+    );
+  }
+
+  async deleteTable(scope: TableTenantScope, tableId: string): Promise<boolean> {
+    const result = await prisma.restaurantTable.deleteMany({
+      where: { id: tableId, ...scopeWhere(scope) },
+    });
+
+    return result.count > 0;
+  }
+
+  async bulkUpdateStatus(
+    scope: TableTenantScope,
+    tableIds: string[],
+    status: UpdateTableInput["status"],
+  ): Promise<number> {
+    if (!status) {
+      return 0;
+    }
+
+    const result = await prisma.restaurantTable.updateMany({
+      where: { id: { in: tableIds }, ...scopeWhere(scope) },
+      data: { status: mapDomainStatusToPrisma(status) },
+    });
+
+    return result.count;
+  }
+
+  async mergeTables(scope: TableTenantScope, input: MergeTablesInput): Promise<TableRecord | null> {
+    const [targetTableId, ...sourceTableIds] = input.sourceTableIds;
+
+    if (!targetTableId || sourceTableIds.length === 0) {
+      throw new Error("Select at least two tables to merge");
+    }
+
+    return runInteractiveTransaction(async (tx) => {
+      const target = await tx.restaurantTable.findFirst({
+        where: { id: targetTableId, ...scopeWhere(scope) },
+        include: tableInclude,
+      });
+
+      if (!target) {
+        return null;
+      }
+
+      const sources = await tx.restaurantTable.findMany({
+        where: {
+          id: { in: sourceTableIds },
+          ...scopeWhere(scope),
+          floorId: input.floorId,
         },
-        seats: buildSeats(id, capacityEach),
-        timeline: [
-          {
-            id: `${id}-tl-split`,
-            tableId: id,
-            type: TABLE_TIMELINE_EVENT_TYPES.SPLIT,
-            timestamp: now,
-            actorId: input.actorId ?? DEFAULT_TABLE_SCOPE.userId,
-            payload: { sourceTableId: input.sourceTableId },
-          },
-        ],
-      } satisfies TableRecord;
-    });
+      });
 
-    floor.tables.splice(sourceIndex, 1, ...created);
-    return structuredClone(created);
+      if (sources.length !== sourceTableIds.length) {
+        throw new Error("One or more source tables not found");
+      }
+
+      const mergedCapacity =
+        target.capacity + sources.reduce((total, table) => total + table.capacity, 0);
+
+      await tx.restaurantTable.update({
+        where: { id: target.id },
+        data: {
+          capacity: mergedCapacity,
+          status: "OCCUPIED",
+          tableName: input.mergedLabel ?? target.tableName,
+        },
+      });
+
+      for (const source of sources) {
+        await tx.restaurantTable.update({
+          where: { id: source.id },
+          data: { status: "OUT_OF_SERVICE", mergedIntoTableId: target.id },
+        });
+      }
+
+      const updated = await tx.restaurantTable.findFirstOrThrow({
+        where: { id: target.id },
+        include: tableInclude,
+      });
+
+      return mapTableToRecord(
+        updated as RestaurantTableWithRelations,
+        scope,
+        resolveZoneId(updated.floorId),
+      );
+    });
   }
 
-  assignTable(input: AssignTableInput): TableRecord | undefined {
-    const record = this.findTableById(input.tableId);
-    if (!record) return undefined;
+  async splitTable(scope: TableTenantScope, input: SplitTableInput): Promise<TableRecord[]> {
+    const updatedSources = await runInteractiveTransaction(async (tx) => {
+      const target = await tx.restaurantTable.findFirst({
+        where: { id: input.sourceTableId, ...scopeWhere(scope), floorId: input.floorId },
+      });
 
-    const now = new Date().toISOString();
-    record.table.status = TABLE_STATUSES.OCCUPIED;
-    record.reservationState = {
-      ...record.reservationState,
-      reservationId: input.reservationId ?? record.reservationState.reservationId,
-      state: TABLE_RESERVATION_STATES.SEATED,
-      partySize: input.partySize,
-      guestName: input.guestName ?? record.reservationState.guestName,
-      seatedAt: now,
-    };
-    record.availability.isAvailable = false;
-    record.availability.occupancyPercent = Math.round(
-      (input.partySize / record.table.seatCapacity) * 100,
+      if (!target) {
+        return [];
+      }
+
+      const mergedChildren = await tx.restaurantTable.findMany({
+        where: { mergedIntoTableId: target.id, ...scopeWhere(scope) },
+      });
+
+      let restoredCapacity = 0;
+      for (const source of mergedChildren) {
+        restoredCapacity += source.capacity;
+        await tx.restaurantTable.update({
+          where: { id: source.id },
+          data: { status: "AVAILABLE", mergedIntoTableId: null },
+        });
+      }
+
+      await tx.restaurantTable.update({
+        where: { id: target.id },
+        data: {
+          capacity: Math.max(target.minimumCapacity, target.capacity - restoredCapacity),
+          status: "AVAILABLE",
+        },
+      });
+
+      return tx.restaurantTable.findMany({
+        where: {
+          id: { in: [target.id, ...mergedChildren.map((entry) => entry.id)] },
+          ...scopeWhere(scope),
+        },
+        include: tableInclude,
+      });
+    });
+
+    return updatedSources.map((table) =>
+      mapTableToRecord(table as RestaurantTableWithRelations, scope, resolveZoneId(table.floorId)),
     );
-    record.timeline.push({
-      id: `${input.tableId}-tl-assign-${now}`,
-      tableId: input.tableId,
-      type: TABLE_TIMELINE_EVENT_TYPES.ASSIGNED,
-      timestamp: now,
-      actorId: input.actorId ?? DEFAULT_TABLE_SCOPE.userId,
-      payload: { partySize: input.partySize },
-    });
-
-    return structuredClone(record);
   }
 
-  transferTable(input: TransferTableInput): TableRecord | undefined {
-    const from = this.findTableById(input.fromTableId);
-    const to = this.findTableById(input.toTableId);
-    if (!from || !to) return undefined;
-
-    const now = new Date().toISOString();
-    from.table.status = TABLE_STATUSES.CLEANING;
-    from.availability.isAvailable = false;
-    from.availability.availableAt = now;
-    from.reservationState.state = TABLE_RESERVATION_STATES.NONE;
-
-    to.table.status = TABLE_STATUSES.OCCUPIED;
-    to.reservationState = {
-      ...to.reservationState,
-      state: TABLE_RESERVATION_STATES.SEATED,
-      partySize: input.partySize,
-      seatedAt: now,
-    };
-    to.availability.isAvailable = false;
-    to.timeline.push({
-      id: `${input.toTableId}-tl-transfer-${now}`,
-      tableId: input.toTableId,
-      type: TABLE_TIMELINE_EVENT_TYPES.TRANSFERRED,
-      timestamp: now,
-      actorId: input.actorId ?? DEFAULT_TABLE_SCOPE.userId,
-      payload: { fromTableId: input.fromTableId, orderId: input.orderId ?? null },
+  async assignTable(scope: TableTenantScope, input: AssignTableInput): Promise<TableRecord | null> {
+    const table = await prisma.restaurantTable.update({
+      where: { id: input.tableId },
+      data: { status: "OCCUPIED" },
+      include: tableInclude,
     });
 
-    return structuredClone(to);
+    if (table.businessId !== scope.businessId || table.branchId !== scope.branchId) {
+      return null;
+    }
+
+    if (input.reservationId) {
+      await prisma.reservation.updateMany({
+        where: {
+          id: input.reservationId,
+          businessId: scope.businessId,
+          branchId: scope.branchId,
+        },
+        data: {
+          restaurantTableId: input.tableId,
+          status: "SEATED",
+          checkInTime: new Date(),
+          ...(input.actorId ? { assignedStaffId: input.actorId } : {}),
+        },
+      });
+    }
+
+    return mapTableToRecord(
+      table as RestaurantTableWithRelations,
+      scope,
+      resolveZoneId(table.floorId),
+    );
   }
 
-  getAvailableTables(partySize: number, floorId?: string): TableRecord[] {
-    return this.searchTables({
+  async transferTable(
+    scope: TableTenantScope,
+    input: TransferTableInput,
+  ): Promise<TableRecord | null> {
+    return runInteractiveTransaction(async (tx) => {
+      const from = await tx.restaurantTable.findFirst({
+        where: { id: input.fromTableId, ...scopeWhere(scope) },
+      });
+      const to = await tx.restaurantTable.findFirst({
+        where: { id: input.toTableId, ...scopeWhere(scope) },
+      });
+
+      if (!from || !to) {
+        return null;
+      }
+
+      await tx.restaurantTable.update({
+        where: { id: from.id },
+        data: { status: "DIRTY" },
+      });
+
+      await tx.restaurantTable.update({
+        where: { id: to.id },
+        data: { status: "OCCUPIED" },
+      });
+
+      if (input.orderId) {
+        await tx.restaurantOrder.updateMany({
+          where: { id: input.orderId, businessId: scope.businessId },
+          data: { restaurantTableId: to.id },
+        });
+      }
+
+      const updated = await tx.restaurantTable.findFirstOrThrow({
+        where: { id: to.id },
+        include: tableInclude,
+      });
+
+      return mapTableToRecord(
+        updated as RestaurantTableWithRelations,
+        scope,
+        resolveZoneId(updated.floorId),
+      );
+    });
+  }
+
+  async getAvailableTables(
+    scope: TableTenantScope,
+    partySize: number,
+    floorId?: string,
+  ): Promise<TableRecord[]> {
+    const result = await this.searchTables(scope, {
       floorId,
       minCapacity: partySize,
       status: TABLE_STATUSES.AVAILABLE,
-    }).filter((record) => record.availability.isAvailable);
-  }
-}
+      pageSize: 100,
+    });
 
-function buildSeats(tableId: string, capacity: number): TableRecord["seats"] {
-  return Array.from({ length: capacity }, (_, index) => ({
-    id: `${tableId}-seat-${index + 1}`,
-    tableId,
-    seatNumber: index + 1,
-    label: `Seat ${index + 1}`,
-    isOccupied: false,
-    guestId: null,
-  }));
+    return result.records.filter((record) => record.availability.isAvailable);
+  }
+
+  private async ensureQrCode(scope: TableTenantScope, tableId: string): Promise<void> {
+    const existing = await prisma.tableQRCode.findUnique({ where: { tableId } });
+
+    if (existing) {
+      return;
+    }
+
+    const token = randomBytes(16).toString("hex");
+    await prisma.tableQRCode.create({
+      data: {
+        businessId: scope.businessId,
+        branchId: scope.branchId,
+        tableId,
+        token,
+        qrCodeUrl: `https://order.getbusal.com/t/${token}`,
+        status: "ACTIVE",
+      },
+    });
+  }
 }
 
 export const tableManagementRepository = new TableManagementRepository();

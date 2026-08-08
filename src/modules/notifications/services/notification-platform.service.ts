@@ -1,9 +1,8 @@
-import { DEFAULT_NOTIFICATION_SCOPE } from "@/modules/notifications/constants/mock-data";
+import "server-only";
+
+import type { NotificationPlatformContext, NotificationRecord } from "@/modules/notifications/types/notification-platform";
 import { notificationRepository } from "@/modules/notifications/repository/notification-repository";
-import type {
-  NotificationPlatformContext,
-  NotificationRecord,
-} from "@/modules/notifications/types/notification-platform";
+import type { NotificationTenantScope } from "@/modules/notifications/lib/notification-scope";
 import { getNotificationSummary } from "@/modules/notifications/utils/notification-selectors";
 
 export interface NotificationPlatformSnapshot {
@@ -20,31 +19,36 @@ export interface NotificationPlatformSnapshot {
 export interface NotificationPlatformInput {
   tenantId?: string;
   workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
+  businessId: string;
+  branchId: string;
   userId?: string;
 }
 
-export function buildNotificationPlatformContext(
-  input: NotificationPlatformInput = {},
-): NotificationPlatformContext {
+export function buildNotificationPlatformContext(input: NotificationPlatformInput): NotificationPlatformContext {
   return {
-    tenantId: input.tenantId ?? DEFAULT_NOTIFICATION_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_NOTIFICATION_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_NOTIFICATION_SCOPE.businessId,
-    branchId: input.branchId ?? DEFAULT_NOTIFICATION_SCOPE.branchId,
-    userId: input.userId ?? DEFAULT_NOTIFICATION_SCOPE.userId,
+    tenantId: input.tenantId ?? input.businessId,
+    workspaceId: input.workspaceId ?? input.businessId,
+    businessId: input.businessId,
+    branchId: input.branchId,
+    userId: input.userId ?? "system",
   };
 }
 
-export function buildNotificationPlatformSnapshot(
-  input: NotificationPlatformInput = {},
-): NotificationPlatformSnapshot {
-  const context = buildNotificationPlatformContext(input);
-  const record = notificationRepository.getRecord();
-  const unread = notificationRepository.getUnreadNotifications();
-  const pending = notificationRepository.getPendingQueue();
-  const failed = notificationRepository.getFailedDeliveries();
+export async function buildNotificationPlatformSnapshot(
+  context: NotificationPlatformContext,
+): Promise<NotificationPlatformSnapshot> {
+  const scope: NotificationTenantScope = {
+    tenantId: context.tenantId,
+    workspaceId: context.workspaceId,
+    businessId: context.businessId,
+    branchId: context.branchId,
+    userId: context.userId,
+  };
+
+  const record = await notificationRepository.getRecord(scope);
+  const unread = record.notifications.filter((n) => !n.isRead);
+  const pending = record.queue.filter((q) => q.status === "pending" || q.status === "retry");
+  const failed = record.deliveries.filter((d) => d.status === "failed" || d.status === "bounced");
 
   return {
     context,
@@ -58,11 +62,7 @@ export function buildNotificationPlatformSnapshot(
   };
 }
 
-export function getDefaultNotificationSnapshot(): NotificationPlatformSnapshot {
-  return buildNotificationPlatformSnapshot();
-}
-
-export function getNotificationPlatformSummary(input: NotificationPlatformInput = {}): string {
-  const snapshot = buildNotificationPlatformSnapshot(input);
+export async function getNotificationPlatformSummary(context: NotificationPlatformContext): Promise<string> {
+  const snapshot = await buildNotificationPlatformSnapshot(context);
   return getNotificationSummary(snapshot.record);
 }

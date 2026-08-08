@@ -4,6 +4,7 @@ import type {
   WorkflowExecutionContext,
   WorkflowNode,
 } from "@/modules/ai-automation/types/automation-types";
+import { runCentralAiInsight } from "@/services/ai-engine-bridge.service";
 
 export async function runAiDecisionNode(
   platform: BusinessContext,
@@ -45,32 +46,67 @@ export async function runAiDecisionNode(
     }
   }
 
-  const eventSummary = JSON.stringify(context.eventPayload).slice(0, 500);
-  const decision =
+  const defaultDecision =
     typeof node.config.defaultDecision === "string" ? node.config.defaultDecision : "proceed";
 
+  const engineResult = await runCentralAiInsight(platform, {
+    currentModule: "automation",
+    prompt: [
+      prompt,
+      `Event payload: ${JSON.stringify(context.eventPayload).slice(0, 1500)}`,
+      knowledge.context ? `Knowledge:\n${knowledge.context.slice(0, 1500)}` : "",
+      toolOutput ? `Tool output: ${JSON.stringify(toolOutput).slice(0, 500)}` : "",
+      'Return JSON: { "decision": string, "confidenceScore": number, "reasoning": string }',
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+    contextData: {
+      eventPayload: context.eventPayload,
+      knowledgeAuditId: knowledge.auditId,
+      toolId,
+      toolOutput,
+      toolError,
+    },
+    responseFormat: "json",
+  });
+
+  const parsed = engineResult.parsed as
+    | { decision?: string; confidenceScore?: number; reasoning?: string }
+    | undefined;
+
+  const decision = parsed?.decision ?? defaultDecision;
   const confidenceScore = Math.min(
     0.95,
-    Math.max(0.4, knowledge.confidenceScore + (toolOutput ? 0.1 : 0) - (toolError ? 0.05 : 0)),
+    Math.max(
+      0.4,
+      parsed?.confidenceScore ??
+        knowledge.confidenceScore + (toolOutput ? 0.1 : 0) - (toolError ? 0.05 : 0),
+    ),
   );
 
-  const reasoningParts = [
-    `Knowledge context retrieved (${knowledge.citations.length} citations).`,
-    toolOutput ? "Tool enrichment succeeded." : null,
-    toolError ? `Tool enrichment skipped: ${toolError}` : null,
-    `Event summary: ${eventSummary}`,
-  ].filter(Boolean);
+  const reasoning =
+    parsed?.reasoning ??
+    [
+      `Knowledge context retrieved (${knowledge.citations.length} citations).`,
+      toolOutput ? "Tool enrichment succeeded." : null,
+      toolError ? `Tool enrichment skipped: ${toolError}` : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
   return {
     decision,
     confidenceScore,
-    reasoning: reasoningParts.join(" "),
+    reasoning,
     structuredOutput: {
       decision,
       knowledgeAuditId: knowledge.auditId,
       toolId,
       toolOutput,
       toolError,
+      providerId: engineResult.providerId,
+      model: engineResult.model,
+      auditId: engineResult.auditId,
       citations: knowledge.citations.map((citation) => ({
         documentTitle: citation.documentTitle,
         score: citation.score,

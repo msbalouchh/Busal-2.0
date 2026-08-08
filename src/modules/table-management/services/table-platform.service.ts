@@ -1,54 +1,26 @@
+import "server-only";
+
 import { TABLE_STATUSES } from "@/modules/table-management/constants/table-status";
-import { DEFAULT_TABLE_SCOPE } from "@/modules/table-management/constants/mock-data";
 import { tableManagementRepository } from "@/modules/table-management/repository/table-management-repository";
+import {
+  buildTableScopeFromInput,
+  toTablePlatformContext,
+  type TableTenantScope,
+} from "@/modules/table-management/lib/table-scope";
+import type { TablePlatformInput } from "@/modules/table-management/lib/table-platform-context";
 import type {
-  FloorRecord,
-  TablePlatformContext,
+  TablePlatformSnapshot,
   TableRecord,
 } from "@/modules/table-management/types/table-management";
 
-export interface TablePlatformSnapshot {
-  context: TablePlatformContext;
-  floors: FloorRecord[];
-  tableCount: number;
-  availableCount: number;
-  occupiedCount: number;
-  reservedCount: number;
-  cleaningCount: number;
-  blockedCount: number;
-  outOfServiceCount: number;
-  avgUtilizationScore: number;
-  realtimeOccupancyPercent: number;
-}
+export type { TablePlatformInput };
 
-export interface TablePlatformInput {
-  tenantId?: string;
-  workspaceId?: string;
-  businessId?: string;
-  branchId?: string;
-  userId?: string;
-}
-
-export function buildTablePlatformContext(input: TablePlatformInput = {}): TablePlatformContext {
-  return {
-    tenantId: input.tenantId ?? DEFAULT_TABLE_SCOPE.tenantId,
-    workspaceId: input.workspaceId ?? DEFAULT_TABLE_SCOPE.workspaceId,
-    businessId: input.businessId ?? DEFAULT_TABLE_SCOPE.businessId,
-    branchId: input.branchId ?? DEFAULT_TABLE_SCOPE.branchId,
-    userId: input.userId ?? DEFAULT_TABLE_SCOPE.userId,
-  };
-}
-
-export function buildTablePlatformSnapshot(input: TablePlatformInput = {}): TablePlatformSnapshot {
-  const context = buildTablePlatformContext(input);
-  const floors = tableManagementRepository
-    .listFloors()
-    .filter(
-      (record) =>
-        record.floor.tenantId === context.tenantId &&
-        record.floor.businessId === context.businessId,
-    );
-
+export async function buildTablePlatformSnapshot(
+  input: TablePlatformInput,
+): Promise<TablePlatformSnapshot> {
+  const scope = buildTableScopeFromInput(input);
+  const context = toTablePlatformContext(scope);
+  const floors = await tableManagementRepository.listFloors(scope);
   const tables = floors.flatMap((floor) => floor.tables);
   const countByStatus = (status: string) =>
     tables.filter((record) => record.table.status === status).length;
@@ -76,13 +48,13 @@ export function buildTablePlatformSnapshot(input: TablePlatformInput = {}): Tabl
   };
 }
 
-export function getDefaultTableSnapshot(): TablePlatformSnapshot {
-  return buildTablePlatformSnapshot();
-}
-
-export function getHighUtilizationTables(limit = 5): TableRecord[] {
-  return tableManagementRepository
-    .listTables()
+export async function getHighUtilizationTables(
+  scope: TableTenantScope,
+  limit = 5,
+): Promise<TableRecord[]> {
+  const floors = await tableManagementRepository.listFloors(scope);
+  return floors
+    .flatMap((floor) => floor.tables)
     .sort((a, b) => b.analytics.utilizationScore - a.analytics.utilizationScore)
     .slice(0, limit);
 }

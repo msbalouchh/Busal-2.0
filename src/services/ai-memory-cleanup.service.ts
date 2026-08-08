@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import { prisma } from "@/lib/prisma";
 import { compressMemoryContent } from "@/services/ai-memory-ranking.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";

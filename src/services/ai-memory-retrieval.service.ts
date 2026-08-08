@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import type { MemoryType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";

@@ -1,5 +1,7 @@
 import "server-only";
 
+/** Non-inference service — no parallel AI execution. */
+
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
 import { prisma } from "@/lib/prisma";
 import {

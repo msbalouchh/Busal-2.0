@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { ROUTES } from "@/constants/routes";
 import { resolvePublicAppUrl } from "@/config/app-url";
+import { persistBusinessContextCookiesForLogin } from "@/modules/business-context/services/business-context-cookie-writer.service";
 import { resolvePostAuthRedirect } from "@/modules/auth/lib/post-auth-redirect";
+import { ACCOUNT_TYPES } from "@/modules/staff-auth/constants/session";
+import { completeLoginSession } from "@/modules/staff-auth/services/staff-auth.service";
 import { AuthServiceError, exchangeCodeForSession, getCurrentUser } from "@/services/auth.service";
 
 function redirectWithError(message: string) {
@@ -34,6 +37,11 @@ export async function GET(request: Request) {
 
     if (!user) {
       return redirectWithError("Unable to establish a session.");
+    }
+
+    const loginResult = await completeLoginSession(user.id, user.email);
+    if (loginResult.accountType === ACCOUNT_TYPES.OWNER || loginResult.staffSession) {
+      await persistBusinessContextCookiesForLogin(user, loginResult);
     }
 
     const redirectPath = await resolvePostAuthRedirect(user, next);

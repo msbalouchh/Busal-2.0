@@ -2,76 +2,49 @@
 
 import { revalidatePath } from "next/cache";
 
+import { KITCHEN_MODULE_PERMISSIONS } from "@/modules/kitchen/constants/permissions";
 import { KITCHEN_ROUTES } from "@/modules/kitchen/constants/routes";
 import {
   refreshElapsedLabels,
   serializeKitchenOrderCard,
   type ClientKitchenOrderCard,
 } from "@/modules/kitchen/lib/kitchen-display-utils";
-import { requireAuthenticatedUser } from "@/modules/onboarding/lib/onboarding-guard";
 import {
-  acknowledgeOrder,
-  getQueue,
-  markReady,
-  markServed,
-  startPreparation,
-} from "@/services/kitchen-queue.service";
-import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
-import { prisma } from "@/lib/prisma";
+  resolveKitchenScope,
+  toKitchenPlatformContext,
+} from "@/modules/kitchen/lib/kitchen-scope";
+import { protectedAction } from "@/modules/platform-guards/guards/action.guards";
+import { kitchenRepository } from "@/modules/kitchen/repository/kitchen-repository";
+import { kitchenService } from "@/modules/kitchen/services/kitchen.service";
+import {
+  addKitchenNoteSchema,
+  assignKitchenStationSchema,
+  createKitchenStationSchema,
+  kitchenOrderActionSchema,
+  receiveOmsOrderSchema,
+  updateKitchenStationSchema,
+} from "@/modules/kitchen/validation/kitchen-schemas";
 
-function revalidateKitchenPage() {
+function revalidateKitchenPages() {
   revalidatePath(KITCHEN_ROUTES.overview);
+  revalidatePath("/dashboard/restaurant/kitchen");
+  revalidatePath("/app/restaurant/kitchen");
 }
 
-async function getBusinessId(): Promise<string> {
-  const user = await requireAuthenticatedUser();
-  const business = await getOrCreateBusinessForOwner(user.id);
-  return business.id;
-}
-
-async function loadActiveKitchenOrders(businessId: string): Promise<ClientKitchenOrderCard[]> {
-  const queueItems = await prisma.kitchenQueue.findMany({
-    where: {
-      businessId,
-      status: { in: ["NEW", "ACKNOWLEDGED", "PREPARING", "READY"] },
-    },
-    include: {
-      order: {
-        include: {
-          table: { select: { name: true } },
-          items: {
-            orderBy: [{ createdAt: "asc" }],
-            select: {
-              id: true,
-              quantity: true,
-              nameSnapshot: true,
-              notes: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: [{ priority: "desc" }, { queuedAt: "asc" }],
-  });
-
+async function loadActiveKitchenOrders(scope: ReturnType<typeof resolveKitchenScope>): Promise<ClientKitchenOrderCard[]> {
+  const queueItems = await kitchenRepository.loadDisplayCards(scope);
   return refreshElapsedLabels(queueItems.map(serializeKitchenOrderCard));
 }
 
 export async function fetchKitchenQueueAction(): Promise<ClientKitchenOrderCard[]> {
-  const businessId = await getBusinessId();
-  await getQueue(businessId);
-  return loadActiveKitchenOrders(businessId);
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_READ, async ({ platform }) => {
+    const scope = resolveKitchenScope(platform);
+    return loadActiveKitchenOrders(scope);
+  });
 }
 
-async function assertQueueItemBelongsToBusiness(
-  queueItemId: string,
-  businessId: string,
-): Promise<void> {
-  const item = await prisma.kitchenQueue.findFirst({
-    where: { id: queueItemId, businessId },
-    select: { id: true },
-  });
-
+async function assertQueueItemInScope(queueItemId: string, scope: ReturnType<typeof resolveKitchenScope>) {
+  const item = await kitchenRepository.findById(scope, queueItemId);
   if (!item) {
     throw new Error("Kitchen queue item not found");
   }
@@ -80,39 +53,138 @@ async function assertQueueItemBelongsToBusiness(
 export async function acceptKitchenOrderAction(
   queueItemId: string,
 ): Promise<ClientKitchenOrderCard[]> {
-  const businessId = await getBusinessId();
-  await assertQueueItemBelongsToBusiness(queueItemId, businessId);
-  await acknowledgeOrder(queueItemId);
-  revalidateKitchenPage();
-  return loadActiveKitchenOrders(businessId);
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const scope = resolveKitchenScope(platform);
+    await assertQueueItemInScope(queueItemId, scope);
+    await kitchenRepository.acceptOrder(scope, { kitchenOrderId: queueItemId });
+    revalidateKitchenPages();
+    return loadActiveKitchenOrders(scope);
+  });
 }
 
 export async function startPreparingKitchenOrderAction(
   queueItemId: string,
 ): Promise<ClientKitchenOrderCard[]> {
-  const businessId = await getBusinessId();
-  await assertQueueItemBelongsToBusiness(queueItemId, businessId);
-  await startPreparation(queueItemId);
-  revalidateKitchenPage();
-  return loadActiveKitchenOrders(businessId);
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const scope = resolveKitchenScope(platform);
+    await assertQueueItemInScope(queueItemId, scope);
+    await kitchenRepository.fireOrder(scope, queueItemId);
+    revalidateKitchenPages();
+    return loadActiveKitchenOrders(scope);
+  });
 }
 
 export async function markKitchenOrderReadyAction(
   queueItemId: string,
 ): Promise<ClientKitchenOrderCard[]> {
-  const businessId = await getBusinessId();
-  await assertQueueItemBelongsToBusiness(queueItemId, businessId);
-  await markReady(queueItemId);
-  revalidateKitchenPage();
-  return loadActiveKitchenOrders(businessId);
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const scope = resolveKitchenScope(platform);
+    await assertQueueItemInScope(queueItemId, scope);
+    await kitchenRepository.markReady(scope, queueItemId);
+    revalidateKitchenPages();
+    return loadActiveKitchenOrders(scope);
+  });
 }
 
 export async function markKitchenOrderServedAction(
   queueItemId: string,
 ): Promise<ClientKitchenOrderCard[]> {
-  const businessId = await getBusinessId();
-  await assertQueueItemBelongsToBusiness(queueItemId, businessId);
-  await markServed(queueItemId);
-  revalidateKitchenPage();
-  return loadActiveKitchenOrders(businessId);
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const scope = resolveKitchenScope(platform);
+    await assertQueueItemInScope(queueItemId, scope);
+    await kitchenRepository.bumpOrder(scope, { kitchenOrderId: queueItemId });
+    revalidateKitchenPages();
+    return loadActiveKitchenOrders(scope);
+  });
+}
+
+export async function holdKitchenOrderAction(kitchenOrderId: string) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const record = await kitchenService.holdOrder(context, kitchenOrderId);
+    revalidateKitchenPages();
+    return { success: true as const, record };
+  });
+}
+
+export async function resumeKitchenOrderAction(kitchenOrderId: string) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const record = await kitchenService.resumeOrder(context, kitchenOrderId);
+    revalidateKitchenPages();
+    return { success: true as const, record };
+  });
+}
+
+export async function recallKitchenOrderAction(input: unknown) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_MANAGE, async ({ platform }) => {
+    const body = kitchenOrderActionSchema.parse(input);
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const record = await kitchenService.recallOrder(context, body);
+    revalidateKitchenPages();
+    return { success: true as const, record };
+  });
+}
+
+export async function completeKitchenOrderAction(kitchenOrderId: string) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const record = await kitchenService.completeOrder(context, kitchenOrderId);
+    revalidateKitchenPages();
+    return { success: true as const, record };
+  });
+}
+
+export async function assignKitchenStationAction(input: unknown) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_ASSIGN_STATION, async ({ platform }) => {
+    const body = assignKitchenStationSchema.parse(input);
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const record = await kitchenService.assignStation(context, body);
+    revalidateKitchenPages();
+    return { success: true as const, record };
+  });
+}
+
+export async function addKitchenNoteAction(input: unknown) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const body = addKitchenNoteSchema.parse(input);
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const record = await kitchenService.addNote(context, body);
+    revalidateKitchenPages();
+    return { success: true as const, record };
+  });
+}
+
+export async function createKitchenStationAction(input: unknown) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_MANAGE, async ({ platform }) => {
+    const body = createKitchenStationSchema.parse(input);
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const station = await kitchenService.createStation(context, body);
+    revalidateKitchenPages();
+    return { success: true as const, station };
+  });
+}
+
+export async function updateKitchenStationAction(input: unknown) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_MANAGE, async ({ platform }) => {
+    const body = updateKitchenStationSchema.parse(input);
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const station = await kitchenService.updateStation(context, body);
+    revalidateKitchenPages();
+    return { success: true as const, station };
+  });
+}
+
+export async function receiveOmsKitchenOrderAction(input: unknown) {
+  return protectedAction(KITCHEN_MODULE_PERMISSIONS.KITCHEN_UPDATE, async ({ platform }) => {
+    const body = receiveOmsOrderSchema.parse(input);
+    const context = toKitchenPlatformContext(resolveKitchenScope(platform));
+    const record = await kitchenService.receiveFromOms(
+      context,
+      body.restaurantOrderId,
+      body.priority,
+    );
+    revalidateKitchenPages();
+    return { success: true as const, record };
+  });
 }

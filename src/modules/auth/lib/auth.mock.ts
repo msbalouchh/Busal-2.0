@@ -69,9 +69,7 @@ export async function mockGetGoogleSignInUrl(): Promise<{ url: string }> {
   throw new Error("Google OAuth integration is coming soon.");
 }
 
-/** TODO: Replace with Supabase auth.resend({ type: 'signup' }). */
-export async function mockResendVerificationEmail(email: string) {
-  await delay();
-  void email;
-  return { message: "Verification email resent." };
+/** @deprecated Use resendVerificationEmail from auth.service via API route. */
+export async function mockResendVerificationEmail(_email: string) {
+  throw new Error("Mock resend is disabled. Use the production resend verification API.");
 }

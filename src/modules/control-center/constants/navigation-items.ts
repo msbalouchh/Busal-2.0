@@ -3,8 +3,10 @@ import {
   AlertTriangle,
   BarChart3,
   Bot,
+  Building2,
   Flag,
   LayoutDashboard,
+  LayoutGrid,
   LifeBuoy,
   Monitor,
   Rocket,
@@ -12,9 +14,11 @@ import {
   Settings,
   Shield,
   ShoppingBag,
+  Sparkles,
   Users,
   Wallet,
   Wrench,
+  Workflow,
 } from "lucide-react";
 
 import { PERMISSION_CODES } from "@/modules/authorization/constants/permissions";
@@ -55,6 +59,20 @@ export const CONTROL_CENTER_NAV_GROUPS: ControlCenterNavGroup[] = [
         permission: PERMISSION_CODES.CONTROL_CENTER_TENANTS,
       },
       {
+        id: "businesses",
+        name: "Businesses",
+        href: CONTROL_CENTER_ROUTES.businesses,
+        icon: Building2,
+        permission: PERMISSION_CODES.CONTROL_CENTER_BUSINESSES,
+      },
+      {
+        id: "workspaces",
+        name: "Workspaces",
+        href: CONTROL_CENTER_ROUTES.workspaces,
+        icon: LayoutGrid,
+        permission: PERMISSION_CODES.CONTROL_CENTER_WORKSPACES,
+      },
+      {
         id: "subscriptions",
         name: "Subscriptions",
         href: CONTROL_CENTER_ROUTES.subscriptions,
@@ -74,6 +92,13 @@ export const CONTROL_CENTER_NAV_GROUPS: ControlCenterNavGroup[] = [
         href: CONTROL_CENTER_ROUTES.marketplace,
         icon: ShoppingBag,
         permission: PERMISSION_CODES.CONTROL_CENTER_MARKETPLACE,
+      },
+      {
+        id: "ai-usage",
+        name: "AI Usage",
+        href: CONTROL_CENTER_ROUTES.ai,
+        icon: Bot,
+        permission: PERMISSION_CODES.CONTROL_CENTER_AI,
       },
       {
         id: "ai-platform",
@@ -118,6 +143,27 @@ export const CONTROL_CENTER_NAV_GROUPS: ControlCenterNavGroup[] = [
         icon: ScrollText,
         permission: PERMISSION_CODES.CONTROL_CENTER_AUDIT,
       },
+      {
+        id: "automation",
+        name: "Automation Center",
+        href: CONTROL_CENTER_ROUTES.automation,
+        icon: Workflow,
+        permission: PERMISSION_CODES.CONTROL_CENTER_AUTOMATION,
+      },
+      {
+        id: "operators",
+        name: "Operators",
+        href: CONTROL_CENTER_ROUTES.operators,
+        icon: Users,
+        permission: PERMISSION_CODES.CONTROL_CENTER_OPERATORS,
+      },
+      {
+        id: "security",
+        name: "Security Center",
+        href: CONTROL_CENTER_ROUTES.security,
+        icon: Shield,
+        permission: PERMISSION_CODES.CONTROL_CENTER_SECURITY,
+      },
     ],
   },
   {
@@ -129,7 +175,7 @@ export const CONTROL_CENTER_NAV_GROUPS: ControlCenterNavGroup[] = [
       {
         id: "platform-settings",
         name: "Platform Settings",
-        href: CONTROL_CENTER_ROUTES.settings,
+        href: CONTROL_CENTER_ROUTES.platformSettings,
         icon: Settings,
         permission: PERMISSION_CODES.CONTROL_CENTER_SETTINGS,
       },
@@ -155,11 +201,32 @@ export const CONTROL_CENTER_NAV_GROUPS: ControlCenterNavGroup[] = [
         permission: PERMISSION_CODES.CONTROL_CENTER_STAFF,
       },
       {
+        id: "intelligence",
+        name: "Platform Intelligence",
+        href: CONTROL_CENTER_ROUTES.intelligence,
+        icon: BarChart3,
+        permission: PERMISSION_CODES.CONTROL_CENTER_INTELLIGENCE,
+      },
+      {
+        id: "ceo",
+        name: "Platform CEO",
+        href: CONTROL_CENTER_ROUTES.ceo,
+        icon: Sparkles,
+        permission: PERMISSION_CODES.CONTROL_CENTER_CEO,
+      },
+      {
         id: "analytics",
         name: "Analytics",
         href: CONTROL_CENTER_ROUTES.analytics,
         icon: BarChart3,
         permission: PERMISSION_CODES.CONTROL_CENTER_ANALYTICS,
+      },
+      {
+        id: "features",
+        name: "Feature Management",
+        href: CONTROL_CENTER_ROUTES.features,
+        icon: Flag,
+        permission: PERMISSION_CODES.CONTROL_CENTER_FEATURE_FLAGS,
       },
       {
         id: "feature-flags",
@@ -271,6 +338,8 @@ export const CONTROL_CENTER_WIDGETS: ControlCenterWidgetDefinition[] = [
 
 export const CONTROL_CENTER_SECTION_LABELS: Record<string, string> = {
   tenants: "Tenants",
+  businesses: "Businesses",
+  workspaces: "Workspaces",
   subscriptions: "Subscriptions",
   revenue: "Revenue",
   marketplace: "Marketplace",
@@ -285,4 +354,7 @@ export const CONTROL_CENTER_SECTION_LABELS: Record<string, string> = {
   staff: "Staff",
   analytics: "Analytics",
   "feature-flags": "Feature Flags",
+  security: "Security Center",
+  operators: "Operators",
+  automation: "Automation Center",
 };

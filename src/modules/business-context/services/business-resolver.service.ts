@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { getActiveBusinessCookie } from "@/modules/business-context/services/business-context-session.service";
+import { getActiveBusinessCookie, clearBusinessContextCookies } from "@/modules/business-context/services/business-context-session.service";
 import { BusinessContextError } from "@/modules/business-context/utils/business-context-errors";
 import { getStaffSessionCookie } from "@/modules/staff-auth/services/staff-session.service";
 import {
@@ -119,6 +119,10 @@ export async function resolveActiveBusinessIdForUser(
 
   const businesses = await listBusinessesForOwner(userId);
   const cookie = await getActiveBusinessCookie();
+
+  if (cookie && cookie.userId !== userId) {
+    await clearBusinessContextCookies();
+  }
 
   if (
     cookie?.userId === userId &&

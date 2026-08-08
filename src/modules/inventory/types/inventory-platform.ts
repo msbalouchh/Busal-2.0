@@ -435,6 +435,8 @@ export interface InventoryContextValue {
   selectItem: (itemId: string | null) => void;
   searchItems: (query: InventorySearchQuery) => InventoryRecord[];
   refresh: () => void;
+  isRefreshing: boolean;
+  error: string | null;
 }
 
 export interface InventoryStockContextValue {
