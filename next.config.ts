@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
+const isDockerBuild = process.env.DOCKER_BUILD === "true";
+
 const nextConfig: NextConfig = {
-  // Produces a self-contained Node server for Cloud Run. Vercel continues to
-  // use Next's normal output, while Docker copies this standalone runtime.
-  output: "standalone",
+  // Standalone is for Docker/Cloud Run only. Netlify and Vercel use default Next output.
+  ...(isDockerBuild ? { output: "standalone" as const } : {}),
   reactStrictMode: true,
   poweredByHeader: false,
   eslint: {

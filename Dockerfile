@@ -12,6 +12,7 @@ RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV DOCKER_BUILD=true
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build
