@@ -1,3 +1,6 @@
+# Busal OS — Netlify deployment for the root Next.js application (not mobile/).
+# Publish directory must be empty in Netlify UI; @netlify/plugin-nextjs manages output.
+
 [build]
   command = "corepack enable && pnpm install --frozen-lockfile && pnpm build"
 
