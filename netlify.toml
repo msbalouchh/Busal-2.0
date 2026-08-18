@@ -1,8 +1,12 @@
-# Busal OS — Netlify deployment for the root Next.js application (not mobile/).
+# Busal OS — Netlify deployment for the root Next.js application.
 
 [build]
   command = "corepack enable && pnpm install --frozen-lockfile && pnpm build"
+  publish = ".netlify"
 
 [build.environment]
-  NODE_VERSION = "22"
+  NODE_VERSION = "20"
   NODE_OPTIONS = "--max-old-space-size=4096"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
