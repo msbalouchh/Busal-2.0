@@ -1,11 +1,9 @@
-# Busal OS — Netlify deployment for the root Next.js application (not mobile/).
-# Publish directory is managed by @netlify/plugin-nextjs; do not set it to out, public, or .next.
-
 [build]
   command = "corepack enable && pnpm install --frozen-lockfile && pnpm build"
 
 [build.environment]
   NODE_VERSION = "20"
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
