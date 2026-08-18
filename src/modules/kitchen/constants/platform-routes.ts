@@ -1,10 +1,10 @@
 /** Architecture route markers (distinct from legacy KITCHEN_ROUTES). */
 export const KITCHEN_PLATFORM_ROUTES = {
-  overview: "/app/restaurant/kitchen",
+  overview: "/dashboard/kitchen",
   stations: "/app/restaurant/kitchen/stations",
-  queue: "/app/restaurant/kitchen/queue",
-  screens: "/app/restaurant/kitchen/screens",
-  analytics: "/app/restaurant/kitchen/analytics",
+  queue: "/dashboard/kitchen",
+  screens: "/app/restaurant/kitchen/fullscreen",
+  analytics: "/app/restaurant/analytics/kitchen",
 } as const;
 
 export const KITCHEN_PLATFORM_NAV_ITEMS = [

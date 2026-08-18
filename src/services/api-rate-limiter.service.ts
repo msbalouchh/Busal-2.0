@@ -43,6 +43,18 @@ export interface IpAllowListResult {
 }
 
 export function checkIpAllowList(ipAddress: string, allowList: string[]): IpAllowListResult {
-  if (allowList.length === 0) return { allowed: true, simulated: true };
-  return { allowed: allowList.includes(ipAddress), simulated: true };
+  if (allowList.length === 0) {
+    return { allowed: true, simulated: false };
+  }
+
+  return { allowed: allowList.includes(ipAddress), simulated: false };
+}
+
+export function resolveClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim() ?? "unknown";
+  }
+
+  return request.headers.get("x-real-ip") ?? "unknown";
 }

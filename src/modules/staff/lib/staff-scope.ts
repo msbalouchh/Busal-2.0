@@ -39,3 +39,18 @@ export function toStaffPlatformContext(scope: StaffTenantScope): StaffPlatformCo
     userId: scope.userId,
   };
 }
+
+export async function resolveStaffScopeFromBusiness(
+  businessId: string,
+): Promise<StaffTenantScope> {
+  const { resolveOrderScopeFromBusiness } = await import("@/modules/orders/lib/order-scope");
+  const orderScope = await resolveOrderScopeFromBusiness(businessId);
+  return {
+    tenantId: businessId,
+    workspaceId: businessId,
+    businessId,
+    branchId: orderScope.branchId,
+    userId: "system",
+    actorStaffId: null,
+  };
+}

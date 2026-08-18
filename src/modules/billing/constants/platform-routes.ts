@@ -1,11 +1,11 @@
 /** Architecture route markers for the Billing platform. */
 export const BILLING_PLATFORM_ROUTES = {
-  overview: "/app/settings/billing",
-  plans: "/app/settings/billing/plans",
-  subscription: "/app/settings/billing/subscription",
-  invoices: "/app/settings/billing/invoices",
-  usage: "/app/settings/billing/usage",
-  enterprise: "/app/settings/billing/enterprise",
+  overview: "/dashboard/settings",
+  plans: "/pricing",
+  subscription: "/dashboard/settings",
+  invoices: "/dashboard/payments",
+  usage: "/dashboard/reporting/financial",
+  enterprise: "/contact",
 } as const;
 
 export const BILLING_PLATFORM_NAV_ITEMS = [

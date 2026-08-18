@@ -112,13 +112,10 @@ export async function bridgeFinanceOnPaymentCompleted(event: DomainEventEnvelope
 }
 
 export async function bridgeWebhooks(event: DomainEventEnvelope): Promise<Record<string, unknown>> {
-  const deliveries = await dispatchWebhookEvent(event.businessId, event.eventType, {
-    ...event.payload,
-    eventType: event.eventType,
-    aggregateId: event.aggregateId,
-    occurredAt: event.occurredAt,
-  });
-  return { deliveries: deliveries.length };
+  const { bridgePlatformWebhooks } = await import(
+    "@/modules/platform/services/platform-webhook-delivery.service"
+  );
+  return bridgePlatformWebhooks(event);
 }
 
 export async function bridgeAutomationWorkflow(event: DomainEventEnvelope, eventId: string): Promise<Record<string, unknown>> {

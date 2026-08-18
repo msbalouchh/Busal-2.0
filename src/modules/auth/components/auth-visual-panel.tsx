@@ -8,10 +8,21 @@ import {
   AUTH_SUPPORTING_COPY,
   AUTH_TRUST_INDICATORS,
 } from "@/modules/auth/constants/auth-copy";
+import { PlatformBrandLogo } from "@/modules/platform/components/platform-brand-logo";
+import type { ResolvedPlatformBranding } from "@/modules/platform/types/platform-config.types";
 
 const TRUST_ICONS = [Shield, Bot, Cloud, Check] as const;
 
-export function AuthVisualPanel() {
+interface AuthVisualPanelProps {
+  branding?: ResolvedPlatformBranding;
+}
+
+export function AuthVisualPanel({ branding }: AuthVisualPanelProps) {
+  const useWhiteLabel = branding?.isWhiteLabel && !branding?.showBusalBranding;
+  const headline = useWhiteLabel
+    ? `Welcome to ${branding?.customerFacingBrandName ?? branding?.platformName}`
+    : AUTH_HEADLINE;
+
   return (
     <aside className="auth-visual" aria-hidden="true">
       <div className="auth-visual__mesh" />
@@ -19,8 +30,12 @@ export function AuthVisualPanel() {
       <div className="auth-visual__orb auth-visual__orb--b" />
 
       <div className="auth-visual__content">
-        <BusalLogo priority variant="horizontal" />
-        <h1 className="auth-visual__headline">{AUTH_HEADLINE}</h1>
+        {useWhiteLabel ? (
+          <PlatformBrandLogo priority height={52} />
+        ) : (
+          <BusalLogo priority variant="horizontal" />
+        )}
+        <h1 className="auth-visual__headline">{headline}</h1>
         <p className="auth-visual__copy">{AUTH_SUPPORTING_COPY}</p>
 
         <div className="auth-visual__preview">

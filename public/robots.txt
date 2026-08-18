@@ -7,5 +7,6 @@ Disallow: /portal/
 Disallow: /api/
 Disallow: /business-onboarding/
 Disallow: /onboarding/
+Disallow: /dev/
 
-Sitemap: https://www.getbusal.com/sitemap.xml
+Sitemap: https://getbusal.com/sitemap.xml

@@ -1364,11 +1364,28 @@ export async function sendCustomerAssistantMessage(
   businessId: string,
   customerId: string,
   content: string,
-  conversationId?: string,
+  options: {
+    conversationId?: string;
+    sessionToken?: string;
+    confirmedActions?: string[];
+  } = {},
 ) {
-  let activeConversationId = conversationId;
+  const { runCustomerAiChat } = await import(
+    "@/modules/customer-ai/services/customer-ai-chat.service"
+  );
 
-  if (!activeConversationId) {
+  const aiResult = await runCustomerAiChat({
+    businessId,
+    message: content.trim(),
+    conversationId: options.conversationId,
+    sessionToken: options.sessionToken,
+    customerId,
+    channel: "portal",
+    confirmedActions: options.confirmedActions,
+  });
+
+  let commConversationId = options.conversationId;
+  if (!commConversationId) {
     const created = await prisma.communicationConversation.create({
       data: {
         businessId,
@@ -1377,14 +1394,15 @@ export async function sendCustomerAssistantMessage(
         sourceChannel: "LIVE_CHAT",
         inboxType: "TEAM",
         status: "AI_HANDLED",
+        tags: ["customer-ai", `ai-conv:${aiResult.conversationId}`],
       },
     });
-    activeConversationId = created.id;
+    commConversationId = created.id;
   }
 
   await prisma.communicationMessage.create({
     data: {
-      conversationId: activeConversationId,
+      conversationId: commConversationId,
       businessId,
       messageType: "INBOUND",
       senderType: "CUSTOMER",
@@ -1394,25 +1412,33 @@ export async function sendCustomerAssistantMessage(
     },
   });
 
-  const reply = await composeCustomerAssistantReply(businessId, customerId, content.trim());
-
   await prisma.communicationMessage.create({
     data: {
-      conversationId: activeConversationId,
+      conversationId: commConversationId,
       businessId,
       messageType: "OUTBOUND",
       senderType: "AI_AGENT",
       channel: "LIVE_CHAT",
-      body: reply,
+      body: aiResult.content,
     },
   });
 
   await prisma.communicationConversation.update({
-    where: { id: activeConversationId },
+    where: { id: commConversationId },
     data: { lastMessageAt: new Date() },
   });
 
-  return { conversationId: activeConversationId, reply };
+  return {
+    conversationId: aiResult.conversationId,
+    sessionToken: aiResult.sessionToken,
+    reply: aiResult.content,
+    aiName: aiResult.aiName,
+    aiAvatarUrl: aiResult.aiAvatarUrl,
+    requiresConfirmation: aiResult.requiresConfirmation,
+    requiresVerification: aiResult.toolResults.some(
+      (entry) => entry.output.requiresVerification === true,
+    ),
+  };
 }
 
 export { formatMoney as formatCustomerPortalMoney };

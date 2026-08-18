@@ -1,8 +1,8 @@
 export const TABLE_MANAGEMENT_ROUTES = {
-  overview: "/app/restaurant/tables",
+  overview: "/dashboard/tables",
   floors: "/app/restaurant/floors",
-  floorPlan: "/app/restaurant/floors/plan",
-  analytics: "/app/restaurant/tables/analytics",
+  floorPlan: "/app/restaurant/floors",
+  analytics: "/dashboard/tables",
 } as const;
 
 export const TABLE_MANAGEMENT_NAV_ITEMS = [

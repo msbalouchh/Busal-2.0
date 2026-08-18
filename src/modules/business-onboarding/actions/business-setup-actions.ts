@@ -9,13 +9,30 @@ import {
   finalizeWorkspaceSetup,
   getBusinessSetupProfile,
   isBusinessSetupCompleted,
+  loadWorkspaceWizardDraft,
   saveBusinessSetupDraft,
+  saveWorkspaceWizardDraft,
   updateBusinessSetupStep,
   type WorkspaceOnboardingFinalizeInput,
 } from "@/services/business-setup.service";
 import { getOrCreateBusinessForOwner } from "@/services/business-profile.service";
+import { buildAppUrl } from "@/config/app-url";
+import { isStripeConfigured } from "@/lib/stripe";
+import { stripeBillingService } from "@/modules/commercial-foundation/services/stripe-billing.service";
+import {
+  assertCheckoutEligiblePlanSlug,
+  canUseDevelopmentBillingFallback,
+  isEnterprisePlanSlug,
+  requireStripeBillingForActivation,
+} from "@/modules/commercial-foundation/services/stripe-billing-config.service";
 import { platformProvisioningService } from "@/modules/commercial-foundation/services/platform-provisioning.service";
+import { resolveSubscriptionAccess } from "@/modules/commercial-foundation/services/subscription-access.service";
+import { subscriptionLifecycleService } from "@/modules/commercial-foundation/services/subscription-lifecycle.service";
 import type { SubscriptionPlan } from "@/modules/business-onboarding/types/onboarding.types";
+import {
+  BUSAL_COMMERCIAL_PLAN_SLUGS,
+  getSubscriptionPlanBySlug,
+} from "@/modules/control-center/billing/registry/subscription-plan-registry";
 import { findActiveStaffByEmail } from "@/modules/staff-auth/services/staff-auth.service";
 import {
   businessContactSchema,
@@ -23,10 +40,11 @@ import {
   businessRegionSchema,
 } from "@/modules/business-onboarding/schemas/business-setup.schema";
 import type { BusinessType } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 function mapSubscriptionPlanToSlug(plan: SubscriptionPlan): string {
   if (plan === "trial") {
-    return "starter";
+    return BUSAL_COMMERCIAL_PLAN_SLUGS.CORE;
   }
 
   return plan;
@@ -54,6 +72,23 @@ export async function provisionWorkspaceAction(input: {
     throw new Error("Business name is required");
   }
 
+  const planSlug = mapSubscriptionPlanToSlug(input.subscriptionPlan);
+  const selectedPlan =
+    getSubscriptionPlanBySlug(planSlug) ??
+    getSubscriptionPlanBySlug(BUSAL_COMMERCIAL_PLAN_SLUGS.CORE);
+
+  if (!selectedPlan) {
+    throw new Error("Selected plan is not configured");
+  }
+
+  if (isEnterprisePlanSlug(selectedPlan.slug)) {
+    throw new Error("Enterprise plans require custom billing. Contact Busal sales to continue.");
+  }
+
+  assertCheckoutEligiblePlanSlug(selectedPlan.slug);
+
+  const mustUseStripe = isStripeConfigured() || !canUseDevelopmentBillingFallback();
+
   const result = await platformProvisioningService.provisionExistingBusiness({
     businessId: business.id,
     ownerId: user.id,
@@ -61,9 +96,35 @@ export async function provisionWorkspaceAction(input: {
     country: input.country,
     timezone: input.timezone,
     branchName: input.defaultBranchName,
-    planSlug: mapSubscriptionPlanToSlug(input.subscriptionPlan),
+    planSlug: selectedPlan.slug,
     ownerEmail: input.businessEmail ?? user.email,
+    deferSubscriptionActivation: mustUseStripe,
   });
+
+  if (mustUseStripe) {
+    requireStripeBillingForActivation();
+    const checkout = await stripeBillingService.createCheckoutSession({
+      businessId: business.id,
+      planId: selectedPlan.id,
+      billingCycle: "monthly",
+      successUrl: buildAppUrl(`${ROUTES.businessOnboarding}?step=11&checkout=success`),
+      cancelUrl: buildAppUrl(`${ROUTES.businessOnboarding}?step=9&checkout=cancelled`),
+      customerEmail: input.businessEmail ?? user.email,
+      requirePaymentMethod: true,
+    });
+
+    if (!checkout.url) {
+      throw new Error("Unable to start billing checkout");
+    }
+
+    return { success: true as const, result, checkoutUrl: checkout.url };
+  }
+
+  if (input.subscriptionPlan === "trial") {
+    await subscriptionLifecycleService.startTrial(business.id, selectedPlan.id);
+  } else {
+    await subscriptionLifecycleService.assignPlan(business.id, selectedPlan.slug);
+  }
 
   return { success: true as const, result };
 }
@@ -183,4 +244,102 @@ export async function goToBusinessSetupStepAction(step: number) {
 
   await updateBusinessSetupStep(user.id, step);
   return { success: true as const, step };
+}
+
+export async function confirmBillingActivationAction() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect(ROUTES.login);
+  }
+
+  const business = await getOrCreateBusinessForOwner(user.id);
+
+  if (isStripeConfigured() || !canUseDevelopmentBillingFallback()) {
+    const synced = await stripeBillingService.syncFromLatestCheckoutSession(business.id);
+    const access = await import(
+      "@/modules/commercial-foundation/services/subscription-access.service"
+    ).then((module) => module.resolveSubscriptionAccess(business.id));
+
+    if (!access.allowed) {
+      throw new Error("Billing activation is required before entering the dashboard.");
+    }
+
+    return { success: true as const, synced };
+  }
+
+  const access = await import(
+    "@/modules/commercial-foundation/services/subscription-access.service"
+  ).then((module) => module.resolveSubscriptionAccess(business.id));
+
+  if (!access.allowed) {
+    throw new Error("Billing activation is required before entering the dashboard.");
+  }
+
+  return { success: true as const, synced: false };
+}
+
+export async function saveWorkspaceWizardProgressAction(input: {
+  step: number;
+  data: Record<string, unknown>;
+}) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect(ROUTES.login);
+  }
+
+  await getOrCreateBusinessForOwner(user.id);
+  const profile = await saveWorkspaceWizardDraft(user.id, input.step, input.data);
+
+  return { success: true as const, profile };
+}
+
+export async function loadWorkspaceWizardDraftAction() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect(ROUTES.login);
+  }
+
+  await getOrCreateBusinessForOwner(user.id);
+  return loadWorkspaceWizardDraft(user.id);
+}
+
+export async function resolvePostCheckoutOnboardingAction() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect(ROUTES.login);
+  }
+
+  const business = await getOrCreateBusinessForOwner(user.id);
+  const tenant = await prisma.tenantRecord.findUnique({
+    where: { businessId: business.id },
+    select: { id: true },
+  });
+
+  if (isStripeConfigured() || !canUseDevelopmentBillingFallback()) {
+    await stripeBillingService.syncFromLatestCheckoutSession(business.id);
+  }
+
+  const access = await resolveSubscriptionAccess(business.id);
+
+  if (access.allowed) {
+    return {
+      skipProvisioning: true as const,
+      redirectToStep: 11 as const,
+      billingActive: true as const,
+    };
+  }
+
+  if (tenant) {
+    return {
+      skipProvisioning: true as const,
+      redirectToStep: 11 as const,
+      billingActive: false as const,
+    };
+  }
+
+  return { skipProvisioning: false as const };
 }

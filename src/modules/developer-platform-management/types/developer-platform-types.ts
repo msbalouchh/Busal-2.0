@@ -17,6 +17,7 @@ export interface ApiApplicationRecord {
 export interface ApiKeyRecord {
   id: string;
   name: string;
+  keyPrefix: string;
   applicationName: string;
   clientId: string;
   status: PlatformApiStatus;

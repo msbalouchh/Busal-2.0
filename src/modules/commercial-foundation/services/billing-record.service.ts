@@ -224,7 +224,7 @@ export async function buildBillingRecordForBusiness(businessId: string): Promise
           workspaceId,
           planId: plan.id,
           status: TRIAL_STATUSES.ACTIVE,
-          startedAt: tenantRecord?.createdAt.toISOString() ?? now.toISOString(),
+          startedAt: commercial.trialStartedAt ?? tenantRecord?.createdAt.toISOString() ?? now.toISOString(),
           endsAt: commercial.trialEndsAt,
           convertedAt: null,
           daysRemaining: Math.max(

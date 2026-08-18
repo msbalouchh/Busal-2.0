@@ -28,4 +28,6 @@ export const PLATFORM_PUBLIC_API_ROUTES = [
   "/api/auth/google",
   "/api/portal/auth/login",
   "/api/portal/auth/register",
+  "/api/webhooks/stripe",
+  "/api/v1",
 ] as const;

@@ -1,3 +1,5 @@
+import { TRIAL_DURATION_DAYS } from "@/modules/billing/constants/billing-status";
+
 export interface PromotionDefinition {
   id: string;
   code: string;
@@ -24,10 +26,10 @@ const DEFAULT_PROMOTIONS: PromotionDefinition[] = [
     id: "promo-trial-14",
     code: "TRIAL14",
     name: "Extended trial",
-    description: "Adds 14 days to trial period.",
+    description: `Adds ${TRIAL_DURATION_DAYS} days to trial period.`,
     discountPercent: 0,
     planSlug: null,
-    trialExtensionDays: 14,
+    trialExtensionDays: TRIAL_DURATION_DAYS,
     active: true,
   },
 ];

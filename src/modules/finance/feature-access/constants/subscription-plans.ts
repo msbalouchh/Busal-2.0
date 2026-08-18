@@ -8,6 +8,10 @@ import {
 export const SUBSCRIPTION_PLAN_KEYS = {
   FREE_TRIAL: "free_trial",
   TRIAL: "trial",
+  BUSAL_CORE: "busal-core",
+  BUSAL_GROWTH: "busal-growth",
+  BUSAL_PRO: "busal-pro",
+  BUSAL_ENTERPRISE: "busal-enterprise",
   STARTER: "starter",
   GROWTH: "growth",
   PROFESSIONAL: "professional",
@@ -20,6 +24,10 @@ export type SubscriptionPlanKey = (typeof SUBSCRIPTION_PLAN_KEYS)[keyof typeof S
 export const SUBSCRIPTION_PLAN_LABELS: Record<SubscriptionPlanKey, string> = {
   free_trial: "Free Trial",
   trial: "Free Trial",
+  "busal-core": "Busal Core",
+  "busal-growth": "Busal Growth",
+  "busal-pro": "Busal Pro",
+  "busal-enterprise": "Busal Enterprise",
   starter: "Starter",
   growth: "Growth",
   professional: "Professional",
@@ -67,6 +75,10 @@ const TRIAL_MODULES: PlatformModuleKey[] = [
 export const PLAN_MODULE_ENTITLEMENTS: Record<SubscriptionPlanKey, PlatformModuleKey[]> = {
   free_trial: TRIAL_MODULES,
   trial: TRIAL_MODULES,
+  "busal-core": STARTER_MODULES,
+  "busal-growth": GROWTH_MODULES,
+  "busal-pro": PROFESSIONAL_MODULES,
+  "busal-enterprise": ALL_PLATFORM_MODULE_KEYS,
   starter: STARTER_MODULES,
   growth: GROWTH_MODULES,
   professional: PROFESSIONAL_MODULES,

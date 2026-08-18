@@ -117,13 +117,14 @@ function extractHeldLabel(orderNotes: string | null): string {
 export async function getOrCreatePosCart(
   businessId: string,
   posSessionId: string,
+  branchId: string | null = null,
 ): Promise<CartData> {
   const active = await getActiveCart(posSessionId);
   if (active) {
     return active;
   }
 
-  return createCart(businessId, posSessionId);
+  return createCart(businessId, posSessionId, branchId);
 }
 
 export async function resolvePosCart(
@@ -171,8 +172,8 @@ export async function listHeldPosOrders(
     tableId: session.tableId,
     tableName: session.table?.name ?? null,
     orderType: decodeOrderType(session.orderNotes),
-    itemCount: session.cart.items.reduce((sum, item) => sum + item.quantity, 0),
-    subtotal: Number(session.cart.subtotal),
+    itemCount: session.cart?.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
+    subtotal: session.cart ? Number(session.cart.subtotal) : 0,
     updatedAt: session.updatedAt.toISOString(),
   }));
 }

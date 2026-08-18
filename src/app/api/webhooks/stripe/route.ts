@@ -3,13 +3,39 @@ import type Stripe from "stripe";
 
 import { isStripeWebhookBypassAllowed } from "@/lib/production-mode";
 import { getStripeClient, getStripeWebhookSecret, isStripeConfigured } from "@/lib/stripe";
-import { stripeBillingService } from "@/modules/commercial-foundation/services/stripe-billing.service";
+import {
+  hasProcessedStripeEvent,
+  markStripeEventProcessed,
+  stripeBillingService,
+} from "@/modules/commercial-foundation/services/stripe-billing.service";
 import { DOMAIN_EVENT_TYPES } from "@/modules/platform-orchestration/constants/domain-events";
 import { publishModuleDomainEvent } from "@/modules/platform-orchestration/lib/publish-module-event";
 
 function resolveBusinessId(metadata: Stripe.Metadata | null | undefined): string | null {
   const businessId = metadata?.businessId;
   return typeof businessId === "string" ? businessId : null;
+}
+
+async function publishBillingEvent(
+  businessId: string,
+  eventType: string,
+  aggregateId: string,
+  payload: Record<string, unknown>,
+) {
+  await publishModuleDomainEvent(
+    {
+      tenantId: businessId,
+      workspaceId: `${businessId}-ws`,
+      businessId,
+      branchId: null,
+      userId: "stripe",
+    },
+    {
+      eventType,
+      aggregateId,
+      payload,
+    },
+  );
 }
 
 export async function POST(request: Request) {
@@ -37,79 +63,64 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  const businessId =
+    resolveBusinessId((event.data.object as { metadata?: Stripe.Metadata }).metadata) ??
+    resolveBusinessId(
+      event.type.startsWith("customer.subscription")
+        ? (event.data.object as Stripe.Subscription).metadata
+        : event.type.startsWith("checkout.session")
+          ? (event.data.object as Stripe.Checkout.Session).metadata
+          : (event.data.object as Stripe.Invoice).metadata,
+    );
+
+  if (businessId && (await hasProcessedStripeEvent(businessId, event.id))) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      const businessId = resolveBusinessId(session.metadata);
-      if (businessId && typeof session.subscription === "string") {
-        await stripeBillingService.syncSubscriptionFromStripe(businessId, session.subscription);
-        await publishModuleDomainEvent(
-          {
-            tenantId: businessId,
-            workspaceId: `${businessId}-ws`,
-            businessId,
-            branchId: null,
-            userId: "stripe",
-          },
-          {
-            eventType: DOMAIN_EVENT_TYPES.SUBSCRIPTION_CREATED,
-            aggregateId: session.subscription,
-            payload: { source: "stripe_checkout" },
-          },
-        );
+      const resolvedBusinessId = resolveBusinessId(session.metadata);
+      if (resolvedBusinessId && typeof session.subscription === "string") {
+        await stripeBillingService.syncSubscriptionFromStripe(resolvedBusinessId, session.subscription);
+        await publishBillingEvent(resolvedBusinessId, DOMAIN_EVENT_TYPES.SUBSCRIPTION_CREATED, session.subscription, {
+          source: "stripe_checkout",
+        });
+        await markStripeEventProcessed(resolvedBusinessId, event.id);
       }
       break;
     }
     case "customer.subscription.updated":
     case "customer.subscription.created": {
       const subscription = event.data.object as Stripe.Subscription;
-      const businessId = resolveBusinessId(subscription.metadata);
-      if (businessId) {
-        await stripeBillingService.syncSubscriptionFromStripe(businessId, subscription.id);
-        await publishModuleDomainEvent(
-          {
-            tenantId: businessId,
-            workspaceId: `${businessId}-ws`,
-            businessId,
-            branchId: null,
-            userId: "stripe",
-          },
-          {
-            eventType: DOMAIN_EVENT_TYPES.SUBSCRIPTION_UPDATED,
-            aggregateId: subscription.id,
-            payload: { status: subscription.status },
-          },
-        );
+      const resolvedBusinessId = resolveBusinessId(subscription.metadata);
+      if (resolvedBusinessId) {
+        await stripeBillingService.syncSubscriptionFromStripe(resolvedBusinessId, subscription.id);
+        await publishBillingEvent(resolvedBusinessId, DOMAIN_EVENT_TYPES.SUBSCRIPTION_UPDATED, subscription.id, {
+          status: subscription.status,
+        });
+        await markStripeEventProcessed(resolvedBusinessId, event.id);
       }
       break;
     }
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription;
-      const businessId = resolveBusinessId(subscription.metadata);
-      if (businessId) {
-        await publishModuleDomainEvent(
-          {
-            tenantId: businessId,
-            workspaceId: `${businessId}-ws`,
-            businessId,
-            branchId: null,
-            userId: "stripe",
-          },
-          {
-            eventType: DOMAIN_EVENT_TYPES.SUBSCRIPTION_CANCELLED,
-            aggregateId: subscription.id,
-            payload: { source: "stripe_webhook" },
-          },
-        );
+      const resolvedBusinessId = resolveBusinessId(subscription.metadata);
+      if (resolvedBusinessId) {
+        await stripeBillingService.syncSubscriptionFromStripe(resolvedBusinessId, subscription.id);
+        await publishBillingEvent(resolvedBusinessId, DOMAIN_EVENT_TYPES.SUBSCRIPTION_CANCELLED, subscription.id, {
+          source: "stripe_webhook",
+        });
+        await markStripeEventProcessed(resolvedBusinessId, event.id);
       }
       break;
     }
     case "invoice.paid":
     case "invoice.payment_failed": {
       const invoice = event.data.object as Stripe.Invoice;
-      const businessId = resolveBusinessId(invoice.metadata);
-      if (businessId) {
-        await stripeBillingService.recordInvoiceFromStripe(businessId, {
+      const resolvedBusinessId = resolveBusinessId(invoice.metadata);
+      if (resolvedBusinessId) {
+        await stripeBillingService.recordInvoiceFromStripe(resolvedBusinessId, {
           id: invoice.id,
           number: invoice.number,
           status: invoice.status,
@@ -126,11 +137,13 @@ export async function POST(request: Request) {
               ? invoice.payments.data[0].payment.payment_intent
               : invoice.id;
           await stripeBillingService.recordPaymentFailure(
-            businessId,
+            resolvedBusinessId,
             paymentIntentId,
             "Invoice payment failed",
           );
         }
+
+        await markStripeEventProcessed(resolvedBusinessId, event.id);
       }
       break;
     }

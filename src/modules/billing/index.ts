@@ -5,6 +5,9 @@ export {
   BILLING_INVOICE_STATUSES,
   BILLING_PAYMENT_STATUSES,
   TRIAL_STATUSES,
+  TRIAL_DURATION_DAYS,
+  formatTrialDurationShort,
+  formatFreeTrialAccessDescription,
   COUPON_DISCOUNT_TYPES,
   ENTERPRISE_CONTRACT_STATUSES,
   BILLING_AI_TOOL_IDS,
@@ -57,7 +60,12 @@ export {
 
 export type * from "@/modules/billing/types/billing-platform";
 
-export * from "@/modules/billing/utils/billing-selectors";
+export {
+  listPublicCommercialPlans,
+  formatCommercialPlanPrice,
+  getCommercialPlanMonthlyAmount,
+  BUSAL_COMMERCIAL_CURRENCY,
+} from "@/modules/billing/lib/commercial-plan-display";
 export * from "@/modules/billing/utils/feature-access-utils";
 export * from "@/modules/billing/utils/billing-proration-utils";
 

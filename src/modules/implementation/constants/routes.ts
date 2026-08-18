@@ -49,4 +49,4 @@ export const IMPLEMENTATION_RISK_SEVERITY_LABELS = {
   CRITICAL: "Critical",
 } as const;
 
-export const IMPLEMENTATION_PORTAL_ROUTE = "/implementation" as const;
+export const IMPLEMENTATION_PORTAL_ROUTE = IMPLEMENTATION_ROUTES.overview;

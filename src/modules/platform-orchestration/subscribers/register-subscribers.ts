@@ -339,6 +339,15 @@ export function registerOrchestrationSubscribers(): void {
   });
 
   registerDomainEventSubscriber({
+    subscriberId: "integrations.webhooks-business",
+    eventPattern: "business.*",
+    module: DOMAIN_EVENT_MODULES.INTEGRATION,
+    async: true,
+    jobType: "webhook",
+    handler: bridgeWebhooks,
+  });
+
+  registerDomainEventSubscriber({
     subscriberId: "inventory.order-created",
     eventPattern: DOMAIN_EVENT_TYPES.ORDER_CREATED,
     module: DOMAIN_EVENT_MODULES.INVENTORY,

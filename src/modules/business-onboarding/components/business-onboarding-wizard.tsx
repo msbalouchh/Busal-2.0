@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 
+import { OnboardingUrlBootstrap } from "@/modules/business-onboarding/components/onboarding-url-bootstrap";
 import { WorkspaceStepEngine } from "@/modules/business-onboarding/components/engine/workspace-step-engine";
 import { WorkspaceNavigation } from "@/modules/business-onboarding/components/onboarding-ui";
+import { WorkspaceWizardHydration } from "@/modules/business-onboarding/components/workspace-wizard-hydration";
 import { AiConfigurationStep } from "@/modules/business-onboarding/components/steps/ai-configuration-step";
 import { BrandIdentityStep } from "@/modules/business-onboarding/components/steps/brand-identity-step";
 import { BusinessIdentityStep } from "@/modules/business-onboarding/components/steps/business-identity-step";
@@ -17,7 +19,11 @@ import { TeamStep } from "@/modules/business-onboarding/components/steps/team-st
 import { WelcomeStep } from "@/modules/business-onboarding/components/steps/welcome-step";
 import { useWorkspaceWizard } from "@/modules/business-onboarding/hooks/use-workspace-wizard";
 
-export function BusinessOnboardingWizard() {
+interface BusinessOnboardingWizardProps {
+  businessSetupStep: number;
+}
+
+export function BusinessOnboardingWizard({ businessSetupStep }: BusinessOnboardingWizardProps) {
   const { currentStep, isSaving, prevStep, persistAndAdvance, submitActiveForm } =
     useWorkspaceWizard();
 
@@ -35,44 +41,53 @@ export function BusinessOnboardingWizard() {
     );
   }, [currentStep, isSaving, prevStep, submitActiveForm]);
 
-  if (currentStep === 11) {
-    return (
-      <WorkspaceStepEngine step={11} hideProgress>
-        <CompleteStep />
-      </WorkspaceStepEngine>
-    );
-  }
-
-  if (currentStep === 10) {
-    return (
-      <WorkspaceStepEngine step={10} hideProgress>
-        <ProvisioningStep />
-      </WorkspaceStepEngine>
-    );
-  }
-
   return (
-    <WorkspaceStepEngine step={currentStep} footer={footer}>
-      {currentStep === 1 ? <WelcomeStep /> : null}
-      {currentStep === 2 ? (
-        <BusinessIdentityStep onContinue={() => void persistAndAdvance()} />
+    <>
+      <Suspense fallback={null}>
+        <OnboardingUrlBootstrap />
+      </Suspense>
+      <WorkspaceWizardHydration businessSetupStep={businessSetupStep} />
+
+      {currentStep === 11 ? (
+        <WorkspaceStepEngine step={11} hideProgress>
+          <CompleteStep />
+        </WorkspaceStepEngine>
       ) : null}
-      {currentStep === 3 ? <LocationStep onContinue={() => void persistAndAdvance()} /> : null}
-      {currentStep === 4 ? (
-        <OrganizationStructureStep onContinue={() => void persistAndAdvance()} />
+
+      {currentStep === 10 ? (
+        <WorkspaceStepEngine step={10} hideProgress>
+          <ProvisioningStep />
+        </WorkspaceStepEngine>
       ) : null}
-      {currentStep === 5 ? <BrandIdentityStep onContinue={() => void persistAndAdvance()} /> : null}
-      {currentStep === 6 ? <ModulesStep onContinue={() => void persistAndAdvance()} /> : null}
-      {currentStep === 7 ? (
-        <AiConfigurationStep onContinue={() => void persistAndAdvance()} />
+
+      {currentStep !== 10 && currentStep !== 11 ? (
+        <WorkspaceStepEngine step={currentStep} footer={footer}>
+          {currentStep === 1 ? <WelcomeStep /> : null}
+          {currentStep === 2 ? (
+            <BusinessIdentityStep onContinue={() => void persistAndAdvance()} />
+          ) : null}
+          {currentStep === 3 ? <LocationStep onContinue={() => void persistAndAdvance()} /> : null}
+          {currentStep === 4 ? (
+            <OrganizationStructureStep onContinue={() => void persistAndAdvance()} />
+          ) : null}
+          {currentStep === 5 ? (
+            <BrandIdentityStep onContinue={() => void persistAndAdvance()} />
+          ) : null}
+          {currentStep === 6 ? <ModulesStep onContinue={() => void persistAndAdvance()} /> : null}
+          {currentStep === 7 ? (
+            <AiConfigurationStep onContinue={() => void persistAndAdvance()} />
+          ) : null}
+          {currentStep === 8 ? (
+            <TeamStep
+              onContinue={() => void persistAndAdvance()}
+              onSkip={() => void persistAndAdvance()}
+            />
+          ) : null}
+          {currentStep === 9 ? (
+            <SubscriptionStep onContinue={() => void persistAndAdvance()} />
+          ) : null}
+        </WorkspaceStepEngine>
       ) : null}
-      {currentStep === 8 ? (
-        <TeamStep
-          onContinue={() => void persistAndAdvance()}
-          onSkip={() => void persistAndAdvance()}
-        />
-      ) : null}
-      {currentStep === 9 ? <SubscriptionStep onContinue={() => void persistAndAdvance()} /> : null}
-    </WorkspaceStepEngine>
+    </>
   );
 }

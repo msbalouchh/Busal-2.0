@@ -22,6 +22,9 @@ function mapBusinessRecord(business: {
   timezone: string | null;
   aiName: string | null;
   aiPersonality: string | null;
+  aiAvatarUrl?: string | null;
+  aiGreeting?: string | null;
+  aiTone?: string | null;
   businessGoal: string | null;
   businessDna: unknown;
   businessCode?: string | null;
@@ -46,6 +49,9 @@ function mapBusinessRecord(business: {
     timezone: business.timezone,
     aiName: business.aiName,
     aiPersonality: business.aiPersonality,
+    aiAvatarUrl: business.aiAvatarUrl ?? null,
+    aiGreeting: business.aiGreeting ?? null,
+    aiTone: business.aiTone ?? null,
     businessGoal: business.businessGoal,
     businessDna: business.businessDna as BusinessProfileData["businessDna"],
     businessCode: business.businessCode ?? null,

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import {
   BILLING_CYCLES,
   SUBSCRIPTION_STATUSES,
+  TRIAL_DURATION_DAYS,
 } from "@/modules/billing/constants/billing-status";
 import type {
   ApplyCouponInput,
@@ -192,13 +193,14 @@ export class SubscriptionLifecycleService {
     return record;
   }
 
-  async startTrial(businessId: string, planId: string, trialDays = 14): Promise<BillingRecord> {
+  async startTrial(businessId: string, planId: string, trialDays = TRIAL_DURATION_DAYS): Promise<BillingRecord> {
     const plan = findCatalogPlanById(planId);
     if (!plan) {
       throw new Error("Plan not found");
     }
 
-    const trialEndsAt = new Date();
+    const trialStartedAt = new Date();
+    const trialEndsAt = new Date(trialStartedAt);
     trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
     await prisma.tenantRecord.update({
@@ -210,6 +212,7 @@ export class SubscriptionLifecycleService {
     });
 
     await mergeCommercialOperations(businessId, {
+      trialStartedAt: trialStartedAt.toISOString(),
       trialEndsAt: trialEndsAt.toISOString(),
     });
 
@@ -259,9 +262,11 @@ export class SubscriptionLifecycleService {
     await updateTenantPlanLimits(businessId, plan.slug);
 
     if (isTrialPlan(plan.slug)) {
-      const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + (plan.trialDays || 14));
+      const trialStartedAt = new Date();
+      const trialEndsAt = new Date(trialStartedAt);
+      trialEndsAt.setDate(trialEndsAt.getDate() + (plan.trialDays || TRIAL_DURATION_DAYS));
       await mergeCommercialOperations(businessId, {
+        trialStartedAt: trialStartedAt.toISOString(),
         trialEndsAt: trialEndsAt.toISOString(),
       });
     }

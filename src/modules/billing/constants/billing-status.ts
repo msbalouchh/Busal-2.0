@@ -22,6 +22,7 @@ export type BillingCycle = (typeof BILLING_CYCLES)[keyof typeof BILLING_CYCLES];
 
 /** Subscription lifecycle statuses. */
 export const SUBSCRIPTION_STATUSES = {
+  PENDING_ACTIVATION: "pending_activation",
   TRIALING: "trialing",
   ACTIVE: "active",
   PAST_DUE: "past_due",
@@ -64,6 +65,20 @@ export const TRIAL_STATUSES = {
 } as const;
 
 export type TrialStatus = (typeof TRIAL_STATUSES)[keyof typeof TRIAL_STATUSES];
+
+/** Official Busal SaaS free-trial duration in days. Single source of truth for production billing. */
+export const TRIAL_DURATION_DAYS = 15;
+
+/** Short customer-facing trial duration label, e.g. "15-day". */
+export function formatTrialDurationShort(): string {
+  return `${TRIAL_DURATION_DAYS}-day`;
+}
+
+/** Onboarding/marketing trial access line derived from the canonical duration. */
+export function formatFreeTrialAccessDescription(options?: { cardRequired?: boolean }): string {
+  const billingNote = options?.cardRequired ? "payment method required" : "no card required";
+  return `${formatTrialDurationShort()} full access — ${billingNote}`;
+}
 
 /** Coupon discount types. */
 export const COUPON_DISCOUNT_TYPES = {
@@ -128,6 +143,7 @@ export const BILLING_CYCLE_LABELS: Record<BillingCycle, string> = {
 };
 
 export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatus, string> = {
+  pending_activation: "Pending Activation",
   trialing: "Trialing",
   active: "Active",
   past_due: "Past Due",

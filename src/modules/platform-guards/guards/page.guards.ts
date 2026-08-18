@@ -3,10 +3,11 @@ import "server-only";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 import {
-  hasAllPermissions,
-  hasAnyPermission,
-  hasPermission,
-} from "@/modules/authorization/services/authorization.service";
+  evaluateAllPermissions as iamEvaluateAllPermissions,
+  evaluateAnyPermission as iamEvaluateAnyPermission,
+  evaluatePermission as iamEvaluatePermission,
+  toPermissionEvaluationContext,
+} from "@/modules/iam/engine/permission-engine";
 import { requireBusinessContext } from "@/modules/platform-guards/guards/business.guards";
 import {
   assertBusinessActive,
@@ -42,6 +43,16 @@ function assertOnboardingComplete(context: PlatformContext): void {
   }
 }
 
+function buildPermissionEvaluationContext(context: PlatformContext) {
+  return toPermissionEvaluationContext({
+    permissions: context.authorization.permissions,
+    roleSlug: context.authorization.roleSlug,
+    isOwner: context.isOwner,
+    businessId: context.business.id,
+    branchId: context.branchId,
+  });
+}
+
 function assertPageAuthorization(
   context: PlatformContext,
   options: PlatformPageGuardOptions = {},
@@ -50,14 +61,19 @@ function assertPageAuthorization(
     throw roleRequired();
   }
 
-  if (options.permission && !hasPermission(context.authorization.permissions, options.permission)) {
+  const permissionContext = buildPermissionEvaluationContext(context);
+
+  if (
+    options.permission &&
+    !iamEvaluatePermission(permissionContext, options.permission)
+  ) {
     throw permissionDenied();
   }
 
   if (options.permissions?.length) {
     const allowed = options.requireAll
-      ? hasAllPermissions(context.authorization.permissions, options.permissions)
-      : hasAnyPermission(context.authorization.permissions, options.permissions);
+      ? iamEvaluateAllPermissions(permissionContext, options.permissions)
+      : iamEvaluateAnyPermission(permissionContext, options.permissions);
 
     if (!allowed) {
       throw permissionDenied();

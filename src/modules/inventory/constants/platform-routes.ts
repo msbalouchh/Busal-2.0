@@ -1,11 +1,11 @@
 /** Architecture route markers (distinct from legacy inventory routes). */
 export const INVENTORY_PLATFORM_ROUTES = {
-  overview: "/app/restaurant/inventory",
-  items: "/app/restaurant/inventory/items",
-  locations: "/app/restaurant/inventory/locations",
+  overview: "/dashboard/inventory",
+  items: "/dashboard/inventory/ingredients",
+  locations: "/dashboard/inventory",
   purchaseOrders: "/app/restaurant/inventory/purchase-orders",
-  movements: "/app/restaurant/inventory/movements",
-  analytics: "/app/restaurant/inventory/analytics",
+  movements: "/dashboard/inventory/movements",
+  analytics: "/dashboard/reporting/inventory",
 } as const;
 
 export const INVENTORY_PLATFORM_NAV_ITEMS = [

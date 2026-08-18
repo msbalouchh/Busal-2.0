@@ -1,3 +1,9 @@
+import {
+  getCommercialPlanMonthlyAmount,
+  listPublicCommercialPlans,
+} from "@/modules/billing/lib/commercial-plan-display";
+import { BUSAL_COMMERCIAL_PLAN_SLUGS } from "@/modules/control-center/billing/registry/subscription-plan-registry";
+
 export const BRAND = {
   name: "Busal OS",
   domain: "https://www.getbusal.com",
@@ -131,6 +137,50 @@ export const INDUSTRIES = [
   },
 ] as const;
 
+const PRICING_PLAN_HIGHLIGHTS: Record<
+  string,
+  { summary: string; highlights: string[]; featured: boolean }
+> = {
+  [BUSAL_COMMERCIAL_PLAN_SLUGS.CORE]: {
+    summary: "Core operations for a single location ready to run professionally.",
+    highlights: ["Core modules", "Business Admin", "Email support", "Standard AI assistant"],
+    featured: false,
+  },
+  [BUSAL_COMMERCIAL_PLAN_SLUGS.GROWTH]: {
+    summary: "Multi-branch growth with deeper CRM, marketing, and analytics.",
+    highlights: [
+      "Everything in Core",
+      "Multi-branch",
+      "CRM & loyalty",
+      "Marketing campaigns",
+      "Priority support",
+    ],
+    featured: true,
+  },
+  [BUSAL_COMMERCIAL_PLAN_SLUGS.PRO]: {
+    summary: "Advanced AI agents, automation, and stronger operational controls.",
+    highlights: [
+      "Everything in Growth",
+      "Full AI agent suite",
+      "Automation platform",
+      "Advanced reporting",
+      "Dedicated onboarding",
+    ],
+    featured: false,
+  },
+  [BUSAL_COMMERCIAL_PLAN_SLUGS.ENTERPRISE]: {
+    summary: "Platform scale, governance, and commercial terms for complex groups.",
+    highlights: [
+      "Everything in Pro",
+      "SSO & enterprise controls",
+      "Custom SLAs",
+      "Dedicated success",
+      "Volume pricing",
+    ],
+    featured: false,
+  },
+};
+
 export const PRICING = {
   implementation: {
     title: "One-time implementation",
@@ -138,62 +188,24 @@ export const PRICING = {
     summary:
       "Discovery, configuration, data setup, training, and go-live support tailored to your business.",
   },
-  plans: [
-    {
-      id: "starter",
-      name: "Starter",
-      price: "£199",
-      period: "/month",
-      summary: "Core operations for a single location ready to run professionally.",
-      highlights: ["Core modules", "Business Admin", "Email support", "Standard AI assistant"],
+  plans: listPublicCommercialPlans().map((plan) => {
+    const copy = PRICING_PLAN_HIGHLIGHTS[plan.slug] ?? {
+      summary: plan.description,
+      highlights: plan.features,
       featured: false,
-    },
-    {
-      id: "growth",
-      name: "Growth",
-      price: "£349",
-      period: "/month",
-      summary: "Multi-branch growth with deeper CRM, marketing, and analytics.",
-      highlights: [
-        "Everything in Starter",
-        "Multi-branch",
-        "CRM & loyalty",
-        "Marketing campaigns",
-        "Priority support",
-      ],
-      featured: true,
-    },
-    {
-      id: "professional",
-      name: "Professional",
-      price: "£599",
-      period: "/month",
-      summary: "Advanced AI agents, automation, and stronger operational controls.",
-      highlights: [
-        "Everything in Growth",
-        "Full AI agent suite",
-        "Automation platform",
-        "Advanced reporting",
-        "Dedicated onboarding",
-      ],
-      featured: false,
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: "Custom",
-      period: "",
-      summary: "Platform scale, governance, and commercial terms for complex groups.",
-      highlights: [
-        "Everything in Professional",
-        "SSO & enterprise controls",
-        "Custom SLAs",
-        "Dedicated success",
-        "Volume pricing",
-      ],
-      featured: false,
-    },
-  ],
+    };
+    const monthly = getCommercialPlanMonthlyAmount(plan);
+
+    return {
+      id: plan.slug,
+      name: plan.name,
+      price: plan.customPricing ? "Custom" : `£${monthly}`,
+      period: plan.customPricing ? "" : "/month",
+      summary: copy.summary,
+      highlights: copy.highlights,
+      featured: copy.featured,
+    };
+  }),
 } as const;
 
 export const JOURNEY = [

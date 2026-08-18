@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { BusalBrandMark } from "@/components/brand/busal-brand-mark";
+import { PlatformBrandMark } from "@/modules/platform/components/platform-brand-logo";
 import {
   Sidebar,
   SidebarContent,
@@ -144,7 +144,7 @@ function WorkspaceSidebarBrand() {
   const { isCollapsed, isMobile } = useNavigationSidebar();
   const compact = !isMobile && isCollapsed;
 
-  return <BusalBrandMark compact={compact} priority />;
+  return <PlatformBrandMark size={compact ? 28 : 32} />;
 }
 
 export function WorkspaceSidebar() {

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { BusinessContext } from "@/modules/business-context/types/business-context";
 import type { AiInjectedContext } from "@/modules/ai-engine/types/ai-engine.types";
 import { aiMemoryManager, resolveSubscriptionContext } from "@/modules/ai-engine/managers/memory-manager";
+import { buildUnifiedMemoryContext } from "@/modules/customer-ai/services/customer-ai-memory.service";
 import { retrieveKnowledge } from "@/services/ai-knowledge.service";
 
 /** Automatically builds full AI context from platform business context. */
@@ -21,12 +22,13 @@ export class AiContextInjectionEngine {
     const businessId = platform.business.id;
     const subscription = await resolveSubscriptionContext(businessId);
 
-    const [tenantRecord, branch, memorySummary, knowledge] = await Promise.all([
+    const [tenantRecord, branch, memorySummary, unifiedMemory, knowledge] = await Promise.all([
       prisma.tenantRecord.findUnique({ where: { businessId } }),
       platform.branchId
         ? prisma.branch.findFirst({ where: { id: platform.branchId, businessId } })
         : Promise.resolve(null),
       aiMemoryManager.summarizeForContext(businessId, platform.user.id),
+      buildUnifiedMemoryContext(businessId).catch(() => ""),
       options.query
         ? retrieveKnowledge(platform, options.query, { limit: 3, agentId: "ai-engine" }).catch(() => null)
         : Promise.resolve(null),
@@ -34,6 +36,7 @@ export class AiContextInjectionEngine {
 
     const relevantData: Record<string, unknown> = {
       memorySummary,
+      unifiedMemory: unifiedMemory || null,
       branch: branch
         ? { id: branch.id, name: branch.name, isMain: branch.isMain, status: branch.status }
         : null,
@@ -73,6 +76,9 @@ export class AiContextInjectionEngine {
         businessGoal: platform.business.businessGoal,
         aiName: platform.business.aiName,
         aiPersonality: platform.business.aiPersonality,
+        aiAvatarUrl: (platform.business as { aiAvatarUrl?: string | null }).aiAvatarUrl ?? null,
+        aiGreeting: (platform.business as { aiGreeting?: string | null }).aiGreeting ?? null,
+        aiTone: (platform.business as { aiTone?: string | null }).aiTone ?? null,
       },
       relevantData,
     };

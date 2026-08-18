@@ -15,6 +15,7 @@ export interface PlatformProvisioningInput {
   branchName?: string;
   ownerEmail?: string;
   businessId?: string;
+  deferSubscriptionActivation?: boolean;
 }
 
 export interface PlatformProvisioningResult {
@@ -81,6 +82,7 @@ export class PlatformProvisioningService {
       businessName: input.businessName,
       branchName: input.branchName,
       planSlug,
+      deferSubscriptionActivation: input.deferSubscriptionActivation,
     });
   }
 
@@ -90,8 +92,10 @@ export class PlatformProvisioningService {
     businessName: string;
     branchName?: string;
     planSlug: string;
+    deferSubscriptionActivation?: boolean;
   }): Promise<PlatformProvisioningResult> {
-    const { businessId, ownerId, businessName, branchName, planSlug } = input;
+    const { businessId, ownerId, businessName, branchName, planSlug, deferSubscriptionActivation } =
+      input;
 
     const { workspaceId } = await tenantFoundationService.createWorkspace({
       businessId,
@@ -119,7 +123,9 @@ export class PlatformProvisioningService {
     }
 
     await this.ensureOwnerRole(businessId, ownerId);
-    await tenantFoundationService.provisionCommercialStack(businessId, planSlug);
+    await tenantFoundationService.provisionCommercialStack(businessId, planSlug, {
+      deferSubscriptionActivation,
+    });
     await tenantFoundationService.activateTenant(businessId, ownerId);
 
     await publishModuleDomainEvent(scope(businessId, ownerId), {

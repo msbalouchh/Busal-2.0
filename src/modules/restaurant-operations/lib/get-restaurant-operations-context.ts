@@ -16,7 +16,7 @@ import {
   getTableFloorBundle,
   queryOrderQueue,
 } from "@/services/restaurant-operations-module.service";
-import { listTables } from "@/services/table.service";
+import { listTablesForBusiness } from "@/services/table.service";
 import { serializeReservation } from "@/modules/reservations/lib/reservation-utils";
 import { serializeTable } from "@/modules/tables/lib/table-utils";
 import type { ClientTable } from "@/modules/tables/lib/table-utils";
@@ -46,7 +46,7 @@ export const getRestaurantTablesContext = cache(async () => {
   const platform = await protectedPage({ permission: PERMISSION_CODES.TABLE_MANAGE });
   const [floor, tables] = await Promise.all([
     getTableFloorBundle(platform),
-    listTables(platform.business.ownerId, { branchId: platform.branchId }),
+    listTablesForBusiness(platform.business.id, { branchId: platform.branchId }),
   ]);
 
   return {
@@ -111,11 +111,12 @@ export const getRestaurantKitchenContext = cache(async () => {
 export const getRestaurantPosContext = cache(async () => {
   const platform = await protectedPage({ permission: PERMISSION_CODES.POS_USE });
   const terminal = await getPosTerminalContext();
+  const permissions = (await getRestaurantOperationsBundle(platform)).permissions;
 
   return {
     platform,
-    permissions: (await getRestaurantOperationsBundle(platform)).permissions,
-    ...terminal,
+    permissions,
+    terminal,
   };
 });
 

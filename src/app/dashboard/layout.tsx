@@ -14,6 +14,8 @@ import { WorkspaceShell } from "@/modules/application-shell";
 import { DashboardPlatformProviders } from "@/modules/application-shell/components/dashboard-platform-providers";
 import { getDashboardPlatformSnapshots } from "@/modules/application-shell/lib/get-dashboard-platform-snapshots";
 import { getWorkspaceShellData } from "@/modules/application-shell/lib/get-workspace-shell-data";
+import { getDashboardPlatformBrandingSnapshot } from "@/modules/platform/services/platform-branding.service";
+import { resolveSubscriptionAccess } from "@/modules/commercial-foundation/services/subscription-access.service";
 import { getCurrentUser } from "@/services/auth.service";
 
 export const dynamic = "force-dynamic";
@@ -35,16 +37,22 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     redirect(ROUTES.businessOnboarding);
   }
 
+  const subscriptionAccess = await resolveSubscriptionAccess(workspace.businessId!);
+  if (!subscriptionAccess.allowed && subscriptionAccess.redirectTo) {
+    redirect(subscriptionAccess.redirectTo);
+  }
+
   const context = await resolveBusinessContextForUser(user);
   const ownerName = resolveDisplayName(context.business.ownerName, context.user.fullName);
   const clientContext = serializeClientBusinessContext(context);
 
-  const [clientDashboard, shellData, platformSnapshots] = await Promise.all([
+  const [clientDashboard, shellData, platformSnapshots, branding] = await Promise.all([
     resolveNavigationFeatureFlags(context).then((featureFlags) =>
       serializeClientDashboardContext(context, featureFlags),
     ),
     getWorkspaceShellData(context),
     getDashboardPlatformSnapshots(context),
+    getDashboardPlatformBrandingSnapshot(context.business.id),
   ]);
 
   return (
@@ -53,6 +61,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         <DashboardPlatformProviders
           tenantSnapshot={platformSnapshots.tenant}
           rbacSnapshot={platformSnapshots.rbac}
+          branding={branding}
         >
           <WorkspaceShell
             workspaceName={shellData.workspaceName}

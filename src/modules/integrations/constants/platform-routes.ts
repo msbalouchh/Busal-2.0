@@ -1,15 +1,15 @@
 /** Architecture route markers for the Integration platform. */
 export const INTEGRATION_PLATFORM_ROUTES = {
-  overview: "/app/settings/integrations",
-  providers: "/app/settings/integrations/providers",
-  connections: "/app/settings/integrations/connections",
-  apiKeys: "/app/settings/integrations/api-keys",
-  webhooks: "/app/settings/integrations/webhooks",
-  oauth: "/app/settings/integrations/oauth",
-  syncJobs: "/app/settings/integrations/sync",
-  developer: "/app/settings/integrations/developer",
-  logs: "/app/settings/integrations/logs",
-  analytics: "/app/settings/integrations/analytics",
+  overview: "/app/integrations",
+  providers: "/app/integrations/providers",
+  connections: "/app/integrations/connections",
+  apiKeys: "/app/developer/keys",
+  webhooks: "/app/integrations/webhooks",
+  oauth: "/app/integrations/providers",
+  syncJobs: "/app/integrations/sync",
+  developer: "/app/developer",
+  logs: "/app/integrations/logs",
+  analytics: "/app/integrations/health",
 } as const;
 
 export const INTEGRATION_PLATFORM_NAV_ITEMS = [

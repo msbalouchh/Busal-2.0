@@ -17,6 +17,8 @@ import type {
   CreateControlCenterTenantInput,
 } from "@/modules/control-center/tenants/types/control-center-tenants-types";
 import type { ControlCenterOperatorContext } from "@/modules/control-center/types/control-center-types";
+import { getPlatformConsumptionConfig } from "@/modules/platform/services/platform-config.service";
+import type { ControlCenterPlatformSummary } from "@/modules/platform/types/control-center-platform.types";
 import {
   serializeResourceLimit,
   serializeResourceUsage,
@@ -265,6 +267,9 @@ export async function getControlCenterTenantDetailBundle(
     activeSessions,
     health,
     analytics,
+    platformConfig,
+    apiKeyCount,
+    webhookCount,
   ] = await Promise.all([
     prisma.business.findUnique({
       where: { id: businessId },
@@ -296,11 +301,28 @@ export async function getControlCenterTenantDetailBundle(
     prisma.iamSession.count({ where: { businessId, isActive: true } }),
     permissions.canViewAnalytics ? runTenantHealthCheck(platform) : Promise.resolve(null),
     permissions.canViewAnalytics ? getTenantAnalytics(platform) : Promise.resolve(null),
+    getPlatformConsumptionConfig(businessId),
+    prisma.platformApiKey.count({ where: { businessId, status: "ACTIVE" } }),
+    prisma.platformApiWebhookSubscription.count({ where: { businessId, status: "ACTIVE" } }),
   ]);
 
   if (!business || !tenant) {
     throw new Error("Tenant not found");
   }
+
+  const platformSummary: ControlCenterPlatformSummary = {
+    deploymentMode: platformConfig.deploymentMode,
+    whiteLabelEnabled: platformConfig.whiteLabelEnabled,
+    platformStatus: platformConfig.platformStatus,
+    subdomain: platformConfig.domains.subdomain,
+    customDomain: platformConfig.domains.customDomain,
+    customDomainVerified: platformConfig.domains.customDomainVerificationStatus === "verified",
+    apiEnabled: platformConfig.api.enabled,
+    webhooksEnabled: platformConfig.webhooks.enabled,
+    embedEnabled: platformConfig.embed.enabled,
+    apiKeyCount,
+    webhookCount,
+  };
 
   return {
     permissions,
@@ -340,6 +362,7 @@ export async function getControlCenterTenantDetailBundle(
       activeSessions,
       maintenanceMode: tenant.maintenanceMode,
       scheduledMaintenanceAt: tenant.scheduledMaintenanceAt?.toISOString() ?? null,
+      platform: platformSummary,
     },
   };
 }

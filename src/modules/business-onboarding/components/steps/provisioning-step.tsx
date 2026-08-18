@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 
 import { PROVISIONING_MESSAGES } from "@/modules/business-onboarding/constants/workspace-steps";
-import { provisionWorkspaceAction } from "@/modules/business-onboarding/actions/business-setup-actions";
+import {
+  provisionWorkspaceAction,
+  resolvePostCheckoutOnboardingAction,
+} from "@/modules/business-onboarding/actions/business-setup-actions";
 import { useWorkspaceWizardStore } from "@/modules/business-onboarding/store/onboarding.store";
 
 export function ProvisioningStep() {
@@ -22,11 +25,16 @@ export function ProvisioningStep() {
   useEffect(() => {
     let cancelled = false;
     async function provision() {
-      const state = useWorkspaceWizardStore.getState();
-      const businessName = state.displayName.trim() || state.businessName.trim();
-
       try {
-        await provisionWorkspaceAction({
+        const resume = await resolvePostCheckoutOnboardingAction();
+        if (!cancelled && resume.skipProvisioning) {
+          setStep(resume.redirectToStep);
+          return;
+        }
+
+        const state = useWorkspaceWizardStore.getState();
+
+        const response = await provisionWorkspaceAction({
           businessName: state.businessName,
           displayName: state.displayName,
           country: state.country,
@@ -37,6 +45,10 @@ export function ProvisioningStep() {
         });
 
         if (!cancelled) {
+          if ("checkoutUrl" in response && response.checkoutUrl) {
+            window.location.assign(response.checkoutUrl);
+            return;
+          }
           setStep(11);
         }
       } catch {

@@ -18,10 +18,10 @@ export const BUSAL_LOGO_HORIZONTAL = {
 /** Standard display height for the horizontal Busal logo across product surfaces. */
 export const BUSAL_LOGO_DISPLAY_HEIGHT = 48;
 
-/** Compact BS mark for favicon-sized surfaces, diagrams, and collapsed navigation. */
+/** Compact brand mark for favicon-sized surfaces, diagrams, and collapsed navigation. */
 export const BUSAL_LOGO_ICON = {
-  src: "/favicon.svg",
+  src: "/branding/favicon.png",
   alt: "Busal OS",
-  width: 64,
-  height: 64,
+  width: 1254,
+  height: 1254,
 } as const;

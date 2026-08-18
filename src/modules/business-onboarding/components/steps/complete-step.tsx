@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ROUTES } from "@/constants/routes";
-import { finalizeWorkspaceOnboardingAction } from "@/modules/business-onboarding/actions/business-setup-actions";
+import { finalizeWorkspaceOnboardingAction, confirmBillingActivationAction } from "@/modules/business-onboarding/actions/business-setup-actions";
 import { OnboardingButton } from "@/modules/business-onboarding/components/onboarding-ui";
 import { useWorkspaceWizardStore } from "@/modules/business-onboarding/store/onboarding.store";
 import { MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
@@ -22,6 +22,7 @@ export function CompleteStep() {
     setEnterError(null);
 
     try {
+      await confirmBillingActivationAction();
       await finalizeWorkspaceOnboardingAction({
         businessName: wizardData.businessName,
         displayName: wizardData.displayName,

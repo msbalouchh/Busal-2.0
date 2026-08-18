@@ -2,17 +2,15 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, type ReactNode } from "react";
 
 import { QUERY_KEYS, STALE_TIMES } from "@/constants/query";
 import { API_ROUTES, ROUTES } from "@/constants/routes";
-import { assignAppPath } from "@/lib/app-navigation";
-import {
-  AUTH_SESSION_ACTIVITY_EVENTS,
-  AUTH_SESSION_IDLE_TIMEOUT_MS,
-  AUTH_SESSION_REFRESH_INTERVAL_MS,
-} from "@/modules/auth/constants/session";
+import { SessionExpiringDialog } from "@/modules/auth/components/session-expiring-dialog";
+import { AUTH_SESSION_REFRESH_INTERVAL_MS } from "@/modules/auth/constants/session";
+import { useIdleSession } from "@/modules/auth/hooks/use-idle-session";
 import { fetchSession } from "@/modules/auth/lib/auth.client";
+import { performClientLogout } from "@/modules/auth/lib/client-logout";
 import { useAuthStore } from "@/stores/auth.store";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/app", "/control-center", "/onboarding"];
@@ -37,24 +35,47 @@ interface AuthSessionProviderProps {
   children: ReactNode;
 }
 
-/** Keeps client auth state aligned with Supabase cookies and handles refresh + idle expiry. */
+/** Keeps client auth state aligned with Supabase cookies, refresh, and idle expiry. */
 export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const setUser = useAuthStore((state) => state.setUser);
-  const resetAuth = useAuthStore((state) => state.reset);
-  const lastActivityRef = useRef(Date.now());
 
-  const handleSessionExpired = useCallback(async () => {
-    resetAuth();
-    await queryClient.removeQueries({ queryKey: QUERY_KEYS.session });
+  const sessionMonitoringEnabled = isProtectedPath(pathname);
 
-    if (isProtectedPath(pathname)) {
-      const redirectTo = encodeURIComponent(pathname);
-      assignAppPath(`${ROUTES.login}?redirectTo=${redirectTo}`);
+  const logout = useCallback(
+    async (options?: { broadcast?: boolean }) => {
+      await performClientLogout({
+        queryClient,
+        redirectPath: sessionMonitoringEnabled ? pathname : null,
+        broadcast: options?.broadcast ?? true,
+      });
+    },
+    [pathname, queryClient, sessionMonitoringEnabled],
+  );
+
+  const {
+    warningOpen,
+    secondsRemaining,
+    isSigningOut,
+    continueWorking,
+    signOutNow,
+    markActivity,
+  } = useIdleSession({
+    enabled: sessionMonitoringEnabled,
+    onIdleLogout: () => logout(),
+    onManualLogout: () => logout(),
+    onRemoteLogout: () => logout({ broadcast: false }),
+  });
+
+  useEffect(() => {
+    if (!sessionMonitoringEnabled) {
+      return;
     }
-  }, [pathname, queryClient, resetAuth]);
+
+    markActivity({ force: true });
+  }, [markActivity, pathname, sessionMonitoringEnabled]);
 
   const { data: sessionUser, isLoading } = useQuery({
     queryKey: QUERY_KEYS.session,
@@ -71,48 +92,22 @@ export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
 
     setUser(sessionUser ?? null);
 
-    if (!sessionUser && isProtectedPath(pathname)) {
+    if (!sessionUser && sessionMonitoringEnabled) {
       const redirectTo = encodeURIComponent(pathname);
       router.replace(`${ROUTES.login}?redirectTo=${redirectTo}`);
     }
-  }, [isLoading, pathname, router, sessionUser, setUser]);
+  }, [isLoading, pathname, router, sessionMonitoringEnabled, sessionUser, setUser]);
 
   useEffect(() => {
-    const markActivity = () => {
-      lastActivityRef.current = Date.now();
-    };
-
-    for (const eventName of AUTH_SESSION_ACTIVITY_EVENTS) {
-      window.addEventListener(eventName, markActivity, { passive: true });
+    if (!sessionMonitoringEnabled || !sessionUser || warningOpen) {
+      return;
     }
 
-    return () => {
-      for (const eventName of AUTH_SESSION_ACTIVITY_EVENTS) {
-        window.removeEventListener(eventName, markActivity);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     const intervalId = window.setInterval(async () => {
-      if (!isProtectedPath(pathname)) {
-        return;
-      }
-
-      const idleMs = Date.now() - lastActivityRef.current;
-      if (idleMs >= AUTH_SESSION_IDLE_TIMEOUT_MS) {
-        try {
-          await fetch(API_ROUTES.logout, { method: "POST", credentials: "include" });
-        } catch {
-          // Proceed with local cleanup even if logout request fails.
-        }
-        await handleSessionExpired();
-        return;
-      }
-
       const refreshed = await refreshSessionOnServer();
+
       if (!refreshed) {
-        await handleSessionExpired();
+        await logout({ broadcast: false });
         return;
       }
 
@@ -120,7 +115,20 @@ export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
     }, AUTH_SESSION_REFRESH_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [handleSessionExpired, pathname, queryClient]);
+  }, [logout, queryClient, sessionMonitoringEnabled, sessionUser, warningOpen]);
 
-  return children;
+  return (
+    <>
+      {children}
+      <SessionExpiringDialog
+        open={warningOpen}
+        secondsRemaining={secondsRemaining}
+        isSigningOut={isSigningOut}
+        onContinueWorking={continueWorking}
+        onSignOut={() => {
+          void signOutNow();
+        }}
+      />
+    </>
+  );
 }

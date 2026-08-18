@@ -43,7 +43,7 @@ export const WORKSPACE_STEP_META = [
   {
     step: 9,
     title: "Choose your plan",
-    description: "Select a subscription tier — billing integration coming soon.",
+    description: "Select a subscription tier and start your 15-day free trial.",
   },
 ] as const;
 

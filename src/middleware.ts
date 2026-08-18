@@ -4,6 +4,7 @@ import { resolveCanonicalOriginForHost } from "@/config/app-url";
 import { ROUTES } from "@/constants/routes";
 import { USER_ROLES } from "@/constants/roles";
 import { createClient } from "@/lib/supabase/middleware";
+import { PLATFORM_HEADERS, normalizeHostname } from "@/modules/platform/constants/platform-defaults";
 import {
   isBusinessAuthRoute,
   isCustomerPortalAuthRoute,
@@ -107,13 +108,17 @@ export async function middleware(request: NextRequest) {
     return redirectAuthenticatedToCustomerPortal(request);
   }
 
-  if (
-    isAuthRoute &&
+  if (isAuthRoute &&
     user &&
     !isCustomerPortalAuthRoute(pathname) &&
     !isBusinessAuthRoute(pathname)
   ) {
     return redirectAuthenticatedToDashboard(request);
+  }
+
+  const hostname = normalizeHostname(request.headers.get("host"));
+  if (hostname) {
+    supabaseResponse.headers.set(PLATFORM_HEADERS.HOST, hostname);
   }
 
   return supabaseResponse;

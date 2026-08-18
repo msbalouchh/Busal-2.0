@@ -4,6 +4,7 @@ export const ROUTES = {
   home: "/",
   application: "/app",
   dashboard: "/dashboard",
+  dashboardBilling: "/dashboard/billing",
   controlCenter: "/control-center",
   onboarding: "/onboarding",
   businessOnboarding: "/business-onboarding",
@@ -24,6 +25,7 @@ export const PROTECTED_ROUTES = [
   ROUTES.dashboard,
   ROUTES.controlCenter,
   ROUTES.onboarding,
+  ROUTES.businessOnboarding,
 ] as const;
 
 /** Routes that redirect authenticated users to the application shell. */
@@ -52,7 +54,6 @@ export const PUBLIC_ROUTES = [
   ROUTES.verifyEmail,
   ROUTES.authCallback,
   ROUTES.authContinue,
-  ROUTES.businessOnboarding,
   "/platform",
   "/ai",
   "/industries",

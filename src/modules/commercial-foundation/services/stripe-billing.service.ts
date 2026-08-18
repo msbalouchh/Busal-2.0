@@ -8,6 +8,7 @@ import {
   BILLING_INVOICE_STATUSES,
   BILLING_PAYMENT_STATUSES,
   SUBSCRIPTION_STATUSES,
+  TRIAL_DURATION_DAYS,
 } from "@/modules/billing/constants/billing-status";
 import type { BillingInvoice, BillingPayment } from "@/modules/billing/types/billing-platform";
 import {
@@ -16,6 +17,12 @@ import {
   saveCommercialOperations,
 } from "@/modules/commercial-foundation/lib/commercial-settings";
 import { findCatalogPlanById, findCatalogPlanBySlug, isTrialPlan } from "@/modules/commercial-foundation/lib/plan-catalog";
+import { resolveConfiguredStripePriceId } from "@/modules/commercial-foundation/lib/stripe-catalog.config";
+import {
+  assertCheckoutEligiblePlanSlug,
+  canUseDevelopmentBillingFallback,
+  requireStripeBillingForActivation,
+} from "@/modules/commercial-foundation/services/stripe-billing-config.service";
 import { buildBillingRecordForBusiness } from "@/modules/commercial-foundation/services/billing-record.service";
 
 function createId(prefix: string): string {
@@ -29,6 +36,7 @@ export interface CheckoutSessionInput {
   successUrl: string;
   cancelUrl: string;
   customerEmail?: string;
+  requirePaymentMethod?: boolean;
 }
 
 export interface PortalSessionInput {
@@ -36,16 +44,35 @@ export interface PortalSessionInput {
   returnUrl: string;
 }
 
+const MAX_STORED_STRIPE_EVENTS = 200;
+
+export async function hasProcessedStripeEvent(businessId: string, eventId: string): Promise<boolean> {
+  const commercial = await loadCommercialOperations(businessId);
+  return commercial.processedStripeEventIds.includes(eventId);
+}
+
+export async function markStripeEventProcessed(businessId: string, eventId: string): Promise<void> {
+  const commercial = await loadCommercialOperations(businessId);
+  const processed = [...commercial.processedStripeEventIds.filter((id) => id !== eventId), eventId];
+  await saveCommercialOperations(businessId, {
+    ...commercial,
+    processedStripeEventIds: processed.slice(-MAX_STORED_STRIPE_EVENTS),
+  });
+}
+
 /** Stripe-backed billing operations for production tenants. */
 export class StripeBillingService {
   async ensureStripeCustomer(businessId: string, email?: string): Promise<string> {
     const commercial = await loadCommercialOperations(businessId);
 
-    if (commercial.stripeCustomerId) {
+    if (commercial.stripeCustomerId && !commercial.stripeCustomerId.startsWith("local_")) {
       return commercial.stripeCustomerId;
     }
 
     if (!isStripeConfigured()) {
+      if (!canUseDevelopmentBillingFallback()) {
+        requireStripeBillingForActivation();
+      }
       const fallbackId = `local_cus_${businessId}`;
       await saveCommercialOperations(businessId, {
         ...commercial,
@@ -76,10 +103,15 @@ export class StripeBillingService {
       throw new Error("Plan not found");
     }
 
+    assertCheckoutEligiblePlanSlug(plan.slug);
+
     const customerId = await this.ensureStripeCustomer(input.businessId, input.customerEmail);
     const commercial = await loadCommercialOperations(input.businessId);
 
     if (!isStripeConfigured()) {
+      if (!canUseDevelopmentBillingFallback()) {
+        requireStripeBillingForActivation();
+      }
       const sessionId = createId("cs_local");
       await saveCommercialOperations(input.businessId, {
         ...commercial,
@@ -88,31 +120,27 @@ export class StripeBillingService {
       return { url: input.successUrl, sessionId };
     }
 
-    const stripe = getStripeClient();
-    const unitAmount =
-      input.billingCycle === "annual" ? plan.yearlyPriceCents : plan.monthlyPriceCents;
+    const configuredPriceId = resolveConfiguredStripePriceId(plan.slug);
+    if (!configuredPriceId) {
+      throw new Error(`Stripe price is not configured for ${plan.name}.`);
+    }
 
+    const stripe = getStripeClient();
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
-      line_items: [
-        {
-          price_data: {
-            currency: plan.currency.toLowerCase(),
-            product_data: { name: plan.name, metadata: { planId: plan.id, planSlug: plan.slug } },
-            unit_amount: unitAmount,
-            recurring: {
-              interval: input.billingCycle === "annual" ? "year" : "month",
-            },
-          },
-          quantity: 1,
+      payment_method_collection: "always",
+      line_items: [{ price: configuredPriceId, quantity: 1 }],
+      subscription_data: {
+        trial_period_days: TRIAL_DURATION_DAYS,
+        metadata: {
+          businessId: input.businessId,
+          planId: plan.id,
+          planSlug: plan.slug,
         },
-      ],
-      subscription_data: isTrialPlan(plan.slug)
-        ? { trial_period_days: plan.trialDays || 14 }
-        : undefined,
+      },
       metadata: {
         businessId: input.businessId,
         planId: plan.id,
@@ -144,10 +172,31 @@ export class StripeBillingService {
     return { url: session.url };
   }
 
+  async syncFromLatestCheckoutSession(businessId: string): Promise<boolean> {
+    const commercial = await loadCommercialOperations(businessId);
+
+    if (!commercial.lastCheckoutSessionId || !isStripeConfigured()) {
+      return false;
+    }
+
+    const stripe = getStripeClient();
+    const session = await stripe.checkout.sessions.retrieve(commercial.lastCheckoutSessionId);
+
+    if (session.status === "complete" && typeof session.subscription === "string") {
+      await this.syncSubscriptionFromStripe(businessId, session.subscription);
+      return true;
+    }
+
+    return false;
+  }
+
   async syncSubscriptionFromStripe(businessId: string, stripeSubscriptionId: string): Promise<void> {
     const commercial = await loadCommercialOperations(businessId);
 
     if (!isStripeConfigured()) {
+      if (!canUseDevelopmentBillingFallback()) {
+        return;
+      }
       await saveCommercialOperations(businessId, {
         ...commercial,
         stripeSubscriptionId,
@@ -160,7 +209,7 @@ export class StripeBillingService {
     const planSlug =
       (subscription.metadata.planSlug as string | undefined) ??
       (subscription.items.data[0]?.price.metadata?.planSlug as string | undefined) ??
-      "starter";
+      "busal-core";
 
     const statusMap: Record<string, string> = {
       active: SUBSCRIPTION_STATUSES.ACTIVE,
@@ -168,24 +217,36 @@ export class StripeBillingService {
       past_due: SUBSCRIPTION_STATUSES.PAST_DUE,
       paused: SUBSCRIPTION_STATUSES.PAUSED,
       canceled: SUBSCRIPTION_STATUSES.CANCELLED,
+      cancelled: SUBSCRIPTION_STATUSES.CANCELLED,
       unpaid: SUBSCRIPTION_STATUSES.PAST_DUE,
+      incomplete_expired: SUBSCRIPTION_STATUSES.EXPIRED,
     };
+
+    const mappedStatus = statusMap[subscription.status] ?? SUBSCRIPTION_STATUSES.ACTIVE;
+    const trialStartedAt = subscription.trial_start
+      ? new Date(subscription.trial_start * 1000).toISOString()
+      : commercial.trialStartedAt;
+    const trialEndsAt = subscription.trial_end
+      ? new Date(subscription.trial_end * 1000).toISOString()
+      : commercial.trialEndsAt;
 
     await prisma.tenantRecord.update({
       where: { businessId },
       data: {
         subscriptionPlan: planSlug,
-        subscriptionStatus: statusMap[subscription.status] ?? SUBSCRIPTION_STATUSES.ACTIVE,
+        subscriptionStatus: mappedStatus,
       },
     });
+
+    await updateTenantPlanLimits(businessId, planSlug);
+    await assignFeaturesForPlan(businessId, planSlug);
 
     await saveCommercialOperations(businessId, {
       ...commercial,
       stripeSubscriptionId,
       stripePriceId: subscription.items.data[0]?.price.id ?? null,
-      trialEndsAt: subscription.trial_end
-        ? new Date(subscription.trial_end * 1000).toISOString()
-        : commercial.trialEndsAt,
+      trialStartedAt,
+      trialEndsAt,
     });
   }
 

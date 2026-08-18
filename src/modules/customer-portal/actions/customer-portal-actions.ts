@@ -111,13 +111,19 @@ export async function createCustomerSupportTicketAction(input: {
 export async function sendCustomerAssistantMessageAction(input: {
   content: string;
   conversationId?: string;
+  sessionToken?: string;
+  confirmedActions?: string[];
 }) {
   const context = await requireCustomerPortalContext();
   const result = await sendCustomerAssistantMessage(
     context.business.id,
     context.customer.id,
     input.content,
-    input.conversationId,
+    {
+      conversationId: input.conversationId,
+      sessionToken: input.sessionToken,
+      confirmedActions: input.confirmedActions,
+    },
   );
   revalidatePortal();
   return { success: true as const, ...result };

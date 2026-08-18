@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { ROUTES } from "@/constants/routes";
 import { getWorkspaceAccessSnapshot } from "@/modules/auth/lib/workspace-access";
+import { resolveSubscriptionAccess } from "@/modules/commercial-foundation/services/subscription-access.service";
 import { findActiveStaffByEmail } from "@/modules/staff-auth/services/staff-auth.service";
 import { getCurrentUser } from "@/services/auth.service";
 
@@ -37,6 +38,13 @@ export const requireApplicationAccess = cache(async () => {
 
   if (workspace.state === "provisioning_incomplete") {
     redirect(resolveBusinessOnboardingPath(workspace.businessSetupStep));
+  }
+
+  if (workspace.businessId) {
+    const subscriptionAccess = await resolveSubscriptionAccess(workspace.businessId);
+    if (!subscriptionAccess.allowed && subscriptionAccess.redirectTo) {
+      redirect(subscriptionAccess.redirectTo);
+    }
   }
 
   return user;

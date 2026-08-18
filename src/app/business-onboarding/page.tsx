@@ -8,6 +8,6 @@ export const metadata: Metadata = {
 };
 
 export default async function BusinessOnboardingPage() {
-  await ensureBusinessSetupAccess();
-  return <BusinessOnboardingWizard />;
+  const { profile } = await ensureBusinessSetupAccess();
+  return <BusinessOnboardingWizard businessSetupStep={profile.businessSetupStep} />;
 }

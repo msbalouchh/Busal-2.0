@@ -1,11 +1,14 @@
-import { IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Manrope } from "next/font/google";
 
 import { AppProviders } from "@/providers/app-providers";
 import { defaultMetadata } from "@/config/site";
 
 import "./globals.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+// The marketing homepage establishes Manrope as Busal's interface typeface.
+// Loading it at the root keeps authenticated and public experiences visually
+// coherent while the marketing layout retains Fraunces for editorial display text.
+const manrope = Manrope({
   variable: "--font-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -29,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${plusJakartaSans.variable} ${ibmPlexMono.variable} bg-background text-text min-h-screen antialiased`}
+        className={`${manrope.variable} ${ibmPlexMono.variable} bg-background text-text min-h-screen antialiased`}
       >
         <AppProviders>{children}</AppProviders>
       </body>

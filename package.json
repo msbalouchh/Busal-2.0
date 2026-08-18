@@ -45,6 +45,9 @@
     "verify-document-platform": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-document-platform.ts",
     "verify-media-platform": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-media-platform.ts",
     "verify-developer-platform": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-developer-platform.ts",
+    "verify-platform-production": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-platform-production.ts",
+    "verify-billing-production": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-billing-production.ts",
+    "verify-phase25-live": "node scripts/verify-phase25-live.mjs",
     "verify-app-marketplace-platform": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-app-marketplace-platform.ts",
     "verify-observability-platform": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-observability-platform.ts",
     "verify-enterprise-platform": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-enterprise-platform.ts",
@@ -79,6 +82,9 @@
     "verify-control-center-platform-admin": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-control-center-platform-admin.ts",
     "verify-production-deployment": "npx tsx scripts/verify-production-deployment.ts",
     "verify-production-database": "npx tsx scripts/verify-production-database.ts",
+    "verify-customer-ai-phase27": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-customer-ai-phase27.ts",
+    "verify-omnichannel-phase28": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-omnichannel-phase28.ts",
+    "verify-ai-business-operations-phase29": "npx tsx --import ./scripts/setup-verify.mjs scripts/verify-ai-business-operations-phase29.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
@@ -139,6 +145,7 @@
     "prettier-plugin-tailwindcss": "^0.6.12",
     "prisma": "^6.9.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   },
   "lint-staged": {
@@ -148,15 +155,6 @@
     ],
     "*.{json,md,css,yml,yaml}": [
       "prettier --write"
-    ]
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma",
-      "sharp",
-      "unrs-resolver"
     ]
   }
 }

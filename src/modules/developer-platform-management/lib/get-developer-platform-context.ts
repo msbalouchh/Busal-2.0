@@ -36,6 +36,7 @@ import {
   searchApiRequestLogs,
 } from "@/services/api-request-logger.service";
 import { API_ROUTE_CATALOG, SDK_FRAMEWORK_LANGUAGES } from "@/services/api-version-manager.service";
+import { listV1ApiRoutesWithScopes } from "@/modules/platform/api/v1/router";
 import { resolveDeveloperPlatformPermissions } from "@/services/developer-platform-permission.service";
 import type { AuthUser } from "@/types/auth";
 import type { BusinessProfileData } from "@/types/business-profile";
@@ -151,7 +152,7 @@ export const getDeveloperWebhooksContext = cache(async () => {
 
 export const getDeveloperExplorerContext = cache(async () => {
   const context = await getDeveloperPlatformContext();
-  return { ...context, routes: API_ROUTE_CATALOG.slice(0, 12) };
+  return { ...context, routes: listV1ApiRoutesWithScopes() };
 });
 
 export const getDeveloperAnalyticsContext = cache(async () => {

@@ -2,8 +2,8 @@
 
 import { useCallback, useState } from "react";
 
+import { saveWorkspaceWizardProgressAction } from "@/modules/business-onboarding/actions/business-setup-actions";
 import { WORKSPACE_FORM_STEP_MAP } from "@/modules/business-onboarding/constants/workspace-steps";
-import { mockSaveWorkspaceProgress } from "@/modules/business-onboarding/lib/onboarding.mock";
 import { useWorkspaceWizardStore } from "@/modules/business-onboarding/store/onboarding.store";
 import type { WorkspaceWizardStep } from "@/modules/business-onboarding/types/onboarding.types";
 
@@ -28,7 +28,10 @@ export function useWorkspaceWizard() {
     setIsSaving(true);
     try {
       const state = useWorkspaceWizardStore.getState();
-      await mockSaveWorkspaceProgress(state.currentStep, extractWorkspaceData(state));
+      await saveWorkspaceWizardProgressAction({
+        step: state.currentStep,
+        data: extractWorkspaceData(state),
+      });
       nextStep();
     } finally {
       setIsSaving(false);
@@ -49,7 +52,10 @@ export function useWorkspaceWizard() {
     setIsSaving(true);
     try {
       const state = useWorkspaceWizardStore.getState();
-      await mockSaveWorkspaceProgress(state.currentStep, extractWorkspaceData(state));
+      await saveWorkspaceWizardProgressAction({
+        step: state.currentStep,
+        data: extractWorkspaceData(state),
+      });
       setStep(10 as WorkspaceWizardStep);
     } finally {
       setIsSaving(false);

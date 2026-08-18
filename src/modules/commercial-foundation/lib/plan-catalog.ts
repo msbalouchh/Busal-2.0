@@ -6,6 +6,7 @@ import {
   BILLING_CYCLES,
   PLAN_TYPES,
   SUBSCRIPTION_STATUSES,
+  TRIAL_DURATION_DAYS,
   type SubscriptionStatus,
 } from "@/modules/billing/constants/billing-status";
 import type {
@@ -14,6 +15,8 @@ import type {
   SubscriptionPlan,
 } from "@/modules/billing/types/billing-platform";
 import {
+  getSubscriptionPlanById,
+  getSubscriptionPlanBySlug,
   listSubscriptionPlans,
   type SubscriptionPlanDefinition,
 } from "@/modules/control-center/billing/registry/subscription-plan-registry";
@@ -22,6 +25,12 @@ import { SUBSCRIPTION_PLAN_KEYS } from "@/modules/finance/feature-access/constan
 function mapPlanType(slug: string): SubscriptionPlan["planType"] {
   if (slug.includes("enterprise")) {
     return PLAN_TYPES.ENTERPRISE;
+  }
+  if (slug.includes("pro") || slug === "professional") {
+    return PLAN_TYPES.PROFESSIONAL;
+  }
+  if (slug.includes("growth")) {
+    return PLAN_TYPES.BUSINESS;
   }
   if (slug.includes("trial") || slug === "free") {
     return PLAN_TYPES.FREE;
@@ -86,8 +95,8 @@ export function catalogPlanToSubscriptionPlan(definition: SubscriptionPlanDefini
     featureAccess: buildFeatureAccess(definition),
     isPublic: !definition.archived,
     isActive: !definition.archived,
-    trialDays: definition.slug === SUBSCRIPTION_PLAN_KEYS.TRIAL ? 14 : 0,
-    sortOrder: 0,
+    trialDays: definition.slug === SUBSCRIPTION_PLAN_KEYS.TRIAL ? TRIAL_DURATION_DAYS : 0,
+    sortOrder: definition.sortOrder ?? 0,
     createdAt: now,
     updatedAt: now,
   };
@@ -98,15 +107,17 @@ export function listCatalogPlans(): SubscriptionPlan[] {
 }
 
 export function findCatalogPlanById(planId: string): SubscriptionPlan | undefined {
-  return listCatalogPlans().find((plan) => plan.id === planId || plan.slug === planId);
+  const definition = getSubscriptionPlanById(planId);
+  return definition ? catalogPlanToSubscriptionPlan(definition) : undefined;
 }
 
 export function findCatalogPlanBySlug(slug: string): SubscriptionPlan | undefined {
-  return listCatalogPlans().find((plan) => plan.slug === slug);
+  const definition = getSubscriptionPlanBySlug(slug);
+  return definition ? catalogPlanToSubscriptionPlan(definition) : undefined;
 }
 
 export function defaultBillingCycleForPlan(slug: string): typeof BILLING_CYCLES.MONTHLY | typeof BILLING_CYCLES.YEARLY {
-  const definition = listSubscriptionPlans().find((plan) => plan.slug === slug);
+  const definition = getSubscriptionPlanBySlug(slug);
   return definition?.billingCycle === "annual" ? BILLING_CYCLES.YEARLY : BILLING_CYCLES.MONTHLY;
 }
 
@@ -126,6 +137,7 @@ export function normalizeSubscriptionStatus(status: string): SubscriptionStatus 
   }
 
   const upperMap: Record<string, SubscriptionStatus> = {
+    PENDING_ACTIVATION: SUBSCRIPTION_STATUSES.PENDING_ACTIVATION,
     ACTIVE: SUBSCRIPTION_STATUSES.ACTIVE,
     TRIAL: SUBSCRIPTION_STATUSES.TRIALING,
     TRIALING: SUBSCRIPTION_STATUSES.TRIALING,

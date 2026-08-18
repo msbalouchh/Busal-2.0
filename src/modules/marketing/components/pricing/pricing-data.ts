@@ -1,3 +1,21 @@
+export type PlanTier = "busal-core" | "busal-growth" | "busal-pro" | "busal-enterprise";
+
+export type CompareValue = boolean | string;
+
+export const PRICING_PLAN_TIERS: PlanTier[] = [
+  "busal-core",
+  "busal-growth",
+  "busal-pro",
+  "busal-enterprise",
+];
+
+export const PRICING_PLAN_LABELS: Record<PlanTier, string> = {
+  "busal-core": "Busal Core",
+  "busal-growth": "Busal Growth",
+  "busal-pro": "Busal Pro",
+  "busal-enterprise": "Busal Enterprise",
+};
+
 export const PRICING_FAQ = [
   {
     q: "How does billing work?",
@@ -17,7 +35,7 @@ export const PRICING_FAQ = [
   },
   {
     q: "What support is included?",
-    a: "Starter includes email support. Growth adds priority support. Enterprise includes a dedicated account manager, custom SLAs, and hands-on success coverage.",
+    a: "Core includes email support. Growth adds priority support. Pro and Enterprise include advanced success coverage and custom SLAs.",
   },
   {
     q: "Can we cancel anytime?",
@@ -25,7 +43,7 @@ export const PRICING_FAQ = [
   },
   {
     q: "How does AI usage work on each plan?",
-    a: "Starter includes a standard AI assistant. Growth adds AI automation and domain agents for operations and marketing. Enterprise includes the full agent suite with advanced orchestration and custom workflows.",
+    a: "Core includes a standard AI assistant. Growth adds AI automation and domain agents. Pro and Enterprise include the full agent suite with advanced orchestration and custom workflows.",
   },
   {
     q: "Is our business data secure?",
@@ -33,39 +51,37 @@ export const PRICING_FAQ = [
   },
 ] as const;
 
-export type PlanTier = "starter" | "growth" | "enterprise";
-
-export type CompareValue = boolean | string;
-
 export const COMPARE_FEATURES: {
   feature: string;
-  starter: CompareValue;
-  growth: CompareValue;
-  enterprise: CompareValue;
+  "busal-core": CompareValue;
+  "busal-growth": CompareValue;
+  "busal-pro": CompareValue;
+  "busal-enterprise": CompareValue;
 }[] = [
-  { feature: "Authentication", starter: true, growth: true, enterprise: "SSO" },
-  { feature: "POS", starter: true, growth: true, enterprise: true },
-  { feature: "Reservations", starter: "Basic", growth: true, enterprise: true },
-  { feature: "QR Menu", starter: true, growth: true, enterprise: true },
-  { feature: "Kitchen Display", starter: true, growth: true, enterprise: true },
-  { feature: "CRM", starter: "Essential", growth: true, enterprise: true },
-  { feature: "Marketing", starter: false, growth: true, enterprise: true },
-  { feature: "Analytics", starter: "Standard", growth: true, enterprise: true },
+  { feature: "Authentication", "busal-core": true, "busal-growth": true, "busal-pro": true, "busal-enterprise": "SSO" },
+  { feature: "POS", "busal-core": true, "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "Reservations", "busal-core": "Basic", "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "QR Menu", "busal-core": true, "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "Kitchen Display", "busal-core": true, "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "CRM", "busal-core": "Essential", "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "Marketing", "busal-core": false, "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "Analytics", "busal-core": "Standard", "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
   {
     feature: "AI Employees",
-    starter: "Assistant",
-    growth: "Core agents",
-    enterprise: "Full suite",
+    "busal-core": "Assistant",
+    "busal-growth": "Core agents",
+    "busal-pro": "Advanced agents",
+    "busal-enterprise": "Full suite",
   },
-  { feature: "AI Automation", starter: false, growth: true, enterprise: true },
-  { feature: "Reports", starter: true, growth: true, enterprise: true },
-  { feature: "Inventory", starter: true, growth: true, enterprise: true },
-  { feature: "API", starter: false, growth: "Standard", enterprise: true },
-  { feature: "Integrations", starter: "Core", growth: true, enterprise: "Custom" },
-  { feature: "Priority Support", starter: false, growth: true, enterprise: true },
-  { feature: "Multi-Branch", starter: false, growth: "Up to 5", enterprise: "Unlimited" },
-  { feature: "White Label", starter: false, growth: false, enterprise: true },
-  { feature: "Enterprise Security", starter: "Standard", growth: true, enterprise: true },
+  { feature: "AI Automation", "busal-core": false, "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "Reports", "busal-core": true, "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "Inventory", "busal-core": true, "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "API", "busal-core": false, "busal-growth": "Standard", "busal-pro": true, "busal-enterprise": true },
+  { feature: "Integrations", "busal-core": "Core", "busal-growth": true, "busal-pro": "Advanced", "busal-enterprise": "Custom" },
+  { feature: "Priority Support", "busal-core": false, "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
+  { feature: "Multi-Branch", "busal-core": false, "busal-growth": "Up to 5", "busal-pro": "Up to 10", "busal-enterprise": "Unlimited" },
+  { feature: "White Label", "busal-core": false, "busal-growth": false, "busal-pro": false, "busal-enterprise": true },
+  { feature: "Enterprise Security", "busal-core": "Standard", "busal-growth": true, "busal-pro": true, "busal-enterprise": true },
 ];
 
 export const SETUP_ITEMS = [

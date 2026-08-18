@@ -38,8 +38,8 @@ export function SubscriptionStep({ onContinue }: SubscriptionStepProps) {
       }}
     >
       <p className="text-sm text-white/55">
-        Select a plan for your workspace. Billing integration is prepared — Stripe connection coming
-        soon.
+        Select a plan for your workspace. All plans include a 15-day free trial. A payment method is
+        required before trial activation — you will not be charged until the trial ends.
       </p>
       <div className="onboarding__plan-grid">
         {SUBSCRIPTION_PLANS.map((plan) => (

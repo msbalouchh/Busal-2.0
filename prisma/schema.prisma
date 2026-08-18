@@ -68,6 +68,9 @@ model Business {
   timezone                        String?
   aiName                          String?                          @map("ai_name")
   aiPersonality                   String?                          @map("ai_personality")
+  aiAvatarUrl                     String?                          @map("ai_avatar_url")
+  aiGreeting                      String?                          @map("ai_greeting")
+  aiTone                          String?                          @map("ai_tone")
   businessGoal                    String?                          @map("business_goal")
   businessDna                     Json                             @default("{}") @map("business_dna")
   onboardingCompleted             Boolean                          @default(false) @map("onboarding_completed")
@@ -274,6 +277,12 @@ model Business {
   savedReports                    SavedReport[]
   dashboardWidgets                DashboardWidget[]
   aiConversations                 AIConversation[]
+  customerAiSessions              CustomerAiSession[]
+  customerAiEvents                CustomerAiEvent[]
+  customerAiActionLogs            CustomerAiActionLog[]
+  customerAiPendingConfirmations  CustomerAiPendingConfirmation[]
+  customerAiChannelConnections    CustomerAiChannelConnection[]
+  customerAiExternalThreads       CustomerAiExternalThread[]
   aiRecommendations               AIRecommendation[]
   platformAIAgents                AIAgent[]
   platformAIAgentExecutions       AIAgentExecution[]
@@ -1991,23 +2000,188 @@ model DashboardWidget {
 }
 
 model AIConversation {
-  id         String             @id @default(uuid())
-  businessId String             @map("business_id")
-  staffId    String?            @map("staff_id")
-  title      String
-  status     ConversationStatus @default(ACTIVE)
-  isPinned   Boolean            @default(false) @map("is_pinned")
-  createdAt  DateTime           @default(now()) @map("created_at")
-  updatedAt  DateTime           @updatedAt @map("updated_at")
-  business   Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  staff      Staff?             @relation(fields: [staffId], references: [id], onDelete: SetNull)
-  messages   AIMessage[]
-  memories   AIMemory[]
+  id           String             @id @default(uuid())
+  businessId   String             @map("business_id")
+  staffId      String?            @map("staff_id")
+  customerId   String?            @map("customer_id")
+  channel      String?            @default("website") @map("channel")
+  audienceType String             @default("STAFF") @map("audience_type")
+  title        String
+  status       ConversationStatus @default(ACTIVE)
+  isPinned     Boolean            @default(false) @map("is_pinned")
+  escalatedAt  DateTime?          @map("escalated_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  business     Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff        Staff?             @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  customer     Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  messages     AIMessage[]
+  memories     AIMemory[]
   voiceSessions AIVoiceSession[]
+  customerAiEvents CustomerAiEvent[]
 
   @@index([businessId, status, updatedAt])
   @@index([businessId, staffId])
+  @@index([businessId, customerId])
+  @@index([businessId, audienceType, updatedAt])
   @@map("ai_conversations")
+}
+
+model CustomerAiSession {
+  id             String    @id @default(uuid())
+  businessId     String    @map("business_id")
+  customerId     String?   @map("customer_id")
+  sessionToken   String    @unique @map("session_token")
+  channel        String    @default("website")
+  verifiedEmail  String?   @map("verified_email")
+  verifiedPhone  String?   @map("verified_phone")
+  metadata       Json      @default("{}")
+  expiresAt      DateTime  @map("expires_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, expiresAt])
+  @@index([businessId, customerId])
+  @@map("customer_ai_sessions")
+}
+
+model CustomerAiEvent {
+  id             String          @id @default(uuid())
+  businessId     String          @map("business_id")
+  conversationId String?         @map("conversation_id")
+  eventType      String          @map("event_type")
+  channel        String          @default("website")
+  metadata       Json            @default("{}")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation   AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, eventType, createdAt])
+  @@index([businessId, createdAt])
+  @@map("customer_ai_events")
+}
+
+model CustomerAiActionLog {
+  id                   String   @id @default(uuid())
+  businessId           String   @map("business_id")
+  customerId           String?  @map("customer_id")
+  conversationId       String?  @map("conversation_id")
+  sessionId            String?  @map("session_id")
+  channel              String   @default("website")
+  toolId               String   @map("tool_id")
+  audience             String
+  riskLevel            String   @map("risk_level")
+  entityType           String?  @map("entity_type")
+  entityId             String?  @map("entity_id")
+  permissionGranted    Boolean  @map("permission_granted")
+  confirmationRequired Boolean  @map("confirmation_required")
+  confirmationStatus   String   @map("confirmation_status")
+  executionStatus      String   @map("execution_status")
+  success              Boolean
+  inputSummary         String   @default("") @map("input_summary")
+  outputSummary        String   @default("") @map("output_summary")
+  errorMessage         String?  @map("error_message")
+  createdAt            DateTime @default(now()) @map("created_at")
+  business             Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, toolId, createdAt])
+  @@index([businessId, conversationId])
+  @@map("customer_ai_action_logs")
+}
+
+model CustomerAiPendingConfirmation {
+  id             String   @id @default(uuid())
+  businessId     String   @map("business_id")
+  conversationId String?  @map("conversation_id")
+  sessionId      String?  @map("session_id")
+  actionId       String   @map("action_id")
+  toolId         String   @map("tool_id")
+  channel        String   @default("website")
+  payload        Json     @default("{}")
+  status         String   @default("pending")
+  expiresAt      DateTime @map("expires_at")
+  consumedAt     DateTime? @map("consumed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, actionId])
+  @@index([businessId, conversationId, status])
+  @@index([businessId, expiresAt])
+  @@map("customer_ai_pending_confirmations")
+}
+
+model CustomerAiChannelConnection {
+  id                   String                            @id @default(uuid())
+  businessId           String                            @map("business_id")
+  channel              String
+  provider             CustomerAiChannelProvider
+  externalAccountId    String                            @map("external_account_id")
+  displayName          String?                           @map("display_name")
+  avatarUrl            String?                           @map("avatar_url")
+  status               CustomerAiChannelConnectionStatus @default(PENDING)
+  encryptedCredentials String                            @default("") @map("encrypted_credentials")
+  tokenExpiresAt       DateTime?                         @map("token_expires_at")
+  webhookVerified      Boolean                           @default(false) @map("webhook_verified")
+  webhookVerifyToken   String?                           @map("webhook_verify_token")
+  aiEnabled            Boolean                           @default(true) @map("ai_enabled")
+  metadata             Json                              @default("{}")
+  lastHealthCheckAt    DateTime?                         @map("last_health_check_at")
+  lastSyncAt           DateTime?                         @map("last_sync_at")
+  lastError            String?                           @map("last_error")
+  createdAt            DateTime                          @default(now()) @map("created_at")
+  updatedAt            DateTime                          @updatedAt @map("updated_at")
+  business             Business                          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  externalThreads      CustomerAiExternalThread[]
+  messageDedup         CustomerAiChannelMessageDedup[]
+
+  @@unique([channel, externalAccountId])
+  @@index([businessId, channel])
+  @@index([businessId, status])
+  @@map("customer_ai_channel_connections")
+}
+
+model CustomerAiExternalThread {
+  id                          String                      @id @default(uuid())
+  businessId                  String                      @map("business_id")
+  connectionId                String                      @map("connection_id")
+  channel                     String
+  externalConversationId      String                      @map("external_conversation_id")
+  externalCustomerId          String                      @map("external_customer_id")
+  customerDisplayName         String?                     @map("customer_display_name")
+  aiConversationId            String?                     @map("ai_conversation_id")
+  communicationConversationId String?                     @map("communication_conversation_id")
+  sessionToken                String?                     @map("session_token")
+  handoffToHuman              Boolean                     @default(false) @map("handoff_to_human")
+  handoffAt                   DateTime?                   @map("handoff_at")
+  metadata                    Json                        @default("{}")
+  lastMessageAt               DateTime                    @default(now()) @map("last_message_at")
+  createdAt                   DateTime                    @default(now()) @map("created_at")
+  updatedAt                   DateTime                    @updatedAt @map("updated_at")
+  business                    Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  connection                  CustomerAiChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalConversationId])
+  @@index([businessId, channel, lastMessageAt])
+  @@map("customer_ai_external_threads")
+}
+
+model CustomerAiChannelMessageDedup {
+  id                String                      @id @default(uuid())
+  businessId        String                      @map("business_id")
+  connectionId      String                      @map("connection_id")
+  externalMessageId String                      @map("external_message_id")
+  channel           String
+  direction         String
+  processedAt       DateTime                    @default(now()) @map("processed_at")
+  metadata          Json                        @default("{}")
+  connection        CustomerAiChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalMessageId])
+  @@index([businessId, channel, processedAt])
+  @@map("customer_ai_channel_message_dedup")
 }
 
 model AIMessage {
@@ -3488,6 +3662,8 @@ model Customer {
   reservations               Reservation[]
   revenueInvoices            RevenueInvoice[]
   aiMemories                 AIMemory[]
+  aiConversations            AIConversation[]
+  customerAiSessions         CustomerAiSession[]
   aiSalesRecommendations     AISalesRecommendation[]
   aiSupportInsights          AISupportInsight[]
   aiSupportRecommendations   AISupportRecommendation[]
@@ -10072,6 +10248,21 @@ enum TenantHealthStatus {
   HEALTHY
   DEGRADED
   CRITICAL
+}
+
+enum CustomerAiChannelProvider {
+  META
+  TWILIO
+  TIKTOK
+  MANUAL
+}
+
+enum CustomerAiChannelConnectionStatus {
+  PENDING
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  REQUIRES_REAUTH
 }
 
 enum TenantAuditEventType {

@@ -48,8 +48,8 @@ export class FeatureResolver {
     if (!record) {
       return {
         businessId,
-        plan: SUBSCRIPTION_PLAN_KEYS.STARTER,
-        planLabel: planResolver.resolveLabel(SUBSCRIPTION_PLAN_KEYS.STARTER),
+        plan: SUBSCRIPTION_PLAN_KEYS.BUSAL_CORE,
+        planLabel: planResolver.resolveLabel(SUBSCRIPTION_PLAN_KEYS.BUSAL_CORE),
         status: "INACTIVE",
         isActive: false,
         assignedFeatures: [],

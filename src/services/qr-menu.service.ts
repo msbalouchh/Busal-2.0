@@ -282,10 +282,16 @@ export async function listQRCodes(
   filters: ListQRCodesFilters = {},
 ): Promise<QRCodeData[]> {
   const business = await getOwnedBusiness(ownerId);
+  return listQRCodesForBusiness(business.id, filters);
+}
 
+export async function listQRCodesForBusiness(
+  businessId: string,
+  filters: ListQRCodesFilters = {},
+): Promise<QRCodeData[]> {
   const qrCodes = await prisma.qRCode.findMany({
     where: {
-      businessId: business.id,
+      businessId,
       ...branchFilter(filters.branchId ?? null),
       ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
       ...(filters.tableId ? { tableId: filters.tableId } : {}),

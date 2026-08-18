@@ -41,6 +41,7 @@ export function serializeApiKey(
   return {
     id: key.id,
     name: key.name,
+    keyPrefix: `bk_${key.id.slice(0, 8)}`,
     applicationName: key.application?.name ?? "",
     clientId: key.application?.clientId ?? "",
     status: key.status,

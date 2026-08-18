@@ -1,10 +1,10 @@
 /** Architecture route markers (distinct from legacy POS routes). */
 export const POS_PLATFORM_ROUTES = {
-  terminal: "/app/restaurant/pos",
-  registers: "/app/restaurant/pos/registers",
-  shifts: "/app/restaurant/pos/shifts",
-  transactions: "/app/restaurant/pos/transactions",
-  analytics: "/app/restaurant/pos/analytics",
+  terminal: "/dashboard/pos",
+  registers: "/dashboard/pos",
+  shifts: "/dashboard/pos",
+  transactions: "/dashboard/payments",
+  analytics: "/dashboard/reporting/sales",
 } as const;
 
 export const POS_PLATFORM_NAV_ITEMS = [

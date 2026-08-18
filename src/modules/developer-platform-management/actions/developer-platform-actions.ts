@@ -22,7 +22,10 @@ import {
   deleteWebhookSubscription,
   updateWebhookSubscriptionStatus,
 } from "@/services/api-webhook-subscription-manager.service";
-import { simulateApiExplorerRequest } from "@/services/developer-portal.service";
+import { executeApiExplorerRequest } from "@/services/developer-portal.service";
+import { listWebhookDeliveryLog } from "@/modules/platform/lib/webhook-delivery-log";
+import { replayWebhookDelivery } from "@/modules/platform/services/platform-webhook-delivery.service";
+import { getOwnedBusinessId } from "@/services/developer-platform-context.service";
 
 function revalidateDeveloperPages(): void {
   const routes = [
@@ -76,9 +79,15 @@ export async function createApiKeyAction(input: {
   applicationId: string;
   name: string;
   permissions?: string[];
+  expiresAt?: string;
 }) {
   const context = await requireDeveloperPlatformActionContext(PERMISSION_CODES.DEVELOPER_CREATE);
-  const result = await createApiKey(context.user.id, input);
+  const result = await createApiKey(context.user.id, {
+    applicationId: input.applicationId,
+    name: input.name,
+    permissions: input.permissions,
+    expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
+  });
   revalidateDeveloperPages();
   return result ? { id: result.id, rawKey: result.rawKey } : { id: "", rawKey: "" };
 }
@@ -102,11 +111,12 @@ export async function createWebhookAction(input: {
   endpoint: string;
 }) {
   const context = await requireDeveloperPlatformActionContext(PERMISSION_CODES.DEVELOPER_CREATE);
-  await createWebhookSubscription(context.user.id, {
+  const result = await createWebhookSubscription(context.user.id, {
     ...input,
     endpoint: validateWebhookEndpoint(input.endpoint),
   });
   revalidateDeveloperPages();
+  return result ? { id: result.subscription.id, secret: result.secret } : null;
 }
 
 export async function disableWebhookAction(subscriptionId: string) {
@@ -131,7 +141,45 @@ export async function updateDeveloperSettingsAction(input: {
   revalidateDeveloperPages();
 }
 
-export async function simulateExplorerAction(input: { method: string; path: string }) {
+export async function executeExplorerAction(input: {
+  method: string;
+  path: string;
+  apiKey: string;
+  body?: string;
+}) {
   const context = await requireDeveloperPlatformActionContext(PERMISSION_CODES.DEVELOPER_VIEW);
-  return simulateApiExplorerRequest(context.user.id, input);
+  return executeApiExplorerRequest(context.user.id, input);
+}
+
+/** @deprecated Use executeExplorerAction */
+export async function simulateExplorerAction(input: {
+  method: string;
+  path: string;
+  apiKey?: string;
+  body?: string;
+}) {
+  if (!input.apiKey?.trim()) {
+    throw new Error("An API key is required to execute live requests.");
+  }
+
+  return executeExplorerAction({
+    method: input.method,
+    path: input.path,
+    apiKey: input.apiKey,
+    body: input.body,
+  });
+}
+
+export async function listWebhookDeliveriesAction(limit = 50) {
+  const context = await requireDeveloperPlatformActionContext(PERMISSION_CODES.DEVELOPER_VIEW);
+  const businessId = await getOwnedBusinessId(context.user.id);
+  return listWebhookDeliveryLog(businessId, limit);
+}
+
+export async function replayWebhookDeliveryAction(deliveryId: string) {
+  const context = await requireDeveloperPlatformActionContext(PERMISSION_CODES.DEVELOPER_MANAGE);
+  const businessId = await getOwnedBusinessId(context.user.id);
+  const result = await replayWebhookDelivery(businessId, deliveryId);
+  revalidateDeveloperPages();
+  return result;
 }

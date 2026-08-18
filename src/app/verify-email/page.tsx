@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
 
-import { AuthLayout } from "@/modules/auth/components/auth-layout";
 import { VerifyEmailPanel } from "@/modules/auth/components/verify-email-panel";
+import { buildBrandedAuthMetadata } from "@/modules/platform/lib/auth-page-metadata";
+import { PlatformAuthShell } from "@/modules/platform/components/platform-auth-shell";
 
-export const metadata: Metadata = {
-  title: "Verify Email",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildBrandedAuthMetadata("Verify Email");
+}
 
 export default function VerifyEmailPage() {
   return (
-    <AuthLayout
+    <PlatformAuthShell
       title="Verify your email"
       description="One more step before your Busal OS workspace goes live."
     >
       <VerifyEmailPanel />
-    </AuthLayout>
+    </PlatformAuthShell>
   );
 }

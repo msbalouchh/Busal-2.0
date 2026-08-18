@@ -1,12 +1,12 @@
 /** Architecture route markers for the Analytics platform. */
 export const ANALYTICS_PLATFORM_ROUTES = {
-  overview: "/app/restaurant/analytics",
-  dashboards: "/app/restaurant/analytics/dashboards",
+  overview: "/dashboard/reporting",
+  dashboards: "/dashboard/reporting",
   reports: "/app/restaurant/analytics/reports",
-  kpis: "/app/restaurant/analytics/kpis",
-  forecasts: "/app/restaurant/analytics/forecasts",
-  alerts: "/app/restaurant/analytics/alerts",
-  benchmarks: "/app/restaurant/analytics/benchmarks",
+  kpis: "/dashboard/reporting/sales",
+  forecasts: "/dashboard/reporting/financial",
+  alerts: "/dashboard/reporting/orders",
+  benchmarks: "/dashboard/reporting/products",
 } as const;
 
 export const ANALYTICS_PLATFORM_NAV_ITEMS = [

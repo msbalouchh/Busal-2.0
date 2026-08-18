@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, LogOut, Monitor, Moon, Settings, Sun, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { API_ROUTES, ROUTES } from "@/constants/routes";
 import { assignAppPath } from "@/lib/app-navigation";
+import { performClientLogout } from "@/modules/auth/lib/client-logout";
 import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
@@ -44,6 +46,7 @@ function getInitials(name: string): string {
 }
 
 export function UserMenu({ userName, userEmail }: UserMenuProps) {
+  const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);

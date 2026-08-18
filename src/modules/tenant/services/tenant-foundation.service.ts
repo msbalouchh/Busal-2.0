@@ -25,6 +25,7 @@ import {
   provisionTenantForBusiness,
 } from "@/services/tenant-platform.service";
 import { commercialLimitsService } from "@/modules/commercial-foundation/services/commercial-limits.service";
+import { SUBSCRIPTION_STATUSES } from "@/modules/billing/constants/billing-status";
 import { assignFeaturesForPlan, updateTenantPlanLimits } from "@/modules/commercial-foundation/services/stripe-billing.service";
 import { subscriptionLifecycleService } from "@/modules/commercial-foundation/services/subscription-lifecycle.service";
 import { usageTrackingService } from "@/modules/commercial-foundation/services/usage-tracking.service";
@@ -435,9 +436,23 @@ export class TenantFoundationService {
     ]);
   }
 
-  async provisionCommercialStack(businessId: string, planSlug = "starter"): Promise<void> {
+  async provisionCommercialStack(
+    businessId: string,
+    planSlug = "starter",
+    options?: { deferSubscriptionActivation?: boolean },
+  ): Promise<void> {
     await provisionTenantForBusiness(businessId);
-    await subscriptionLifecycleService.assignPlan(businessId, planSlug);
+
+    if (options?.deferSubscriptionActivation) {
+      await subscriptionLifecycleService.assignPlan(
+        businessId,
+        planSlug,
+        SUBSCRIPTION_STATUSES.PENDING_ACTIVATION,
+      );
+    } else {
+      await subscriptionLifecycleService.assignPlan(businessId, planSlug);
+    }
+
     await assignFeaturesForPlan(businessId, planSlug);
     await updateTenantPlanLimits(businessId, planSlug);
 

@@ -3,6 +3,7 @@ import "server-only";
 import type { PlatformCloudSubscriptionStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { TRIAL_DURATION_DAYS } from "@/modules/billing/constants/billing-status";
 import { getCloudBusinessId } from "@/services/cloud-platform-context.service";
 
 export async function createTenantSubscription(
@@ -13,7 +14,7 @@ export async function createTenantSubscription(
   const tenant = await prisma.platformCloudTenant.findUnique({ where: { businessId } });
   if (!tenant) return null;
 
-  const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  const trialEnds = new Date(Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
   const subscription = await prisma.platformCloudTenantSubscription.create({
     data: {
       tenantId: tenant.id,

@@ -1,13 +1,24 @@
 import { NextResponse } from "next/server";
 
+import { isProductionDeployment } from "@/lib/production-mode";
+import { isStripeConfigured } from "@/lib/stripe";
 import { billingService } from "@/modules/billing/services/billing.service";
+import { canUseDevelopmentBillingFallback } from "@/modules/commercial-foundation/services/stripe-billing-config.service";
 import { subscriptionLifecycleService } from "@/modules/commercial-foundation/services/subscription-lifecycle.service";
+import {
+  BUSAL_COMMERCIAL_PLAN_SLUGS,
+  getSubscriptionPlanBySlug,
+} from "@/modules/control-center/billing/registry/subscription-plan-registry";
 import { PLATFORM_MODULE_KEYS } from "@/modules/feature-access";
 import { assertPlatformModuleFromContext } from "@/modules/feature-access/guards/platform-feature.guard";
 import {
   handlePlatformRouteError,
   protectedRoute,
 } from "@/modules/platform-guards/guards/route.guards";
+
+function directSubscriptionMutationBlocked(): boolean {
+  return isProductionDeployment() || isStripeConfigured() || !canUseDevelopmentBillingFallback();
+}
 
 export async function GET() {
   try {
@@ -26,7 +37,18 @@ export async function POST(request: Request) {
     const platform = await protectedRoute();
     await assertPlatformModuleFromContext(platform, PLATFORM_MODULE_KEYS.BILLING);
 
-    const body = (await request.json()) as { planSlug?: string; trialDays?: number };
+    if (directSubscriptionMutationBlocked()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Subscription changes must be completed through Stripe checkout or billing portal.",
+          code: "BILLING_CHECKOUT_REQUIRED",
+        },
+        { status: 403 },
+      );
+    }
+
+    const body = (await request.json()) as { planSlug?: string };
     const businessId = platform.business.id;
 
     if (body.planSlug) {
@@ -34,11 +56,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, data: record.subscription });
     }
 
-    const record = await subscriptionLifecycleService.startTrial(
-      businessId,
-      "plan-starter",
-      body.trialDays ?? 14,
-    );
+    const corePlan = getSubscriptionPlanBySlug(BUSAL_COMMERCIAL_PLAN_SLUGS.CORE);
+    if (!corePlan) {
+      return NextResponse.json({ success: false, error: "Core plan not configured" }, { status: 500 });
+    }
+
+    const record = await subscriptionLifecycleService.startTrial(businessId, corePlan.id);
 
     return NextResponse.json({ success: true, data: record.subscription });
   } catch (error) {

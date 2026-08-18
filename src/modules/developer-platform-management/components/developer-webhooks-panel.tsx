@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,27 @@ import {
   createWebhookAction,
   deleteWebhookAction,
   disableWebhookAction,
+  listWebhookDeliveriesAction,
+  replayWebhookDeliveryAction,
 } from "@/modules/developer-platform-management/actions/developer-platform-actions";
 import type { DeveloperPlatformContext } from "@/modules/developer-platform-management/lib/get-developer-platform-context";
 import type {
   ApiApplicationRecord,
   WebhookSubscriptionRecord,
 } from "@/modules/developer-platform-management/types/developer-platform-types";
+
+interface WebhookDeliveryRecord {
+  id: string;
+  event: string;
+  endpoint: string;
+  status: string;
+  statusCode: number | null;
+  attemptCount: number;
+  errorMessage: string | null;
+  deliveryId: string;
+  createdAt: string;
+  nextRetryAt: string | null;
+}
 
 interface DeveloperWebhooksPanelProps {
   context: DeveloperPlatformContext;
@@ -33,14 +48,48 @@ export function DeveloperWebhooksPanel({
 }: DeveloperWebhooksPanelProps) {
   const [event, setEvent] = useState(WEBHOOK_EVENT_OPTIONS[0]);
   const [endpoint, setEndpoint] = useState("https://example.com/webhooks/busal");
+  const [createdSecret, setCreatedSecret] = useState<string | null>(null);
+  const [deliveries, setDeliveries] = useState<WebhookDeliveryRecord[]>([]);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
   const applicationId = applications[0]?.id ?? "";
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    void listWebhookDeliveriesAction(50)
+      .then((records) => setDeliveries(records as WebhookDeliveryRecord[]))
+      .catch((error: unknown) => {
+        setDeliveryError(error instanceof Error ? error.message : "Unable to load delivery history");
+      });
+  }, []);
+
+  function refreshDeliveries() {
+    void listWebhookDeliveriesAction(50)
+      .then((records) => setDeliveries(records as WebhookDeliveryRecord[]))
+      .catch((error: unknown) => {
+        setDeliveryError(error instanceof Error ? error.message : "Unable to load delivery history");
+      });
+  }
 
   function handleCreate(submitEvent: React.FormEvent) {
     submitEvent.preventDefault();
     if (!applicationId) return;
     startTransition(async () => {
-      await createWebhookAction({ applicationId, event, endpoint });
+      const result = await createWebhookAction({ applicationId, event, endpoint });
+      if (result?.secret) {
+        setCreatedSecret(result.secret);
+      }
+    });
+  }
+
+  function handleReplay(deliveryId: string) {
+    startTransition(async () => {
+      setDeliveryError(null);
+      try {
+        await replayWebhookDeliveryAction(deliveryId);
+        refreshDeliveries();
+      } catch (error) {
+        setDeliveryError(error instanceof Error ? error.message : "Replay failed");
+      }
     });
   }
 
@@ -61,7 +110,7 @@ export function DeveloperWebhooksPanel({
                   id="webhook-event"
                   className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
                   value={event}
-                  onChange={(e) => setEvent(e.target.value as typeof event)}
+                  onChange={(eventTarget) => setEvent(eventTarget.target.value as typeof event)}
                 >
                   {WEBHOOK_EVENT_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -75,7 +124,7 @@ export function DeveloperWebhooksPanel({
                 <Input
                   id="webhook-endpoint"
                   value={endpoint}
-                  onChange={(e) => setEndpoint(e.target.value)}
+                  onChange={(eventTarget) => setEndpoint(eventTarget.target.value)}
                   required
                 />
               </div>
@@ -83,6 +132,20 @@ export function DeveloperWebhooksPanel({
                 Subscribe
               </Button>
             </form>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {createdSecret ? (
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="text-base">Webhook signing secret</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-2 text-sm">
+              Copy this secret now. It will not be shown again.
+            </p>
+            <code className="bg-muted block overflow-x-auto rounded p-3 text-xs">{createdSecret}</code>
           </CardContent>
         </Card>
       ) : null}
@@ -128,6 +191,64 @@ export function DeveloperWebhooksPanel({
                       </Button>
                     ) : null}
                   </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="text-base">Delivery history</CardTitle>
+          <Button type="button" size="sm" variant="outline" onClick={refreshDeliveries}>
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {deliveryError ? (
+            <p className="text-destructive mb-3 text-sm" role="alert">
+              {deliveryError}
+            </p>
+          ) : null}
+
+          {deliveries.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No webhook deliveries recorded yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {deliveries.map((delivery) => (
+                <li key={delivery.id} className="rounded border p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{delivery.event}</p>
+                      <p className="text-muted-foreground text-xs">{delivery.endpoint}</p>
+                    </div>
+                    <Badge variant="secondary">{delivery.status}</Badge>
+                  </div>
+                  <div className="text-muted-foreground mt-2 grid gap-1 text-xs sm:grid-cols-2">
+                    <span>HTTP {delivery.statusCode ?? "—"}</span>
+                    <span>Attempts {delivery.attemptCount}</span>
+                    <span>{new Date(delivery.createdAt).toLocaleString()}</span>
+                    {delivery.nextRetryAt ? (
+                      <span>Next retry {new Date(delivery.nextRetryAt).toLocaleString()}</span>
+                    ) : null}
+                  </div>
+                  {delivery.errorMessage ? (
+                    <p className="text-destructive mt-2 text-xs">{delivery.errorMessage}</p>
+                  ) : null}
+                  {context.permissionsFlags.canUpdate &&
+                  (delivery.status === "failed" || delivery.status === "retrying") ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-3"
+                      disabled={pending}
+                      onClick={() => handleReplay(delivery.deliveryId)}
+                    >
+                      Replay
+                    </Button>
+                  ) : null}
                 </li>
               ))}
             </ul>

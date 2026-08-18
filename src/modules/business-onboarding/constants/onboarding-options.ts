@@ -1,3 +1,10 @@
+import {
+  formatCommercialPlanPrice,
+  listPublicCommercialPlans,
+} from "@/modules/billing/lib/commercial-plan-display";
+import { formatFreeTrialAccessDescription } from "@/modules/billing/constants/billing-status";
+import { BUSAL_COMMERCIAL_PLAN_SLUGS } from "@/modules/control-center/billing/registry/subscription-plan-registry";
+
 export const INDUSTRY_OPTIONS = [
   { value: "Restaurant", label: "Restaurant" },
   { value: "Retail", label: "Retail" },
@@ -124,34 +131,16 @@ export const SUBSCRIPTION_PLANS = [
   {
     id: "trial" as const,
     label: "Trial",
-    description: "14-day full access — no card required",
+    description: formatFreeTrialAccessDescription(),
     price: "Free",
   },
-  {
-    id: "starter" as const,
-    label: "Starter",
-    description: "Single location, core modules",
-    price: "£49/mo",
-  },
-  {
-    id: "growth" as const,
-    label: "Growth",
-    description: "Multi-location, AI agents included",
-    price: "£149/mo",
-  },
-  {
-    id: "professional" as const,
-    label: "Professional",
-    description: "Advanced analytics & automation",
-    price: "£349/mo",
-  },
-  {
-    id: "enterprise" as const,
-    label: "Enterprise",
-    description: "Custom SLA, dedicated success",
-    price: "Custom",
-  },
-] as const;
+  ...listPublicCommercialPlans().map((plan) => ({
+    id: plan.slug as (typeof BUSAL_COMMERCIAL_PLAN_SLUGS)[keyof typeof BUSAL_COMMERCIAL_PLAN_SLUGS],
+    label: plan.name,
+    description: plan.description,
+    price: formatCommercialPlanPrice(plan),
+  })),
+];
 
 export const INDUSTRY_MODULE_RECOMMENDATIONS: Record<string, string[]> = {
   Restaurant: [

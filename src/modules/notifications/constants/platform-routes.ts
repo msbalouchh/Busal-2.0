@@ -1,13 +1,13 @@
 /** Architecture route markers for the Notification Center platform. */
 export const NOTIFICATION_PLATFORM_ROUTES = {
-  overview: "/app/notifications",
-  inbox: "/app/notifications/inbox",
-  templates: "/app/notifications/templates",
-  preferences: "/app/notifications/preferences",
-  rules: "/app/notifications/rules",
-  queue: "/app/notifications/queue",
-  history: "/app/notifications/history",
-  analytics: "/app/notifications/analytics",
+  overview: "/dashboard/notifications",
+  inbox: "/dashboard/notifications/inbox",
+  templates: "/dashboard/notifications/templates",
+  preferences: "/dashboard/notifications/preferences",
+  rules: "/dashboard/notifications/rules",
+  queue: "/dashboard/notifications/deliveries",
+  history: "/dashboard/notifications/audit",
+  analytics: "/dashboard/notifications",
 } as const;
 
 export const NOTIFICATION_PLATFORM_NAV_ITEMS = [

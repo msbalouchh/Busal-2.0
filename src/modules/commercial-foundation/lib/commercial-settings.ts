@@ -12,11 +12,13 @@ export interface StoredCommercialOperations {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   stripePriceId: string | null;
+  trialStartedAt: string | null;
   trialEndsAt: string | null;
   invoices: BillingInvoice[];
   payments: BillingPayment[];
   couponsApplied: string[];
   lastCheckoutSessionId: string | null;
+  processedStripeEventIds: string[];
 }
 
 export function defaultCommercialOperations(): StoredCommercialOperations {
@@ -24,11 +26,13 @@ export function defaultCommercialOperations(): StoredCommercialOperations {
     stripeCustomerId: null,
     stripeSubscriptionId: null,
     stripePriceId: null,
+    trialStartedAt: null,
     trialEndsAt: null,
     invoices: [],
     payments: [],
     couponsApplied: [],
     lastCheckoutSessionId: null,
+    processedStripeEventIds: [],
   };
 }
 

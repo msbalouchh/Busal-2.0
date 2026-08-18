@@ -1,11 +1,11 @@
 /** Architecture route markers for the Finance platform. */
 export const FINANCE_PLATFORM_ROUTES = {
-  overview: "/app/restaurant/finance",
-  ledger: "/app/restaurant/finance/ledger",
-  invoices: "/app/restaurant/finance/invoices",
-  expenses: "/app/restaurant/finance/expenses",
-  reports: "/app/restaurant/finance/reports",
-  cashFlow: "/app/restaurant/finance/cash-flow",
+  overview: "/dashboard/reporting/financial",
+  ledger: "/dashboard/reporting/financial",
+  invoices: "/dashboard/payments",
+  expenses: "/app/ai/finance/expenses",
+  reports: "/dashboard/reporting/financial",
+  cashFlow: "/app/ai/finance/cash-flow",
 } as const;
 
 export const FINANCE_PLATFORM_NAV_ITEMS = [

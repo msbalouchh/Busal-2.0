@@ -199,6 +199,53 @@ export function ControlCenterTenantDetail({ bundle }: ControlCenterTenantDetailP
             {profile.tenant.subscriptionPlan ?? "None"} · {profile.tenant.subscriptionStatus}
           </p>
         </div>
+      </section>
+
+      {profile.platform ? (
+        <section className="grid gap-4 rounded-lg border p-4 md:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">Deployment mode</p>
+            <p className="text-sm font-medium">{profile.platform.deploymentMode}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">White label</p>
+            <p className="text-sm font-medium">
+              {profile.platform.whiteLabelEnabled ? "Enabled" : "Disabled"}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">Domain</p>
+            <p className="text-sm font-medium">
+              {profile.platform.customDomain ??
+                (profile.platform.subdomain
+                  ? `${profile.platform.subdomain}.getbusal.com`
+                  : "getbusal.com (native)")}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">API platform</p>
+            <p className="text-sm font-medium">
+              {profile.platform.apiEnabled
+                ? `Enabled · ${profile.platform.apiKeyCount} keys`
+                : "Disabled"}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">Webhooks</p>
+            <p className="text-sm font-medium">
+              {profile.platform.webhooksEnabled
+                ? `Enabled · ${profile.platform.webhookCount} subscriptions`
+                : "Disabled"}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs uppercase">Platform status</p>
+            <p className="text-sm font-medium">{profile.platform.platformStatus}</p>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="grid gap-4 rounded-lg border p-4 md:grid-cols-2 xl:grid-cols-4">
         <div>
           <p className="text-muted-foreground text-xs uppercase">Industry</p>
           <p className="text-sm font-medium">{profile.businessType ?? "—"}</p>

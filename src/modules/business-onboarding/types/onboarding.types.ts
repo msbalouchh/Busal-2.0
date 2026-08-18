@@ -1,8 +1,12 @@
+import { BUSAL_COMMERCIAL_PLAN_SLUGS } from "@/modules/control-center/billing/registry/subscription-plan-registry";
+
 export type BusinessStructure = "single" | "multi";
 
 export type ThemePreference = "light" | "dark" | "system";
 
-export type SubscriptionPlan = "trial" | "starter" | "growth" | "professional" | "enterprise";
+export type SubscriptionPlan =
+  | "trial"
+  | (typeof BUSAL_COMMERCIAL_PLAN_SLUGS)[keyof typeof BUSAL_COMMERCIAL_PLAN_SLUGS];
 
 export type TeamRole =
   "owner" | "admin" | "manager" | "cashier" | "chef" | "waiter" | "accountant" | "support";

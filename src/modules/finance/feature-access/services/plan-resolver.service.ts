@@ -24,7 +24,10 @@ export class PlanResolver {
   }
 
   isEnterprisePlan(plan: SubscriptionPlanKey): boolean {
-    return plan === SUBSCRIPTION_PLAN_KEYS.ENTERPRISE;
+    return (
+      plan === SUBSCRIPTION_PLAN_KEYS.ENTERPRISE ||
+      plan === SUBSCRIPTION_PLAN_KEYS.BUSAL_ENTERPRISE
+    );
   }
 
   mergeCustomModules(
@@ -41,7 +44,7 @@ export class PlanResolver {
     }
 
     if (this.isEnterprisePlan(plan)) {
-      return ALL_PLATFORM_MODULE_KEYS;
+      return assignedFeatures.length > 0 ? assignedFeatures : ALL_PLATFORM_MODULE_KEYS;
     }
 
     return planModules;

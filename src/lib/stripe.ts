@@ -31,6 +31,34 @@ export function getStripeWebhookSecret(): string {
   return secret;
 }
 
+export type StripeEnvironmentMode = "test" | "live" | "unconfigured";
+
+export function getStripeMode(): StripeEnvironmentMode {
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+
+  if (!secretKey) {
+    return "unconfigured";
+  }
+
+  if (secretKey.startsWith("sk_test_")) {
+    return "test";
+  }
+
+  if (secretKey.startsWith("sk_live_")) {
+    return "live";
+  }
+
+  return "unconfigured";
+}
+
+export function isStripeTestMode(): boolean {
+  return getStripeMode() === "test";
+}
+
+export function isStripeLiveMode(): boolean {
+  return getStripeMode() === "live";
+}
+
 export function isStripeConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
+  return Boolean(process.env.STRIPE_SECRET_KEY?.trim());
 }

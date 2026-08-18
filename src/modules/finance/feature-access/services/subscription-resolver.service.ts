@@ -16,26 +16,34 @@ export interface TenantSubscriptionRecord {
 }
 
 function normalizePlanSlug(plan: string | null | undefined): SubscriptionPlanKey {
-  const normalized = (plan ?? SUBSCRIPTION_PLAN_KEYS.STARTER).toLowerCase().replace(/[\s-]+/g, "_");
+  const normalized = (plan ?? SUBSCRIPTION_PLAN_KEYS.BUSAL_CORE).toLowerCase().replace(/[\s-]+/g, "_");
 
   switch (normalized) {
     case "free_trial":
     case "trial":
       return SUBSCRIPTION_PLAN_KEYS.TRIAL;
+    case "busal_core":
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_CORE;
+    case "busal_growth":
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_GROWTH;
+    case "busal_pro":
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_PRO;
+    case "busal_enterprise":
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_ENTERPRISE;
     case "starter":
-      return SUBSCRIPTION_PLAN_KEYS.STARTER;
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_CORE;
     case "growth":
-      return SUBSCRIPTION_PLAN_KEYS.GROWTH;
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_GROWTH;
     case "professional":
     case "pro":
-      return SUBSCRIPTION_PLAN_KEYS.PROFESSIONAL;
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_PRO;
     case "enterprise":
-      return SUBSCRIPTION_PLAN_KEYS.ENTERPRISE;
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_ENTERPRISE;
     case "custom_enterprise":
     case "custom":
       return SUBSCRIPTION_PLAN_KEYS.CUSTOM_ENTERPRISE;
     default:
-      return SUBSCRIPTION_PLAN_KEYS.STARTER;
+      return SUBSCRIPTION_PLAN_KEYS.BUSAL_CORE;
   }
 }
 

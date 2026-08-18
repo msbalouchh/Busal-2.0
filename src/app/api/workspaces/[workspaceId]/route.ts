@@ -16,6 +16,10 @@ export async function GET(_request: Request, context: RouteContext) {
     const { workspaceId } = await context.params;
 
     const businessId = workspaceId.replace(/-ws$/, "");
+    if (businessId !== platform.business.id) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
     const snapshot = await tenantFoundationService.buildSnapshotForBusiness(
       businessId,
       platform.branchId ?? undefined,
@@ -32,6 +36,10 @@ export async function PATCH(_request: Request, context: RouteContext) {
     const platform = await protectedRoute();
     const { workspaceId } = await context.params;
     const businessId = workspaceId.replace(/-ws$/, "");
+
+    if (businessId !== platform.business.id) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
 
     await tenantFoundationService.activateTenant(businessId, platform.user.id);
     const snapshot = await tenantFoundationService.buildSnapshotForBusiness(businessId);

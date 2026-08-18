@@ -1,6 +1,6 @@
 import "server-only";
 
-import { type BusinessType, type Business } from "@prisma/client";
+import { type BusinessType, type Business, type Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { ensureMainBranch } from "@/services/business-management.service";
@@ -306,4 +306,117 @@ export async function completeBusinessSetup(ownerId: string): Promise<BusinessSe
   });
 
   return mapBusinessSetupProfile(updated);
+}
+
+const WORKSPACE_WIZARD_DRAFT_KEY = "workspaceWizardDraft";
+
+export interface WorkspaceWizardDraftSnapshot {
+  step: number;
+  data: Record<string, unknown>;
+}
+
+export async function saveWorkspaceWizardDraft(
+  ownerId: string,
+  step: number,
+  data: Record<string, unknown>,
+): Promise<BusinessSetupProfile> {
+  const business = await getPrimaryBusinessByOwnerId(ownerId);
+
+  if (!business) {
+    throw new Error("Business not found for user");
+  }
+
+  const draft: WorkspaceWizardDraftSnapshot = { step, data };
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.business.update({
+      where: { id: business.id },
+      data: {
+        businessName:
+          typeof data.displayName === "string" && data.displayName.trim()
+            ? data.displayName.trim()
+            : typeof data.businessName === "string" && data.businessName.trim()
+              ? data.businessName.trim()
+              : business.businessName,
+        businessType:
+          typeof data.businessType === "string"
+            ? resolveBusinessType(data.businessType)
+            : business.businessType,
+        industry:
+          typeof data.industry === "string" ? data.industry.trim() : business.industry,
+        country: typeof data.country === "string" ? data.country.trim() : business.country,
+        currency: typeof data.currency === "string" ? data.currency.trim() : business.currency,
+        timezone: typeof data.timezone === "string" ? data.timezone.trim() : business.timezone,
+        phone: typeof data.phone === "string" ? data.phone.trim() : business.phone,
+        businessEmail:
+          typeof data.businessEmail === "string" ? data.businessEmail.trim() : business.businessEmail,
+        businessSetupStep: step,
+      },
+    });
+
+    const settings = await tx.tenantSettings.findUnique({
+      where: { businessId: business.id },
+      select: { customSettings: true },
+    });
+
+    const settingsObject =
+      settings?.customSettings &&
+      typeof settings.customSettings === "object" &&
+      settings.customSettings !== null
+        ? (settings.customSettings as Record<string, unknown>)
+        : {};
+
+    await tx.tenantSettings.upsert({
+      where: { businessId: business.id },
+      create: {
+        businessId: business.id,
+        customSettings: {
+          ...settingsObject,
+          [WORKSPACE_WIZARD_DRAFT_KEY]: draft,
+        } as unknown as Prisma.InputJsonValue,
+      },
+      update: {
+        customSettings: {
+          ...settingsObject,
+          [WORKSPACE_WIZARD_DRAFT_KEY]: draft,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return result;
+  });
+
+  return mapBusinessSetupProfile(updated);
+}
+
+export async function loadWorkspaceWizardDraft(
+  ownerId: string,
+): Promise<WorkspaceWizardDraftSnapshot | null> {
+  const business = await getPrimaryBusinessByOwnerId(ownerId);
+
+  if (!business) {
+    return null;
+  }
+
+  const settings = await prisma.tenantSettings.findUnique({
+    where: { businessId: business.id },
+    select: { customSettings: true },
+  });
+
+  const raw = settings?.customSettings;
+  if (!raw || typeof raw !== "object" || raw === null || !(WORKSPACE_WIZARD_DRAFT_KEY in raw)) {
+    return null;
+  }
+
+  const draft = (raw as Record<string, unknown>)[WORKSPACE_WIZARD_DRAFT_KEY];
+  if (!draft || typeof draft !== "object" || draft === null) {
+    return null;
+  }
+
+  const snapshot = draft as WorkspaceWizardDraftSnapshot;
+  if (typeof snapshot.step !== "number" || typeof snapshot.data !== "object" || snapshot.data === null) {
+    return null;
+  }
+
+  return snapshot;
 }

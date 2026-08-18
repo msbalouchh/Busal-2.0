@@ -14,6 +14,7 @@ const STATUS_VARIANT: Record<
   SubscriptionStatus,
   "default" | "secondary" | "outline" | "destructive"
 > = {
+  pending_activation: "outline",
   trialing: "secondary",
   active: "default",
   past_due: "destructive",

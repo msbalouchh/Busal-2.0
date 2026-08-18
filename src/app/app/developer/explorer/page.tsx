@@ -17,7 +17,7 @@ export default async function DeveloperExplorerPage() {
   return (
     <ApplicationPageTemplate
       title="API Explorer"
-      description="Explore and simulate API requests."
+      description="Execute live authenticated requests against registered API v1 routes."
       icon={Terminal}
       breadcrumbs={[
         { label: "Busal OS", href: APPLICATION_SHELL_ROUTES.dashboard },

@@ -19,10 +19,16 @@ import { FadeIn, Reveal } from "@/modules/marketing/components/home/home-motion"
 import {
   COMPARE_FEATURES,
   PRICING_FAQ,
+  PRICING_PLAN_LABELS,
+  PRICING_PLAN_TIERS,
   SETUP_ITEMS,
   type CompareValue,
   type PlanTier,
 } from "@/modules/marketing/components/pricing/pricing-data";
+import {
+  buildMarketingPricingPlans,
+  DEFAULT_HIGHLIGHT_PLAN,
+} from "@/modules/marketing/components/pricing/commercial-pricing-plans";
 import { PricingRoiCalculator } from "@/modules/marketing/components/pricing/pricing-roi";
 import { MARKETING_ROUTES } from "@/modules/marketing/constants/routes";
 
@@ -31,65 +37,7 @@ import "./pricing.css";
 
 const YEARLY_DISCOUNT = 0.17;
 
-const PLANS = [
-  {
-    id: "starter" as const,
-    name: "Starter",
-    tagline: "Single location · Small businesses",
-    monthly: 199,
-    features: [
-      "Core POS, orders & kitchen",
-      "QR menu & basic reservations",
-      "Essential CRM & inventory",
-      "Standard reports & analytics",
-      "Email support",
-    ],
-    ai: ["Standard AI assistant"],
-    users: "Up to 10 users",
-    locations: "1 location",
-    cta: "Start Free Trial",
-    ctaHref: ROUTES.signup,
-    featured: false,
-  },
-  {
-    id: "growth" as const,
-    name: "Growth",
-    tagline: "Growing businesses · AI automation",
-    monthly: 349,
-    features: [
-      "Everything in Starter",
-      "Multi-user collaboration",
-      "CRM, loyalty & marketing campaigns",
-      "Advanced analytics & reports",
-      "Priority support",
-    ],
-    ai: ["AI Manager", "AI Marketing", "AI Operations", "Workflow automation"],
-    users: "Up to 50 users",
-    locations: "Up to 5 locations",
-    cta: "Start Free Trial",
-    ctaHref: ROUTES.signup,
-    featured: true,
-  },
-  {
-    id: "enterprise" as const,
-    name: "Enterprise",
-    tagline: "Multi-branch · Advanced AI · Custom scale",
-    monthly: null,
-    features: [
-      "Everything in Growth",
-      "Dedicated onboarding & success",
-      "Custom integrations & API access",
-      "SSO & enterprise security controls",
-      "Volume pricing & custom SLAs",
-    ],
-    ai: ["Full AI agent suite", "Custom automations", "Executive AI briefings"],
-    users: "Unlimited users",
-    locations: "Unlimited locations",
-    cta: "Talk to Sales",
-    ctaHref: MARKETING_ROUTES.contact,
-    featured: false,
-  },
-];
+const PLANS = buildMarketingPricingPlans();
 
 function formatPrice(amount: number, yearly: boolean) {
   if (yearly) {
@@ -141,7 +89,7 @@ function FaqItem({ q, a, defaultOpen }: { q: string; a: string; defaultOpen?: bo
 
 export function PricingPage() {
   const [yearly, setYearly] = useState(false);
-  const [highlightPlan, setHighlightPlan] = useState<PlanTier>("growth");
+  const [highlightPlan, setHighlightPlan] = useState<PlanTier>(DEFAULT_HIGHLIGHT_PLAN);
   const reduced = useReducedMotion();
 
   return (
@@ -339,7 +287,7 @@ export function PricingPage() {
                 role="tablist"
                 aria-label="Highlight plan column"
               >
-                {(["starter", "growth", "enterprise"] as const).map((tier) => (
+                {PRICING_PLAN_TIERS.map((tier) => (
                   <button
                     key={tier}
                     type="button"
@@ -348,7 +296,7 @@ export function PricingPage() {
                     className={cn("price-compare__tab", highlightPlan === tier && "is-active")}
                     onClick={() => setHighlightPlan(tier)}
                   >
-                    {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                    {PRICING_PLAN_LABELS[tier]}
                   </button>
                 ))}
               </div>
@@ -358,39 +306,29 @@ export function PricingPage() {
                   <thead>
                     <tr>
                       <th scope="col">Feature</th>
-                      <th
-                        scope="col"
-                        className={highlightPlan === "starter" ? "is-highlight" : undefined}
-                      >
-                        Starter
-                      </th>
-                      <th
-                        scope="col"
-                        className={highlightPlan === "growth" ? "is-highlight" : undefined}
-                      >
-                        Growth
-                      </th>
-                      <th
-                        scope="col"
-                        className={highlightPlan === "enterprise" ? "is-highlight" : undefined}
-                      >
-                        Enterprise
-                      </th>
+                      {PRICING_PLAN_TIERS.map((tier) => (
+                        <th
+                          key={tier}
+                          scope="col"
+                          className={highlightPlan === tier ? "is-highlight" : undefined}
+                        >
+                          {PRICING_PLAN_LABELS[tier]}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {COMPARE_FEATURES.map((row) => (
                       <tr key={row.feature}>
                         <th scope="row">{row.feature}</th>
-                        <td className={highlightPlan === "starter" ? "is-highlight" : undefined}>
-                          <CompareCell value={row.starter} />
-                        </td>
-                        <td className={highlightPlan === "growth" ? "is-highlight" : undefined}>
-                          <CompareCell value={row.growth} />
-                        </td>
-                        <td className={highlightPlan === "enterprise" ? "is-highlight" : undefined}>
-                          <CompareCell value={row.enterprise} />
-                        </td>
+                        {PRICING_PLAN_TIERS.map((tier) => (
+                          <td
+                            key={tier}
+                            className={highlightPlan === tier ? "is-highlight" : undefined}
+                          >
+                            <CompareCell value={row[tier]} />
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>

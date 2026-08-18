@@ -17,6 +17,23 @@ export {
   assignFeaturesForPlan,
 } from "@/modules/commercial-foundation/services/stripe-billing.service";
 export {
+  stripeCatalogService,
+  auditBusalStripeCatalog,
+  ensureBusalStripeCatalog,
+  listResolvedBusalStripePlans,
+  resolveBusalStripePlan,
+} from "@/modules/commercial-foundation/services/stripe-catalog.service";
+export type {
+  ResolvedBusalStripePlan,
+  StripeCatalogPlanAudit,
+  StripeCatalogProvisionResult,
+} from "@/modules/commercial-foundation/services/stripe-catalog.service";
+export {
+  BUSAL_STRIPE_PLAN_BINDINGS,
+  resolveConfiguredStripePriceId,
+  resolveConfiguredStripeProductId,
+} from "@/modules/commercial-foundation/lib/stripe-catalog.config";
+export {
   SubscriptionLifecycleService,
   subscriptionLifecycleService,
 } from "@/modules/commercial-foundation/services/subscription-lifecycle.service";

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { BUSAL_COMMERCIAL_PLAN_SLUGS } from "@/modules/control-center/billing/registry/subscription-plan-registry";
+
 const emailSchema = z.string().trim().email("Enter a valid business email");
 const colorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid color");
 const optionalUrl = z.union([z.literal(""), z.string().trim().url("Enter a valid URL")]);
@@ -63,7 +65,13 @@ export const teamInviteSchema = z.object({
 });
 
 export const subscriptionSchema = z.object({
-  subscriptionPlan: z.enum(["trial", "starter", "growth", "professional", "enterprise"]),
+  subscriptionPlan: z.enum([
+    "trial",
+    BUSAL_COMMERCIAL_PLAN_SLUGS.CORE,
+    BUSAL_COMMERCIAL_PLAN_SLUGS.GROWTH,
+    BUSAL_COMMERCIAL_PLAN_SLUGS.PRO,
+    BUSAL_COMMERCIAL_PLAN_SLUGS.ENTERPRISE,
+  ]),
 });
 
 export type BusinessIdentityValues = z.infer<typeof businessIdentitySchema>;

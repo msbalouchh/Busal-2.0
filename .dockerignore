@@ -1,0 +1,15 @@
+.git
+.next
+node_modules
+mobile/node_modules
+mobile/dist
+mobile/android
+mobile/ios
+.vercel
+.env
+.env.*
+!.env.example
+build-*.log
+coverage
+*.tsbuildinfo
+README.md

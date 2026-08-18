@@ -5,8 +5,10 @@ import "server-only";
 import type { MemoryContextBundle } from "@/modules/ai-memory-management/types/ai-memory-types";
 import {
   retrieveAgentMemories,
+  retrieveMemoriesByBusinessId,
   retrieveMemoriesByType,
   retrieveWorkingMemories,
+  retrieveWorkingMemoriesByBusinessId,
 } from "@/services/ai-memory-retrieval.service";
 import {
   summarizeConversationContext,
@@ -54,6 +56,20 @@ export async function buildConversationContext(
 ): Promise<string> {
   const working = await retrieveWorkingMemories(ownerId, conversationId, 16);
   const longTerm = await retrieveMemoriesByType(ownerId, "LONG_TERM", 8);
+  return summarizeConversationContext([...working, ...longTerm]);
+}
+
+export async function buildBusinessContextByBusinessId(businessId: string): Promise<string> {
+  const business = await retrieveMemoriesByBusinessId(businessId, "BUSINESS", 10);
+  return summarizeMemoryCollection(business, 8);
+}
+
+export async function buildConversationContextByBusinessId(
+  businessId: string,
+  conversationId: string,
+): Promise<string> {
+  const working = await retrieveWorkingMemoriesByBusinessId(businessId, conversationId, 16);
+  const longTerm = await retrieveMemoriesByBusinessId(businessId, "LONG_TERM", 8);
   return summarizeConversationContext([...working, ...longTerm]);
 }
 

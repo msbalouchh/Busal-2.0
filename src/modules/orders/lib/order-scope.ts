@@ -2,6 +2,7 @@ import "server-only";
 
 import type { BusinessContext } from "@/modules/business-context/types/business-context";
 import type { OmsPlatformContext } from "@/modules/orders/types/order";
+import { prisma } from "@/lib/prisma";
 
 export interface OrderTenantScope {
   tenantId: string;
@@ -52,4 +53,29 @@ export function buildOrderScopeFromInput(input: {
     branchId: input.branchId,
     userId: input.userId ?? "system",
   };
+}
+
+/** Resolves order scope for API integrations using the tenant's primary branch. */
+export async function resolveOrderScopeFromBusiness(
+  businessId: string,
+): Promise<OrderTenantScope> {
+  const branch =
+    (await prisma.branch.findFirst({
+      where: { businessId, isMain: true, isActive: true },
+      select: { id: true },
+    })) ??
+    (await prisma.branch.findFirst({
+      where: { businessId, isActive: true },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }));
+
+  if (!branch) {
+    throw new Error("No active branch found for business");
+  }
+
+  return buildOrderScopeFromInput({
+    businessId,
+    branchId: branch.id,
+  });
 }

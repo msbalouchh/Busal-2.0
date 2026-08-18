@@ -22,3 +22,11 @@ export function isCronAuthorizedWithoutSecret(): boolean {
 export function isStripeWebhookBypassAllowed(): boolean {
   return !isProductionDeployment();
 }
+
+/** Local billing bypass (startTrial without Stripe) — development only. */
+export function isDevelopmentBillingFallbackAllowed(): boolean {
+  if (isProductionDeployment()) {
+    return false;
+  }
+  return process.env.ALLOW_DEV_BILLING_BYPASS === "true";
+}

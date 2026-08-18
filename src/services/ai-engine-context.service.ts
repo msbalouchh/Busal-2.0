@@ -53,7 +53,12 @@ export async function resolveBusinessContextFromModule(
   const userId = context.userId ?? businessRecord.ownerId;
   const business =
     (await getOwnedBusinessById(userId, context.businessId)) ??
-    (await getOrCreateBusinessForOwner(businessRecord.ownerId));
+    (await getOwnedBusinessById(businessRecord.ownerId, context.businessId));
+
+  if (!business) {
+    throw new Error(`Business not found: ${context.businessId}`);
+  }
+
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
   const branch = context.branchId

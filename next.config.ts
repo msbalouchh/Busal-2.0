@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Produces a self-contained Node server for Cloud Run. Vercel continues to
+  // use Next's normal output, while Docker copies this standalone runtime.
+  output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
   eslint: {
@@ -35,6 +38,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      {
+        source: "/embed/:path*",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
+      },
       {
         source: "/:path*",
         headers: [

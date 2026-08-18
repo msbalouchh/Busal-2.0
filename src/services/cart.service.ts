@@ -58,7 +58,7 @@ function mapCartItem(item: CartWithItems["items"][number]): CartItemData {
     unitPrice: toNumber(item.unitPrice),
     totalPrice: toNumber(item.totalPrice),
     notes: item.notes,
-    menuItemName: item.menuItem.name,
+    menuItemName: item.menuItem?.name ?? "Unavailable item",
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };

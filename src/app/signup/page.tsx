@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
 
-import { AuthLayout } from "@/modules/auth/components/auth-layout";
 import { SignupForm } from "@/modules/auth/components/signup-form";
+import { buildBrandedAuthMetadata } from "@/modules/platform/lib/auth-page-metadata";
+import { PlatformAuthShell } from "@/modules/platform/components/platform-auth-shell";
 
-export const metadata: Metadata = {
-  title: "Sign Up",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildBrandedAuthMetadata("Sign Up");
+}
 
 export default function SignupPage() {
   return (
-    <AuthLayout
+    <PlatformAuthShell
       title="Create your workspace"
       description="Launch Busal OS for your business in minutes"
     >
       <SignupForm />
-    </AuthLayout>
+    </PlatformAuthShell>
   );
 }

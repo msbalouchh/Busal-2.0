@@ -15,6 +15,7 @@ import type {
   TenantRecordView,
   TenantSettingsView,
 } from "@/modules/tenant-platform/types/tenant-platform-types";
+import type { ControlCenterPlatformSummary } from "@/modules/platform/types/control-center-platform.types";
 
 export interface ControlCenterTenantPermissions {
   canView: boolean;
@@ -108,6 +109,7 @@ export interface ControlCenterTenantProfile {
   activeSessions: number;
   maintenanceMode: TenantMaintenanceMode;
   scheduledMaintenanceAt: string | null;
+  platform: ControlCenterPlatformSummary | null;
 }
 
 export interface ControlCenterTenantManagementBundle {

@@ -6,7 +6,7 @@ import { faqJsonLd, marketingMetadata } from "@/modules/marketing/lib/seo";
 export const metadata = marketingMetadata({
   title: "Pricing",
   description:
-    "Busal OS pricing: one-time implementation £3,000–£4,000 and monthly plans from £199. Starter, Growth, Professional, and Enterprise.",
+    "Busal OS pricing: one-time implementation £3,000–£4,000 and monthly plans from £299. Busal Core, Growth, Pro, and Enterprise.",
   path: MARKETING_ROUTES.pricing,
 });
 

@@ -1,11 +1,11 @@
 /** Architecture route markers (distinct from legacy STAFF_ROUTES). */
 export const STAFF_PLATFORM_ROUTES = {
-  overview: "/app/restaurant/staff",
-  directory: "/app/restaurant/staff/directory",
-  schedule: "/app/restaurant/staff/schedule",
-  attendance: "/app/restaurant/staff/attendance",
-  leave: "/app/restaurant/staff/leave",
-  analytics: "/app/restaurant/staff/analytics",
+  overview: "/dashboard/staff",
+  directory: "/dashboard/staff/directory",
+  schedule: "/dashboard/staff",
+  attendance: "/dashboard/staff/activity",
+  leave: "/dashboard/staff",
+  analytics: "/dashboard/reporting/staff",
 } as const;
 
 export const STAFF_PLATFORM_NAV_ITEMS = [

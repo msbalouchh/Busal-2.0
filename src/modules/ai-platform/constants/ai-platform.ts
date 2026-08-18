@@ -5,6 +5,9 @@ import { AI_TOOLS_ROUTES } from "@/modules/ai-tools/constants/routes";
 
 export const AI_PLATFORM_ROUTES = {
   overview: "/dashboard/ai-platform",
+  controlCenter: "/dashboard/ai-platform/control-center",
+  channels: "/dashboard/ai-platform/channels",
+  operations: "/dashboard/ai-platform/operations",
   assistant: "/dashboard/ai-platform/assistant",
   agents: "/dashboard/ai-platform/agents",
   knowledge: "/dashboard/ai-platform/knowledge",
@@ -20,6 +23,9 @@ export const AI_PLATFORM_ROUTES = {
 
 export const AI_PLATFORM_NAV_ITEMS = [
   { label: "Overview", href: AI_PLATFORM_ROUTES.overview },
+  { label: "Control Center", href: AI_PLATFORM_ROUTES.controlCenter },
+  { label: "Channels", href: AI_PLATFORM_ROUTES.channels },
+  { label: "Operations", href: AI_PLATFORM_ROUTES.operations },
   { label: "Assistant", href: AI_PLATFORM_ROUTES.assistant },
   { label: "Agents", href: AI_PLATFORM_ROUTES.agents },
   { label: "Knowledge", href: AI_PLATFORM_ROUTES.knowledge },

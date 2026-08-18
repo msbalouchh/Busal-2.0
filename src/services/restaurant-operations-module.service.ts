@@ -30,7 +30,7 @@ import { getMenuManagementContext } from "@/services/menu-management.service";
 import { listOrders, type OrderData } from "@/services/order.service";
 import { getDateRangeForPeriod, getReportingDashboard } from "@/services/reporting.service";
 import { listReservations } from "@/services/reservation.service";
-import { listTables } from "@/services/table.service";
+import { listTablesForBusiness } from "@/services/table.service";
 
 function buildPermissions(platform: BusinessContext): RestaurantOperationsPermissions {
   const permissions = platform.authorization.permissions;
@@ -382,7 +382,7 @@ export async function getTableFloorBundle(
   platform: BusinessContext,
 ): Promise<SerializedTableFloorItem[]> {
   const [tables, qrCounts, reservationCounts] = await Promise.all([
-    listTables(platform.business.ownerId, { branchId: platform.branchId, isActive: true }),
+    listTablesForBusiness(platform.business.id, { branchId: platform.branchId, isActive: true }),
     prisma.qRCode.groupBy({
       by: ["tableId"],
       where: {

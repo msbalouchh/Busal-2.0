@@ -2,8 +2,8 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import type { BusinessContext } from "@/modules/business-context/types/business-context";
-import type { DashboardActivityItem, DashboardHomeData } from "@/modules/dashboard/types/dashboard";
 import { branchFilter } from "@/modules/business-context/utils/branch-scope";
+import type { DashboardActivityItem, DashboardHomeData } from "@/modules/dashboard/types/dashboard";
 import { moneyDecimalToPence } from "@/modules/payments/utils/currency";
 import { getDateRangeForPeriod, getReportingDashboard } from "@/services/reporting.service";
 import { getNotificationDashboard } from "@/services/notifications.service";
@@ -15,20 +15,39 @@ function formatPence(pence: number): string {
   }).format(pence / 100);
 }
 
+function createEmptyDashboardHomeData(platform: BusinessContext): DashboardHomeData {
+  return {
+    stats: {
+      businessName: platform.business.businessName?.trim() || "Your business",
+      todayRevenuePence: 0,
+      todayOrders: 0,
+      todayReservations: 0,
+      totalCustomers: 0,
+      staffOnline: 0,
+      inventoryAlerts: 0,
+      unreadNotifications: 0,
+    },
+    recentActivity: [],
+    recentNotifications: [],
+    upcomingTasks: [],
+  };
+}
+
 export async function getDashboardHomeData(platform: BusinessContext): Promise<DashboardHomeData> {
   const businessId = platform.business.id;
   const branchId = platform.branchId;
   const todayRange = getDateRangeForPeriod("today");
 
-  const [
-    reporting,
-    notificationMetrics,
-    reservationCount,
-    staffOnline,
-    recentOrders,
-    recentInbox,
-    upcomingTasks,
-  ] = await Promise.all([
+  try {
+    const [
+      reporting,
+      notificationMetrics,
+      reservationCount,
+      staffOnline,
+      recentOrders,
+      recentInbox,
+      upcomingTasks,
+    ] = await Promise.all([
     getReportingDashboard(businessId, branchId),
     getNotificationDashboard(businessId),
     prisma.reservation.count({
@@ -92,38 +111,42 @@ export async function getDashboardHomeData(platform: BusinessContext): Promise<D
     }),
   ]);
 
-  const recentActivity: DashboardActivityItem[] = recentOrders.map((order) => ({
-    id: order.id,
-    title: `Order #${order.orderNumber}`,
-    description: `${order.status} · ${formatPence(moneyDecimalToPence(order.totalAmount))}`,
-    timestamp: order.placedAt.toISOString(),
-    href: `/dashboard/reporting/orders`,
-  }));
+    const recentActivity: DashboardActivityItem[] = recentOrders.map((order) => ({
+      id: order.id,
+      title: `Order #${order.orderNumber}`,
+      description: `${order.status} · ${formatPence(moneyDecimalToPence(order.totalAmount))}`,
+      timestamp: order.placedAt.toISOString(),
+      href: `/dashboard/reporting/orders`,
+    }));
 
-  return {
-    stats: {
-      businessName: platform.business.businessName?.trim() || "Your business",
-      todayRevenuePence: reporting.sales.periods.today.grossRevenuePence,
-      todayOrders: reporting.sales.periods.today.totalOrders,
-      todayReservations: reservationCount,
-      totalCustomers: reporting.customers.newCustomers + reporting.customers.returningCustomers,
-      staffOnline,
-      inventoryAlerts: reporting.inventory.lowStockCount + reporting.inventory.outOfStockCount,
-      unreadNotifications: notificationMetrics.unreadInbox,
-    },
-    recentActivity,
-    recentNotifications: recentInbox.map((item) => ({
-      id: item.id,
-      title: item.notification.title,
-      body: item.notification.body,
-      createdAt: item.createdAt.toISOString(),
-      status: item.status,
-    })),
-    upcomingTasks: upcomingTasks.map((task) => ({
-      id: task.id,
-      title: task.title,
-      dueDate: task.dueAt?.toISOString() ?? null,
-      status: task.status,
-    })),
-  };
+    return {
+      stats: {
+        businessName: platform.business.businessName?.trim() || "Your business",
+        todayRevenuePence: reporting.sales.periods.today.grossRevenuePence,
+        todayOrders: reporting.sales.periods.today.totalOrders,
+        todayReservations: reservationCount,
+        totalCustomers: reporting.customers.newCustomers + reporting.customers.returningCustomers,
+        staffOnline,
+        inventoryAlerts: reporting.inventory.lowStockCount + reporting.inventory.outOfStockCount,
+        unreadNotifications: notificationMetrics.unreadInbox,
+      },
+      recentActivity,
+      recentNotifications: recentInbox.map((item) => ({
+        id: item.id,
+        title: item.notification.title,
+        body: item.notification.body,
+        createdAt: item.createdAt.toISOString(),
+        status: item.status,
+      })),
+      upcomingTasks: upcomingTasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        dueDate: task.dueAt?.toISOString() ?? null,
+        status: task.status,
+      })),
+    };
+  } catch (error) {
+    console.error("[dashboard] Failed to load home data", error);
+    return createEmptyDashboardHomeData(platform);
+  }
 }

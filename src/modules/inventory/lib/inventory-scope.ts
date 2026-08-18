@@ -40,3 +40,18 @@ export function toInventoryPlatformContext(scope: InventoryTenantScope): Invento
     defaultLocationId: scope.defaultLocationId,
   };
 }
+
+export async function resolveInventoryScopeFromBusiness(
+  businessId: string,
+): Promise<InventoryTenantScope> {
+  const { resolveOrderScopeFromBusiness } = await import("@/modules/orders/lib/order-scope");
+  const orderScope = await resolveOrderScopeFromBusiness(businessId);
+  return {
+    tenantId: businessId,
+    workspaceId: businessId,
+    businessId,
+    branchId: orderScope.branchId,
+    userId: "system",
+    defaultLocationId: `${orderScope.branchId}-loc-main`,
+  };
+}

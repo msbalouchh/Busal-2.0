@@ -2,6 +2,10 @@ import "server-only";
 
 import type { PlatformApiStatus } from "@prisma/client";
 
+import { deliverWebhookEvent as deliverPlatformWebhooks } from "@/modules/platform/services/platform-webhook-delivery.service";
+import { verifyIncomingWebhookSignature as verifyPlatformWebhookSignature } from "@/modules/platform/services/platform-webhook-delivery.service";
+import { loadPlatformConsumptionConfig } from "@/modules/platform/lib/platform-settings";
+import { resolvePlatformEntitlements } from "@/modules/platform/services/platform-entitlements.service";
 import { prisma } from "@/lib/prisma";
 import {
   encryptDeveloperSecret,
@@ -24,15 +28,29 @@ export async function listWebhookSubscriptions(ownerId: string, applicationId?: 
 export async function createWebhookSubscription(
   ownerId: string,
   input: { applicationId: string; event: string; endpoint: string },
-) {
+): Promise<{ subscription: Awaited<ReturnType<typeof prisma.platformApiWebhookSubscription.create>>; secret: string } | null> {
   const businessId = await getOwnedBusinessId(ownerId);
   const application = await prisma.platformApiApplication.findFirst({
     where: { id: input.applicationId, businessId },
   });
   if (!application) return null;
 
+  const tenant = await prisma.tenantRecord.findUnique({
+    where: { businessId },
+    select: { subscriptionPlan: true },
+  });
+  const entitlements = resolvePlatformEntitlements(tenant?.subscriptionPlan);
+  if (!entitlements.webhooks) {
+    throw new Error("Webhooks require Busal Pro or Enterprise.");
+  }
+
+  const config = await loadPlatformConsumptionConfig(businessId);
+  if (!config.webhooks.enabled) {
+    throw new Error("Webhooks are disabled for this tenant.");
+  }
+
   const secret = generateWebhookSecret();
-  return prisma.platformApiWebhookSubscription.create({
+  const subscription = await prisma.platformApiWebhookSubscription.create({
     data: {
       businessId,
       applicationId: input.applicationId,
@@ -42,6 +60,8 @@ export async function createWebhookSubscription(
       status: "ACTIVE",
     },
   });
+
+  return { subscription, secret };
 }
 
 export async function updateWebhookSubscriptionStatus(
@@ -77,10 +97,7 @@ export function verifyWebhookSignature(
   signature: string,
   secret: string,
 ): boolean {
-  void payload;
-  void signature;
-  void secret;
-  return true;
+  return verifyPlatformWebhookSignature(payload, signature, secret);
 }
 
 export async function dispatchWebhookEvent(
@@ -88,16 +105,7 @@ export async function dispatchWebhookEvent(
   event: string,
   payload: Record<string, unknown>,
 ) {
-  const subscriptions = await prisma.platformApiWebhookSubscription.findMany({
-    where: { businessId, event, status: "ACTIVE" },
-  });
-
-  return subscriptions.map((subscription) => ({
-    subscriptionId: subscription.id,
-    endpoint: subscription.endpoint,
-    simulated: true,
-    payload,
-  }));
+  return deliverPlatformWebhooks({ businessId, event, data: payload });
 }
 
 export async function searchWebhookSubscriptions(ownerId: string, query: string) {

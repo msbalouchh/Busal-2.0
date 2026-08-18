@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { BusalLogo } from "@/components/brand/busal-logo";
 import { AuthCard } from "@/modules/auth/components/auth-card";
 import { AuthVisualPanel } from "@/modules/auth/components/auth-visual-panel";
+import { PlatformBrandLogo } from "@/modules/platform/components/platform-brand-logo";
+import type { ResolvedPlatformBranding } from "@/modules/platform/types/platform-config.types";
 import { motion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -16,17 +18,31 @@ interface AuthLayoutProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  branding?: ResolvedPlatformBranding;
 }
 
-export function AuthLayout({ title, description, children, footer, className }: AuthLayoutProps) {
+export function AuthLayout({
+  title,
+  description,
+  children,
+  footer,
+  className,
+  branding,
+}: AuthLayoutProps) {
+  const useWhiteLabel = branding?.isWhiteLabel && !branding.showBusalBranding;
+
   return (
     <div className={cn("auth", motion.pageEnter, className)}>
-      <AuthVisualPanel />
+      <AuthVisualPanel branding={branding} />
 
       <div className="auth-panel">
         <main className={cn("auth-panel__inner", className)}>
           <div className="auth-panel__mobile-logo">
-            <BusalLogo priority variant="horizontal" />
+            {useWhiteLabel ? (
+              <PlatformBrandLogo priority height={48} />
+            ) : (
+              <BusalLogo priority variant="horizontal" />
+            )}
           </div>
 
           <AuthCard title={title} description={description} footer={footer}>

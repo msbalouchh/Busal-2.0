@@ -94,8 +94,8 @@ export function softwareApplicationJsonLd() {
     offers: {
       "@type": "Offer",
       priceCurrency: "GBP",
-      price: "199.00",
-      description: "Starter plan from £199/month after implementation",
+      price: "299.00",
+      description: "Busal Core from £299/month after implementation",
     },
   };
 }

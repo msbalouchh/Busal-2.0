@@ -1,4 +1,6 @@
 import type { AiInjectedContext } from "@/modules/ai-engine/types/ai-engine.types";
+import { composeStaffSystemPrompt } from "@/modules/customer-ai/engine/customer-ai-prompt";
+import type { CustomerAiIdentity } from "@/modules/customer-ai/types/customer-ai.types";
 
 export interface ComposedPrompt {
   systemPrompt: string;
@@ -7,9 +9,27 @@ export interface ComposedPrompt {
 
 /** Builds structured prompts from injected business context. */
 export class AiPromptManager {
-  composeSystemPrompt(context: AiInjectedContext, agentInstructions?: string): string {
+  composeSystemPrompt(
+    context: AiInjectedContext,
+    agentInstructions?: string,
+    identity?: Partial<CustomerAiIdentity>,
+  ): string {
+    if (identity?.aiName || context.businessProfile.aiName) {
+      const resolvedIdentity: CustomerAiIdentity = {
+        aiName: String(identity?.aiName ?? context.businessProfile.aiName ?? "Assistant"),
+        aiPersonality: String(
+          identity?.aiPersonality ?? context.businessProfile.aiPersonality ?? "Professional",
+        ),
+        aiAvatarUrl: identity?.aiAvatarUrl ?? null,
+        aiGreeting: identity?.aiGreeting ?? null,
+        aiTone: (identity?.aiTone ?? "Professional") as CustomerAiIdentity["aiTone"],
+        businessName: context.businessName,
+        whiteLabelName: null,
+      };
+      return composeStaffSystemPrompt(context, resolvedIdentity, agentInstructions);
+    }
+
     const sections = [
-      "You are Busal AI — the intelligence layer for Busal OS, an AI-first business operating system.",
       "",
       "## Identity & Scope",
       `- Business: ${context.businessName}`,

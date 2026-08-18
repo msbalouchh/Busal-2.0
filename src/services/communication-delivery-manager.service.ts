@@ -7,6 +7,10 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOwnedBusinessId } from "@/services/communication-platform-context.service";
 import { getCommunicationProviderRegistry } from "@/services/communication-provider-registry.service";
+import {
+  applyEmailBrandingToHtml,
+  resolvePlatformEmailBranding,
+} from "@/modules/platform/services/platform-email-branding.service";
 
 const MAX_DELIVERY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 500;
@@ -65,10 +69,20 @@ export async function deliverMessage(ownerId: string, messageId: string) {
       return { success: false, message: "Provider not configured" };
     }
 
+    let content = message.content;
+    if (message.channel === "EMAIL") {
+      try {
+        const branding = await resolvePlatformEmailBranding(businessId);
+        content = applyEmailBrandingToHtml(content, branding);
+      } catch {
+        // Keep unbranded content when tenant branding cannot be resolved.
+      }
+    }
+
     const result = await provider.sendMessage({
       recipient: message.recipient,
       subject: message.subject,
-      content: message.content,
+      content,
     });
 
     return {

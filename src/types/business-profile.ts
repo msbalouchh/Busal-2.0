@@ -10,6 +10,9 @@ export interface BusinessProfileData {
   timezone: string | null;
   aiName: string | null;
   aiPersonality: string | null;
+  aiAvatarUrl: string | null;
+  aiGreeting: string | null;
+  aiTone: string | null;
   businessGoal: string | null;
   businessDna: BusinessDna;
   businessCode: string | null;
