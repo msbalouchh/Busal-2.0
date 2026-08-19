@@ -1,8 +1,9 @@
 [build]
   command = "corepack enable && pnpm install --frozen-lockfile && pnpm build"
+  publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
   NODE_OPTIONS = "--max-old-space-size=4096"
 
 [[plugins]]
