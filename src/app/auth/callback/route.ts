@@ -5,8 +5,9 @@ import { resolvePublicAppUrl } from "@/config/app-url";
 import { persistBusinessContextCookiesForLogin } from "@/modules/business-context/services/business-context-cookie-writer.service";
 import { resolvePostAuthRedirect } from "@/modules/auth/lib/post-auth-redirect";
 import { ACCOUNT_TYPES } from "@/modules/staff-auth/constants/session";
+import { resolveAuthRouteErrorMessage } from "@/modules/auth/lib/auth-route-errors";
 import { completeLoginSession } from "@/modules/staff-auth/services/staff-auth.service";
-import { AuthServiceError, exchangeCodeForSession, getCurrentUser } from "@/services/auth.service";
+import { exchangeCodeForSession, getCurrentUser } from "@/services/auth.service";
 
 function redirectWithError(message: string) {
   const url = new URL(ROUTES.home, resolvePublicAppUrl());
@@ -47,9 +48,8 @@ export async function GET(request: Request) {
     const redirectPath = await resolvePostAuthRedirect(user, next);
     return NextResponse.redirect(new URL(redirectPath, appOrigin));
   } catch (error) {
-    const message =
-      error instanceof AuthServiceError ? error.message : "Unable to complete authentication.";
+    console.error("[auth/callback]", error);
 
-    return redirectWithError(message);
+    return redirectWithError(resolveAuthRouteErrorMessage(error));
   }
 }

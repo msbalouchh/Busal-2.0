@@ -38,7 +38,13 @@ async function getSupabaseClient() {
 }
 
 async function mapSupabaseUserToSession(user: User, accessToken: string): Promise<Session> {
-  const profile = await getUserProfile(user.id);
+  let profile = null;
+
+  try {
+    profile = await getUserProfile(user.id);
+  } catch (error) {
+    console.error("[auth] Failed to load user profile:", error);
+  }
 
   return {
     user: mapProfileToAuthUser(user.id, user.email ?? "", profile, user.user_metadata),

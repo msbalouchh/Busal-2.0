@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import {
+  isInfrastructureError,
+  resolveAuthRouteErrorMessage,
+} from "@/modules/auth/lib/auth-route-errors";
 import { AuthServiceError } from "@/services/auth.service";
 import { StaffAuthError } from "@/modules/staff-auth/utils/staff-auth-errors";
 
@@ -20,6 +24,11 @@ export function handleAuthRouteError(error: unknown) {
   if (error instanceof StaffAuthError) {
     const status = error.code === "INVALID_CREDENTIALS" ? 401 : 403;
     return authError(error.message, status);
+  }
+
+  if (isInfrastructureError(error)) {
+    console.error("[auth] infrastructure error:", error);
+    return authError(resolveAuthRouteErrorMessage(error), 503);
   }
 
   console.error("[auth]", error);
