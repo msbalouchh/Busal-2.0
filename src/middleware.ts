@@ -4,7 +4,10 @@ import { resolveCanonicalOriginForHost } from "@/config/app-url";
 import { ROUTES } from "@/constants/routes";
 import { USER_ROLES } from "@/constants/roles";
 import { createClient } from "@/lib/supabase/middleware";
-import { PLATFORM_HEADERS, normalizeHostname } from "@/modules/platform/constants/platform-defaults";
+import {
+  PLATFORM_HEADERS,
+  normalizeHostname,
+} from "@/modules/platform/constants/platform-defaults";
 import {
   isBusinessAuthRoute,
   isCustomerPortalAuthRoute,
@@ -24,6 +27,7 @@ import {
 
 function resolveUserRole(user: { user_metadata?: Record<string, unknown> }): string {
   const role = user.user_metadata?.role;
+
   return typeof role === "string" ? role : USER_ROLES.OWNER;
 }
 
@@ -44,6 +48,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const { supabase, supabaseResponse } = createClient(request);
+
   const pathname = request.nextUrl.pathname;
 
   const {
@@ -54,6 +59,7 @@ export async function middleware(request: NextRequest) {
   const isProtectedApiRoute = isPlatformProtectedApiRoute(pathname);
   const isPortalProtectedRoute = isCustomerPortalProtectedRoute(pathname);
   const isAuthRoute = isPlatformAuthRoute(pathname);
+
   const userRole = user ? resolveUserRole(user) : null;
   const isCustomerUser = userRole === USER_ROLES.CUSTOMER;
   const emailVerified = user ? hasVerifiedEmail(user) : true;
@@ -108,7 +114,8 @@ export async function middleware(request: NextRequest) {
     return redirectAuthenticatedToCustomerPortal(request);
   }
 
-  if (isAuthRoute &&
+  if (
+    isAuthRoute &&
     user &&
     !isCustomerPortalAuthRoute(pathname) &&
     !isBusinessAuthRoute(pathname)
@@ -117,6 +124,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const hostname = normalizeHostname(request.headers.get("host"));
+
   if (hostname) {
     supabaseResponse.headers.set(PLATFORM_HEADERS.HOST, hostname);
   }
