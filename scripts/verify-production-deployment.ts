@@ -36,11 +36,18 @@ async function main() {
   console.log("Infrastructure files");
   assert(read("vercel.json").includes("www.getbusal.com"), "vercel.json missing www redirect");
   assert(read("next.config.ts").includes("Strict-Transport-Security"), "security headers missing");
-  assert(read("public/robots.txt").includes("Sitemap: https://getbusal.com/sitemap.xml"), "robots.txt missing sitemap reference");
+  assert(
+    read("public/robots.txt").includes("Sitemap: https://getbusal.com/sitemap.xml"),
+    "robots.txt missing sitemap reference",
+  );
   assert(read("public/sitemap.xml").includes("https://getbusal.com/"), "sitemap.xml misconfigured");
-  assert(read("public/manifest.json").includes("\"name\": \"Busal\""), "manifest.json misconfigured");
+  assert(read("public/manifest.json").includes('"name": "Busal"'), "manifest.json misconfigured");
   assert(read("public/favicon.ico").length > 0, "public/favicon.ico missing");
-  assert(read("src/config/site.ts").includes("/favicon.svg"), "site metadata favicon misconfigured");
+  assert(
+    read("src/config/site.ts").includes("/favicon.ico"),
+    "site metadata favicon misconfigured",
+  );
+  assert(read("src/app/favicon.ico").length > 0, "src/app/favicon.ico missing");
   console.log("  PASS");
 
   console.log("Environment template");

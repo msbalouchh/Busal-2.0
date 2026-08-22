@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { BUSAL_LOGO_ICON } from "@/constants/brand";
 import { resolvePublicAppUrl } from "@/config/app-url";
 
 export const siteConfig = {
@@ -13,6 +14,16 @@ export const siteConfig = {
   },
 } as const;
 
+/** Canonical Busal favicon assets — all derived from public/branding/favicon.png */
+export const BUSAL_FAVICON = {
+  ico: "/favicon.ico",
+  png48: "/branding/favicon-48.png",
+  png192: "/branding/favicon-192.png",
+  png512: "/branding/favicon-512.png",
+  apple: "/apple-touch-icon.png",
+  brandMark: BUSAL_LOGO_ICON.src,
+} as const;
+
 export const defaultMetadata: Metadata = {
   title: {
     default: siteConfig.name,
@@ -23,11 +34,13 @@ export const defaultMetadata: Metadata = {
   applicationName: siteConfig.name,
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
-      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: BUSAL_FAVICON.ico, sizes: "48x48", type: "image/x-icon" },
+      { url: BUSAL_FAVICON.png48, sizes: "48x48", type: "image/png" },
+      { url: BUSAL_FAVICON.png192, sizes: "192x192", type: "image/png" },
+      { url: BUSAL_FAVICON.png512, sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-    shortcut: ["/favicon.ico"],
+    apple: [{ url: BUSAL_FAVICON.apple, sizes: "180x180", type: "image/png" }],
+    shortcut: [{ url: BUSAL_FAVICON.ico, type: "image/x-icon" }],
   },
   manifest: "/manifest.json",
   openGraph: {

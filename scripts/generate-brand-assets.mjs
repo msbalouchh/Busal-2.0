@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "public", "branding", "favicon.png");
 const publicDir = path.join(root, "public");
+const appDir = path.join(root, "src", "app");
+const brandingDir = path.join(publicDir, "branding");
 
 const icoSizes = [16, 32, 48];
 const appleTouchSize = 180;
@@ -51,6 +53,14 @@ function encodeIco(pngBuffers) {
   return output;
 }
 
+async function writeResizedPng(sourceBuffer, targetPath, size) {
+  await mkdir(path.dirname(targetPath), { recursive: true });
+  await sharp(sourceBuffer)
+    .resize(size, size, { fit: "cover" })
+    .png({ compressionLevel: 9 })
+    .toFile(targetPath);
+}
+
 async function main() {
   const sourceBuffer = await readFile(source);
 
@@ -60,24 +70,27 @@ async function main() {
     ),
   );
 
-  await writeFile(path.join(publicDir, "favicon.ico"), encodeIco(icoPngBuffers));
+  const ico = encodeIco(icoPngBuffers);
 
-  // Next.js file-based metadata in src/app/favicon.ico conflicts with public/favicon.ico.
-  // Keep the canonical ICO in public/ only.
+  await writeFile(path.join(publicDir, "favicon.ico"), ico);
+  await writeFile(path.join(appDir, "favicon.ico"), ico);
 
-  await sharp(sourceBuffer)
-    .resize(appleTouchSize, appleTouchSize, { fit: "cover" })
-    .png()
-    .toFile(path.join(publicDir, "apple-touch-icon.png"));
+  await writeResizedPng(sourceBuffer, path.join(publicDir, "apple-touch-icon.png"), appleTouchSize);
+  await writeResizedPng(sourceBuffer, path.join(appDir, "apple-icon.png"), appleTouchSize);
+  await writeResizedPng(sourceBuffer, path.join(appDir, "icon.png"), 512);
 
-  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1254 1254" role="img" aria-label="Busal">
-  <image width="1254" height="1254" xlink:href="/branding/favicon.png"/>
-</svg>
-`;
+  for (const [size, name] of [
+    [32, "favicon-32.png"],
+    [48, "favicon-48.png"],
+    [192, "favicon-192.png"],
+    [512, "favicon-512.png"],
+  ]) {
+    await writeResizedPng(sourceBuffer, path.join(brandingDir, name), size);
+  }
 
-  await writeFile(path.join(publicDir, "favicon.svg"), faviconSvg, "utf8");
-
-  console.log("Generated public/favicon.ico, public/apple-touch-icon.png, public/favicon.svg");
+  console.log(
+    "Generated Busal favicons: public/favicon.ico, src/app/{favicon.ico,icon.png,apple-icon.png}, branding/favicon-{32,48,192,512}.png",
+  );
 }
 
 main().catch((error) => {
