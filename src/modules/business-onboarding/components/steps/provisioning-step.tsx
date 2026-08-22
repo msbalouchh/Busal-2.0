@@ -51,9 +51,13 @@ export function ProvisioningStep() {
           }
           setStep(11);
         }
-      } catch {
+      } catch (provisionError) {
         if (!cancelled) {
-          setError("Provisioning failed. Please refresh and try again.");
+          const message =
+            provisionError instanceof Error
+              ? provisionError.message
+              : "Provisioning failed. Please refresh and try again.";
+          setError(message);
         }
       }
     }

@@ -38,9 +38,13 @@ function scope(businessId: string, userId: string) {
 
 /** Full commercial onboarding: tenant → workspace → business → branch → owner role → subscription → features → AI → events. */
 export class PlatformProvisioningService {
-  async provisionNewBusiness(input: PlatformProvisioningInput): Promise<PlatformProvisioningResult> {
+  async provisionNewBusiness(
+    input: PlatformProvisioningInput,
+  ): Promise<PlatformProvisioningResult> {
     if (input.businessId) {
-      return this.provisionExistingBusiness(input as PlatformProvisioningInput & { businessId: string });
+      return this.provisionExistingBusiness(
+        input as PlatformProvisioningInput & { businessId: string },
+      );
     }
 
     const planSlug = input.planSlug ?? "starter";
@@ -75,6 +79,29 @@ export class PlatformProvisioningService {
         timezone: input.timezone ?? "UTC",
       },
     });
+
+    const existingTenant = await prisma.tenantRecord.findUnique({
+      where: { businessId: input.businessId },
+      select: { lifecycleStatus: true },
+    });
+    const existingMainBranch = await prisma.branch.findFirst({
+      where: { businessId: input.businessId, isMain: true },
+      select: { id: true },
+    });
+
+    if (
+      existingTenant?.lifecycleStatus === "ACTIVE" &&
+      existingMainBranch &&
+      !input.deferSubscriptionActivation
+    ) {
+      return {
+        businessId: input.businessId,
+        workspaceId: `${input.businessId}-ws`,
+        branchId: existingMainBranch.id,
+        tenantId: input.businessId,
+        planSlug,
+      };
+    }
 
     return this.finalizeCommercialProvisioning({
       businessId: input.businessId,
@@ -144,6 +171,9 @@ export class PlatformProvisioningService {
   }
 
   private async ensureOwnerRole(businessId: string, ownerId: string): Promise<void> {
+    const { ensureOwnerBusinessMembership } = await import("@/services/business-profile.service");
+    await ensureOwnerBusinessMembership(businessId, ownerId);
+
     const existingRole = await prisma.role.findFirst({
       where: { businessId, slug: "owner" },
     });

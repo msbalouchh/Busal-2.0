@@ -45,6 +45,64 @@ export async function getPrimaryBusinessByOwnerId(ownerId: string): Promise<Busi
   });
 }
 
+export interface OwnerIdentity {
+  email: string;
+  fullName?: string;
+}
+
+/** Ensures a Prisma user row exists before business/member FK writes. */
+export async function ensureOwnerPrismaUserRecord(
+  ownerId: string,
+  ownerIdentity?: OwnerIdentity,
+): Promise<void> {
+  const existing = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return;
+  }
+
+  if (!ownerIdentity?.email) {
+    throw new Error("Account setup is incomplete. Sign out and sign in again.");
+  }
+
+  await prisma.user.create({
+    data: {
+      id: ownerId,
+      email: ownerIdentity.email,
+      fullName: ownerIdentity.fullName?.trim() || ownerIdentity.email.split("@")[0] || "User",
+      role: "owner",
+    },
+  });
+}
+
+/** Ensures the business owner has an active OWNER membership row. */
+export async function ensureOwnerBusinessMembership(
+  businessId: string,
+  ownerId: string,
+): Promise<void> {
+  await prisma.businessMember.upsert({
+    where: {
+      businessId_userId: {
+        businessId,
+        userId: ownerId,
+      },
+    },
+    create: {
+      businessId,
+      userId: ownerId,
+      role: "OWNER",
+      status: "ACTIVE",
+    },
+    update: {
+      role: "OWNER",
+      status: "ACTIVE",
+    },
+  });
+}
+
 export async function getBusinessByOwnerId(ownerId: string): Promise<BusinessProfileData | null> {
   const businesses = await listBusinessesForOwner(ownerId);
 
@@ -95,18 +153,48 @@ export async function isBusinessOnboardingCompleted(businessId: string): Promise
   return Boolean(business?.onboardingCompleted);
 }
 
-export async function getOrCreateBusinessForOwner(ownerId: string): Promise<BusinessProfileData> {
+export async function getOrCreateBusinessForOwner(
+  ownerId: string,
+  ownerIdentity?: OwnerIdentity,
+): Promise<BusinessProfileData> {
+  await ensureOwnerPrismaUserRecord(ownerId, ownerIdentity);
+
   const existing = await getPrimaryBusinessByOwnerId(ownerId);
 
   if (existing) {
+    await ensureOwnerBusinessMembership(existing.id, ownerId);
+
+    const tenant = await prisma.tenantRecord.findUnique({
+      where: { businessId: existing.id },
+      select: { id: true },
+    });
+
+    if (!tenant) {
+      const { ensureTenantPlatformDefaults } = await import("@/services/tenant-platform.service");
+      await ensureTenantPlatformDefaults(existing.id);
+    }
+
     return mapBusiness(existing);
   }
 
-  const business = await prisma.business.create({
-    data: {
-      ownerId,
-      ...DEFAULT_BUSINESS_VALUES,
-    },
+  const business = await prisma.$transaction(async (tx) => {
+    const created = await tx.business.create({
+      data: {
+        ownerId,
+        ...DEFAULT_BUSINESS_VALUES,
+      },
+    });
+
+    await tx.businessMember.create({
+      data: {
+        businessId: created.id,
+        userId: ownerId,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+    });
+
+    return created;
   });
 
   const { ensureTenantPlatformDefaults } = await import("@/services/tenant-platform.service");
